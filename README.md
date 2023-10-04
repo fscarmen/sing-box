@@ -8,17 +8,20 @@
 - [项目特点](README.md#项目特点)
 - [Sing-box for VPS 运行脚本](README.md#sing-box-for-vps-运行脚本)
 - [Sekobox 设置 shadowTLS 方法](README.md#sekobox-设置-shadowtls-方法)
+- [鸣谢下列作者的文章和项目](README.md#鸣谢下列作者的文章和项目)
 - [免责声明](README.md#免责声明)
 
 * * *
 ## 更新信息
+
+2023.10.3 beta2 1. Single-select, multi-select or select all the required protocols; 2. Support according to the order of selection, the definition of the corresponding protocol listen port number; 1. 可以单选、多选或全选需要的协议; 2. 支持根据选择的先后次序，定义相应协议监听端口号
 
 2023.9.30 beta1 Sing-box 全家桶一键脚本 for vps
 
 
 ## 项目特点:
 
-* 一键部署多协议，包含但不仅限于 ShadowTLS v3 / Reality / Hysteria2 / Tuic V5 / ShadowSocks / Trojan, 总有一款适合你
+* 一键部署多协议，可以单选、多选或全选 ShadowTLS v3 / Reality / Hysteria2 / Tuic V5 / ShadowSocks / Trojan, 总有一款适合你
 * 内置 warp 链式代理解锁 chatGPT
 * 不需要域名
 * 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 和 Arch Linux,请务必选择 LTS 系统
@@ -50,6 +53,10 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 点击 "选择配置" 后，给节点起个名字，先后选 1-tls-not-use 和 2-ss-not-use，按 enter 或 双击 使用这个服务器。一定要注意顺序不能反了，逻辑为 ShadowTLS -> ShadowSocks。
 
 <img width="408" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/753e7159-92f9-4c88-91b5-867fdc8cca47">
+
+
+## 鸣谢下列作者的文章和项目:
+千歌 sing-box 模板: https://github.com/chika0801/sing-box-examples
 
 
 ## 免责声明:
