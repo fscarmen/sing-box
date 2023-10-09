@@ -9,11 +9,14 @@
 - [Sing-box for VPS 运行脚本](README.md#sing-box-for-vps-运行脚本)
 - [Vmess / Vless 方案设置任意端口回源以使用 cdn](README.md#Vmess--Vless-方案设置任意端口回源以使用-cdn)
 - [Nekobox 设置 shadowTLS 方法](README.md#nekobox-设置-shadowtls-方法)
+- [主体目录文件及说明](README.md#主体目录文件及说明)
 - [鸣谢下列作者的文章和项目](README.md#鸣谢下列作者的文章和项目)
 - [免责声明](README.md#免责声明)
 
 * * *
 ## 更新信息
+2023.10.9 beta4 1. Add v2rayN client, ShadowTLS and Tuic based on sing-box kernel configuration file output; 2. Shadowsocks encryption from aes-256-gcm to aes-128-gcm; 3. Optimize the routing and dns of sing-box on the server side; 1. 补充 v2rayN 客户端中，ShadowTLS 和 Tuic 基于 sing-box 内核的配置文件输出; 2. Shadowsocks 加密从 aes-256-gcm 改为 aes-128-gcm; 3. 优化服务端 sing-box 的 路由和 dns
+
 2023.10.6 beta3 1. Add vmess + ws / vless + ws + tls protocols; 2. Hysteria2 add obfuscated verification of obfs; 1. 增加 vmess + ws / vless + ws + tls 协议; 2. Hysteria2 增加 obfs 混淆验证
 
 2023.10.3 beta2 1. Single-select, multi-select or select all the required protocols; 2. Support according to the order of selection, the definition of the corresponding protocol listen port number; 1. 可以单选、多选或全选需要的协议; 2. 支持根据选择的先后次序，定义相应协议监听端口号
@@ -69,6 +72,34 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 点击 "选择配置" 后，给节点起个名字，先后选 1-tls-not-use 和 2-ss-not-use，按 enter 或 双击 使用这个服务器。一定要注意顺序不能反了，逻辑为 ShadowTLS -> ShadowSocks。
 
 <img width="408" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/753e7159-92f9-4c88-91b5-867fdc8cca47">
+
+
+## 主体目录文件及说明
+
+```
+/etc/sing-box/                               # 项目主体目录
+|-- cert                                     # 存放证书文件目录
+|   |-- cert.pem                             # SSL/TLS 安全证书文件
+|   `-- private.key                          # SSL/TLS 证书的私钥信息
+|-- conf                                     # sing-box server 配置文件目录
+|   |-- 00_log.json                          # 日志配置文件
+|   |-- 01_outbounds.json                    # 服务端出站配置文件，已加了 warp 账户信息
+|   |-- 02_route.json                        # 路由配置文件，chatGPT 使用 warp ipv6 链式代理出站
+|   |-- 11_SHADOWTLS_inbounds.json           # ShadowTLS 协议配置文件
+|   |-- 12_REALITY_inbounds.json             # Reality 协议配置文件
+|   |-- 13_HYSTERIA2_inbounds.json           # Hysteria2 协议配置文件
+|   |-- 14_TUIC_inbounds.json                # Tuic V5 协议配置文件
+|   |-- 15_SHADOWSOCKS_inbounds.json         # Shadowsocks 协议配置文件
+|   |-- 16_TROJAN_inbounds.json              # Trojan 协议配置文件
+|   |-- 17_VMESS_WS_inbounds.json            # vmess + ws 协议配置文件
+|   `-- 18_VLESS_WS_inbounds.json            # vless + ws + tls 协议配置文件
+|-- geosite.db                               # 存储地理位置和域名信息文件，用于流量控制
+|-- language                                 # 存放脚本语言文件，E 为英文，C 为中文
+|-- list                                     # 节点信息列表
+|-- logs
+|   `-- box.log                              # sing-box 运行日志文件
+`-- sing-box                                 # sing-box 主程序
+```
 
 
 ## 鸣谢下列作者的文章和项目:

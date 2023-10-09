@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='beta 3'
+VERSION='beta 4'
 
 # 各变量默认值
 GH_PROXY='https://ghproxy.com'
 TEMP_DIR='/tmp/sing-box'
 WORK_DIR='/etc/sing-box'
 START_PORT_DEFAULT='8881'
-CONSECUTIVE_PORTS=8
 MIN_PORT=1000
 MAX_PORT=65525
 TLS_SERVER=addons.mozilla.org
-CDN_DEFAULT=icook.tw
+CDN_DEFAULT=www.who.int
+CONSECUTIVE_PORTS=9
 
 trap "rm -rf $TEMP_DIR >/dev/null 2>&1 ; echo -e '\n' ;exit 1" INT QUIT TERM EXIT
 
@@ -20,8 +20,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Add vmess + ws / vless + ws + tls protocols; 2. Hysteria2 add obfuscated verification of obfs"
-C[1]="1. 增加 vmess + ws / vless + ws + tls 协议; 2. Hysteria2 增加 obfs 混淆验证"
+E[1]="1. Add v2rayN client, ShadowTLS and Tuic based on sing-box kernel configuration file output; 2. Shadowsocks encryption from aes-256-gcm to aes-128-gcm; 3. Optimize the routing and dns of sing-box on the server side."
+C[1]="1. 补充 v2rayN 客户端中，ShadowTLS 和 Tuic 基于 sing-box 内核的配置文件输出; 2. Shadowsocks 加密从 aes-256-gcm 改为 aes-128-gcm; 3. 优化服务端 sing-box 的 路由和 dns"
 E[2]="This project is designed to add sing-box support for multiple protocols to VPS, details: [https://github.com/fscarmen/sing-box]\n Script Features:\n\t • Deploy multiple protocols with one click, there is always one for you!\n\t • Custom ports for nat machine with limited open ports.\n\t • Built-in warp chained proxy to unlock chatGPT.\n\t • No domain name is required.\n\t • Support system: Ubuntu, Debian, CentOS, Alpine and Arch Linux 3.\n\t • Support architecture: AMD,ARM and s390x\n"
 C[2]="本项目专为 VPS 添加 sing-box 支持的多种协议, 详细说明: [https://github.com/fscarmen/sing-box]\n 脚本特点:\n\t • 一键部署多协议，总有一款适合你\n\t • 自定义端口，适合有限开放端口的 nat 小鸡\n\t • 内置 warp 链式代理解锁 chatGPT\n\t • 不需要域名\n\t • 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 和 Arch Linux,请务必选择 LTS 系统\n\t • 支持硬件结构类型: AMD 和 ARM\n"
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -116,8 +116,8 @@ E[47]="No server ip, script exits. Feedback:[https://github.com/fscarmen/sing-bo
 C[47]="没有 server ip，脚本退出，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 E[48]="ShadowTLS - Copy the above two Neko links and manually set up the chained proxies in order. Tutorial: https://github.com/fscarmen/sing-box/blob/main/README.md#sekobox-%E8%AE%BE%E7%BD%AE-shadowtls-%E6%96%B9%E6%B3%95"
 C[48]="ShadowTLS - 复制上面两条 Neko links 进去，并按顺序手动设置链式代理，详细教程: https://github.com/fscarmen/sing-box/blob/main/README.md#sekobox-%E8%AE%BE%E7%BD%AE-shadowtls-%E6%96%B9%E6%B3%95"
-E[49]="Select more protocols to install (e.g. 7523):\n 1.all (default)\n 2.shadowTLS\n 3.reality\n 4.hysteria2\n 5.tuic\n 6.shadowsocks\n 7.trojan\n 8.vmess + ws (resolving your own domain name in cloudflare is required.)\n 9.vless + ws + tls (resolving your own domain in cloudflare is required.)\n\n Please select:"
-C[49]="多选需要安装协议(比如 7523):\n 1.all (默认)\n 2.shadowTLS\n 3.reality\n 4.hysteria2\n 5.tuic\n 6.shadowsocks\n 7.trojan\n 8.vmess + ws (必须在 cloudflare 解析自有域名)\n 9.vless + ws + tls (必须在 cloudflare 解析自有域名)\n\n 请选择:"
+E[49]="Select more protocols to install (e.g. hgbd):\n a. all (default)\n b. shadowTLS\n c. reality\n d. hysteria2\n e .tuic\n f. shadowsocks\n g. trojan\n h. vmess + ws (resolving your own domain name in cloudflare is required.)\n i. vless + ws + tls (resolving your own domain in cloudflare is required.)\n\n Please select:"
+C[49]="多选需要安装协议(比如 hgbd):\n a. all (默认)\n b. shadowTLS\n c. reality\n d. hysteria2\n e .tuic\n f. shadowsocks\n g. trojan\n h. vmess + ws (必须在 cloudflare 解析自有域名)\n i. vless + ws + tls (必须在 cloudflare 解析自有域名)\n\n 请选择:"
 E[50]="Please enter the \$TYPE domain name:"
 C[50]="请输入 \$TYPE 域名:"
 E[51]="Please enter a cdn ip or domain name, http support is required. \(Default is: \${CDN_DEFAULT}\):"
@@ -126,8 +126,8 @@ E[52]="Please set the ip \[\${WS_SERVER_IP}] to domain \[\${TYPE_HOST_DOMAIN}], 
 C[52]="请在 Cloudflare 绑定 \[\${WS_SERVER_IP}] 的域名为 \[\${TYPE_HOST_DOMAIN}], 并设置 origin rule 为 \[\${TYPE_PORT_WS}]"
 E[53]="I don't know how to configure it, if you do, please let me know."
 C[53]="我不会设置，知道的朋友请告诉我"
-E[54]="The contents of the hysteria2 configuration file need to be updated for the hysteria2 kernel."
-C[54]="hysteria2 配置文件内容，需要更新 hysteria2 内核"
+E[54]="The contents of the \$V2RAYN_PROTOCAL configuration file need to be updated for the \$V2RAYN_KERNEL kernel."
+C[54]="\$V2RAYN_PROTOCAL 配置文件内容，需要更新 \$V2RAYN_KERNEL 内核"
 E[55]="Please set inSecure in tls to true."
 C[55]="请把 tls 里的 inSecure 设置为 true"
 
@@ -156,6 +156,15 @@ select_language() {
       * ) [ -z "$L" ] && L=E && hint "\n $(text 0) \n" && reading " $(text 24) " LANGUAGE
       [ "$LANGUAGE" = 2 ] && L=C ;;
     esac
+  fi
+}
+
+# 字母与数字的 ASCII 码值转换
+asc(){
+  if [[ "$1" = [a-z] ]]; then
+    [ "$2" = '++' ] && printf "\\$(printf '%03o' "$[ $(printf "%d" "'$1'") + 1 ]")" || printf "%d" "'$1'"
+  else
+    [[ "$1" =~ ^[0-9]+$ ]] && printf "\\$(printf '%03o' "$1")"
   fi
 }
 
@@ -259,26 +268,25 @@ sing-box_variable() {
     error "\n $(text 46) \n"
   elif [ -n "$WAN4" ]; then
     SERVER_IP_DEFAULT=$WAN4
-    DNS_TAG='google'
-    DNS_ADDRESS='udp://8.8.8.8'
-    DNS_STRATEGY=prefer_ipv4
+    WARP_ENDPOINT=162.159.193.10
   elif [ -n "$WAN6" ]; then
     SERVER_IP_DEFAULT=$WAN6
-    DNS_TAG='dns64'
-    DNS_ADDRESS='2a00:1098:2b::1'
-    DNS_STRATEGY=prefer_ipv6
+    WARP_ENDPOINT=2606:4700:d0::a29f:c101
   fi
 
+  # 选择安装的协议，由于选项 a 为全部协议，所以选项数不是从 a 开始，而是从 b 开始，处理输入：把大写全部变为小写，把不符合的选项去掉，把重复的选项合并
+  MAX_CHOOSE_PROTOCALS=$(asc $[CONSECUTIVE_PORTS+96+1])
   [ -z "$CHOOSE_PROTOCALS" ] && reading "\n $(text 49) " CHOOSE_PROTOCALS
-  [[ ! "$CHOOSE_PROTOCALS" =~ [2-$((CONSECUTIVE_PORTS+1))] ]] && INSTALL_PROTOCALS=($(seq 2 $[CONSECUTIVE_PORTS+1])) || INSTALL_PROTOCALS=($(grep -o . <<< "$CHOOSE_PROTOCALS" | sed "/[^2-$((CONSECUTIVE_PORTS+1))]/d" | awk '!seen[$0]++'))
+  CHOOSE_PROTOCALS=$(tr '[:upper:]' '[:lower:]' <<< "$CHOOSE_PROTOCALS")
+  [[ ! "$CHOOSE_PROTOCALS" =~ [b-$MAX_CHOOSE_PROTOCALS] ]] && INSTALL_PROTOCALS=($(eval echo {b..$MAX_CHOOSE_PROTOCALS})) || INSTALL_PROTOCALS=($(grep -o . <<< "$CHOOSE_PROTOCALS" | sed "/[^b-$MAX_CHOOSE_PROTOCALS]/d" | awk '!seen[$0]++'))
 
   reading "\n $(text_eval 10) " SERVER_IP
   SERVER_IP=${SERVER_IP:-"$SERVER_IP_DEFAULT"} && WS_SERVER_IP=$SERVER_IP
   [ -z "$SERVER_IP" ] && error " $(text 47) "
   [ -n "$SERVER_IP" ] && [ -z "$START_PORT" ] && enter_start_port ${#INSTALL_PROTOCALS[@]}
 
-  # 如选择有 vmess + ws 或 vless + ws 时，先检测是否有支持的 http 端口可用，如有则要求输入域名和 cdn
-  if [[ "${INSTALL_PROTOCALS[@]}" =~ '8' ]]; then
+  # 如选择有 h. vmess + ws 或 i. vless + ws 时，先检测是否有支持的 http 端口可用，如有则要求输入域名和 cdn
+  if [[ "${INSTALL_PROTOCALS[@]}" =~ 'h' ]]; then
     local DOMAIN_ERROR_TIME=5
     until [ -n "$VMESS_HOST_DOMAIN" ]; do
       (( DOMAIN_ERROR_TIME-- )) || true
@@ -286,7 +294,7 @@ sing-box_variable() {
     done
   fi
 
-  if [[ "${INSTALL_PROTOCALS[@]}" =~ '9' ]]; then
+  if [[ "${INSTALL_PROTOCALS[@]}" =~ 'i' ]]; then
     local DOMAIN_ERROR_TIME=5
     until [ -n "$VLESS_HOST_DOMAIN" ]; do
       (( DOMAIN_ERROR_TIME-- )) || true
@@ -355,7 +363,7 @@ check_dependencies() {
 # 生成100年的自签证书
 ssl_certificate() {
   mkdir -p $WORK_DIR/cert
-  openssl ecparam -genkey -name prime256v1 -out $WORK_DIR/cert/private.key && openssl req -new -x509 -days 36500 -key $WORK_DIR/cert/private.key -out $WORK_DIR/cert/cert.pem -subj "/CN=bing.com"
+  openssl ecparam -genkey -name prime256v1 -out $WORK_DIR/cert/private.key && openssl req -new -x509 -days 36500 -key $WORK_DIR/cert/private.key -out $WORK_DIR/cert/cert.pem -subj "/CN=$(awk -F . '{print $(NF-1)"."$NF}' <<< "$TLS_SERVER")"
 }
 
 # 生成 sing-box 配置文件
@@ -377,7 +385,8 @@ EOF
     "outbounds":[
         {
             "type":"direct",
-            "tag":"direct"
+            "tag":"direct",
+            "domain_strategy":"prefer_ipv4"
         },
         {
             "type":"direct",
@@ -394,7 +403,7 @@ EOF
         {
             "type":"wireguard",
             "tag":"wireguard-out",
-            "server":"162.159.192.1",
+            "server":"${WARP_ENDPOINT}",
             "server_port":2408,
             "local_address":[
                 "172.16.0.2/32",
@@ -436,23 +445,7 @@ EOF
 }
 EOF
 
-  cat > $WORK_DIR/conf/03_dns.json << EOF
-{
-    "dns":{
-        "servers":[
-            {
-                "tag":"${DNS_TAG}",
-                "address":"${DNS_ADDRESS}",
-                "address_strategy":"${DNS_STRATEGY}",
-                "strategy":"${DNS_STRATEGY}",
-                "detour":"direct"
-            }
-        ]
-    }
-}
-EOF
-
-  CHECK_PROTOCALS=2
+  CHECK_PROTOCALS=b
   if [[ "${INSTALL_PROTOCALS[@]}" =~ "$CHECK_PROTOCALS" ]]; then
     SHADOWTLS_PASSWORD=$($TEMP_DIR/sing-box generate rand --base64 16)
     PORT_SHADOWTLS=$((START_PORT+$(awk -v target=$CHECK_PROTOCALS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCALS[*]}")))
@@ -491,7 +484,7 @@ EOF
 EOF
   fi
 
-  ((CHECK_PROTOCALS++))
+  CHECK_PROTOCALS=$(asc "$CHECK_PROTOCALS" ++)
   if [[ "${INSTALL_PROTOCALS[@]}" =~ "$CHECK_PROTOCALS" ]]; then
     REALITY_KEYPAIR=$($TEMP_DIR/sing-box generate reality-keypair)
     REALITY_PRIVATE=$(awk '/PrivateKey/{print $NF}' <<< "$REALITY_KEYPAIR")
@@ -534,7 +527,7 @@ EOF
 EOF
   fi
 
-  ((CHECK_PROTOCALS++))
+  CHECK_PROTOCALS=$(asc "$CHECK_PROTOCALS" ++)
   if [[ "${INSTALL_PROTOCALS[@]}" =~ "$CHECK_PROTOCALS" ]]; then
     PORT_HYSTERIA2=$((START_PORT+$(awk -v target=$CHECK_PROTOCALS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCALS[*]}")))
     cat > $WORK_DIR/conf/13_HYSTERIA2_inbounds.json << EOF
@@ -574,7 +567,7 @@ EOF
 EOF
   fi
 
-  ((CHECK_PROTOCALS++))
+  CHECK_PROTOCALS=$(asc "$CHECK_PROTOCALS" ++)
   if [[ "${INSTALL_PROTOCALS[@]}" =~ "$CHECK_PROTOCALS" ]]; then
     PORT_TUIC=$((START_PORT+$(awk -v target=$CHECK_PROTOCALS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCALS[*]}")))
     cat > $WORK_DIR/conf/14_TUIC_inbounds.json << EOF
@@ -607,7 +600,7 @@ EOF
 EOF
   fi
 
-  ((CHECK_PROTOCALS++))
+  CHECK_PROTOCALS=$(asc "$CHECK_PROTOCALS" ++)
   if [[ "${INSTALL_PROTOCALS[@]}" =~ "$CHECK_PROTOCALS" ]]; then
     PORT_SHADOWSOCKS=$((START_PORT+$(awk -v target=$CHECK_PROTOCALS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCALS[*]}")))
     cat > $WORK_DIR/conf/15_SHADOWSOCKS_inbounds.json << EOF
@@ -620,7 +613,7 @@ EOF
             "tag":"shadowsocks-in",
             "listen":"::",
             "listen_port":$PORT_SHADOWSOCKS,
-            "method":"aes-256-gcm",
+            "method":"aes-128-gcm",
             "password":"$UUID"
         }
     ]
@@ -628,7 +621,7 @@ EOF
 EOF
   fi
 
-  ((CHECK_PROTOCALS++))
+  CHECK_PROTOCALS=$(asc "$CHECK_PROTOCALS" ++)
   if [[ "${INSTALL_PROTOCALS[@]}" =~ "$CHECK_PROTOCALS" ]]; then
     PORT_TROJAN=$((START_PORT+$(awk -v target=$CHECK_PROTOCALS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCALS[*]}")))
     cat > $WORK_DIR/conf/16_TROJAN_inbounds.json << EOF
@@ -657,7 +650,7 @@ EOF
 EOF
   fi
 
-  ((CHECK_PROTOCALS++))
+  CHECK_PROTOCALS=$(asc "$CHECK_PROTOCALS" ++)
   if [[ "${INSTALL_PROTOCALS[@]}" =~ "$CHECK_PROTOCALS" ]]; then
     PORT_VMESS_WS=$((START_PORT+$(awk -v target=$CHECK_PROTOCALS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCALS[*]}")))
     cat > $WORK_DIR/conf/17_VMESS_WS_inbounds.json << EOF
@@ -690,7 +683,7 @@ EOF
 EOF
   fi
 
-  ((CHECK_PROTOCALS++))
+  CHECK_PROTOCALS=$(asc "$CHECK_PROTOCALS" ++)
   if [[ "${INSTALL_PROTOCALS[@]}" =~ "$CHECK_PROTOCALS" ]]; then
     PORT_VLESS_WS=$((START_PORT+$(awk -v target=$CHECK_PROTOCALS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCALS[*]}")))
     cat > $WORK_DIR/conf/18_VLESS_WS_inbounds.json << EOF
@@ -818,21 +811,61 @@ export_list() {
 │     $(warning "V2rayN")     │
 │                │
 └────────────────┘
-----------------------------
 EOF
-  [ -n "$PORT_SHADOWTLS" ] && cat >> $WORK_DIR/list << EOF
+  [ -n "$PORT_SHADOWTLS" ] && V2RAYN_PROTOCAL=ShadowTLS && V2RAYN_KERNEL=sing_box && cat >> $WORK_DIR/list << EOF
+
 ----------------------------
-$(info "shadowTLS: $(text 53)")
+$(info "$(text_eval 54)
+
+{
+  \"log\":{
+      \"level\":\"info\"
+  },
+  \"inbounds\":[
+      {
+          \"domain_strategy\":\"\",
+          \"listen\":\"127.0.0.1\",
+          \"listen_port\":${PORT_SHADOWTLS},
+          \"sniff\":true,
+          \"sniff_override_destination\":false,
+          \"tag\":\"ShadowTLS\",
+          \"type\":\"mixed\"
+      }
+  ],
+  \"outbounds\":[
+      {
+          \"detour\":\"shadowtls-out\",
+          \"domain_strategy\":\"\",
+          \"method\":\"2022-blake3-aes-128-gcm\",
+          \"password\":\"${SHADOWTLS_PASSWORD}\",
+          \"type\":\"shadowsocks\",
+          \"udp_over_tcp\":false
+      },
+      {
+          \"domain_strategy\":\"\",
+          \"password\":\"${UUID}\",
+          \"server\":\"${SERVER_IP}\",
+          \"server_port\":${PORT_SHADOWTLS},
+          \"tag\":\"shadowtls-out\",
+          \"tls\":{
+              \"enabled\":true,
+              \"server_name\":\"${TLS_SERVER}\"
+          },
+          \"type\":\"shadowtls\",
+          \"version\":3
+      }
+  ]
+}")
 EOF
   [ -n "$PORT_REALITY" ] && cat >> $WORK_DIR/list << EOF
 
 ----------------------------
 $(info "vless://${UUID}@${SERVER_IP_1}:${PORT_REALITY}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${TLS_SERVER}&fp=chrome&pbk=${REALITY_PUBLIC}&type=tcp&headerType=none#${NODE_NAME} vless-reality-vision")
 EOF
-  [ -n "$PORT_HYSTERIA2" ] && cat >> $WORK_DIR/list << EOF
+  [ -n "$PORT_HYSTERIA2" ] && V2RAYN_PROTOCAL=Hysteria2 && V2RAYN_KERNEL=hysteria2 && cat >> $WORK_DIR/list << EOF
 
 ----------------------------
-$(info "$(text 54)
+$(info "$(text_eval 54)
 
 server: \"${SERVER_IP_1}:${PORT_HYSTERIA2}\"
 auth: ${UUID}
@@ -852,15 +885,57 @@ tls:
 socks5:
   listen: 127.0.0.1:${PORT_HYSTERIA2}")
 EOF
-  [ -n "$PORT_TUIC" ] && cat >> $WORK_DIR/list << EOF
+  [ -n "$PORT_TUIC" ] && V2RAYN_PROTOCAL=Tuic && V2RAYN_KERNEL=sing_box && cat >> $WORK_DIR/list << EOF
 
 ----------------------------
-$(info "Tuic: $(text 53)")
+$(info "$(text_eval 54)
+
+{
+    \"log\":{
+        \"level\":\"info\"
+    },
+    \"inbounds\":[
+        {
+            \"domain_strategy\":\"\",
+            \"listen\":\"127.0.0.1\",
+            \"listen_port\":${PORT_TUIC},
+            \"sniff\":true,
+            \"sniff_override_destination\":false,
+            \"type\":\"mixed\"
+        }
+    ],
+    \"outbounds\":[
+        {
+            \"congestion_control\":\"bbr\",
+            \"domain_strategy\":\"\",
+            \"heartbeat\":\"10s\",
+            \"password\":\"${UUID}\",
+            \"server\":\"${SERVER_IP}\",
+            \"server_port\":${PORT_TUIC},
+            \"tag\":\"proxy\",
+            \"tls\":{
+                \"alpn\":[
+                    \"h3\",
+                    \"spdy/3.1\"
+                ],
+                \"certificate\":\"\",
+                \"disable_sni\":false,
+                \"enabled\":true,
+                \"insecure\":true,
+                \"server_name\":\"\"
+            },
+            \"type\":\"tuic\",
+            \"udp_relay_mode\":\"native\",
+            \"uuid\":\"${UUID}\",
+            \"zero_rtt_handshake\":false
+        }
+    ]
+}")
 EOF
   [ -n "$PORT_SHADOWSOCKS" ] && cat >> $WORK_DIR/list << EOF
 
 ----------------------------
-$(info "ss://$(base64 -w0 <<< aes-256-gcm:${UUID}@${SERVER_IP_1}:${PORT_SHADOWSOCKS})#${NODE_NAME} ss")
+$(info "ss://$(base64 -w0 <<< aes-128-gcm:${UUID}@${SERVER_IP_1}:${PORT_SHADOWSOCKS})#${NODE_NAME} ss")
 EOF
   [ -n "$PORT_TROJAN" ] && cat >> $WORK_DIR/list << EOF
 
@@ -906,11 +981,12 @@ EOF
 $(hint "hysteria2://${UUID}@${SERVER_IP_2}:${PORT_HYSTERIA2}?insecure=1&obfs=none&obfs-password=${UUID}#${NODE_NAME}%20hysteria2")
 EOF
   [ -n "$PORT_TUIC" ] && cat >> $WORK_DIR/list << EOF
+
 $(hint "tuic://${UUID}:${UUID}@${SERVER_IP_2}:${PORT_TUIC}?congestion_control=bbr&udp_relay_mode=native&alpn=h3&allow_insecure=1#${NODE_NAME}%20tuic")
 EOF
   [ -n "$PORT_SHADOWSOCKS" ] && cat >> $WORK_DIR/list << EOF
 
-$(hint "ss://$(base64 -w0 <<< aes-256-gcm:${UUID}@${SERVER_IP_2}:${PORT_SHADOWSOCKS} | sed "s/Cg==$//")#${NODE_NAME}%20ss")
+$(hint "ss://$(base64 -w0 <<< aes-128-gcm:${UUID}@${SERVER_IP_2}:${PORT_SHADOWSOCKS} | sed "s/Cg==$//")#${NODE_NAME}%20ss")
 EOF
   [ -n "$PORT_TROJAN" ] && cat >> $WORK_DIR/list << EOF
 
@@ -957,7 +1033,7 @@ $(info "- {name: \"${NODE_NAME} tuic\", type: tuic, server: ${SERVER_IP}, port: 
 EOF
   [ -n "$PORT_SHADOWSOCKS" ] && cat >> $WORK_DIR/list << EOF
 
-$(info "- {name: \"${NODE_NAME} ss\", server: ${SERVER_IP}, port: ${PORT_SHADOWSOCKS}, type: ss, cipher: aes-256-gcm, password: \"${UUID}\"}")
+$(info "- {name: \"${NODE_NAME} ss\", server: ${SERVER_IP}, port: ${PORT_SHADOWSOCKS}, type: ss, cipher: aes-128-gcm, password: \"${UUID}\"}")
 EOF
   [ -n "$PORT_TROJAN" ] && cat >> $WORK_DIR/list << EOF
 
@@ -984,9 +1060,9 @@ EOF
 │    $(warning "NekoBox")     │
 │                │
 └────────────────┘
-----------------------------
 EOF
   [ -n "$PORT_SHADOWTLS" ] && cat >> $WORK_DIR/list << EOF
+----------------------------
 $(hint "nekoray://custom#$(base64 -w0 <<< "{\"_v\":0,\"addr\":\"127.0.0.1\",\"cmd\":[\"\"],\"core\":\"internal\",\"cs\":\"{\n    \\\"password\\\": \\\"${UUID}\\\",\n    \\\"server\\\": \\\"${SERVER_IP_1}\\\",\n    \\\"server_port\\\": ${PORT_SHADOWTLS},\n    \\\"tag\\\": \\\"shadowtls-out\\\",\n    \\\"tls\\\": {\n        \\\"enabled\\\": true,\n        \\\"server_name\\\": \\\"addons.mozilla.org\\\"\n    },\n    \\\"type\\\": \\\"shadowtls\\\",\n    \\\"version\\\": 3\n}\n\",\"mapping_port\":0,\"name\":\"1-tls-not-use\",\"port\":1080,\"socks_port\":0}")
 
 nekoray://shadowsocks#$(base64 -w0 <<< "{\"_v\":0,\"method\":\"2022-blake3-aes-128-gcm\",\"name\":\"2-ss-not-use\",\"pass\":\"${SHADOWTLS_PASSWORD}\",\"port\":0,\"stream\":{\"ed_len\":0,\"insecure\":false,\"mux_s\":0,\"net\":\"tcp\"},\"uot\":0}")
@@ -1007,7 +1083,7 @@ $(hint "tuic://${UUID}:${UUID}@${SERVER_IP_1}:${PORT_TUIC}?congestion_control=bb
 EOF
   [ -n "$PORT_SHADOWSOCKS" ] && cat >> $WORK_DIR/list << EOF
 ----------------------------
-$(hint "ss://$(base64 -w0 <<< aes-256-gcm:${UUID} | sed "s/Cg==$//")@${SERVER_IP_1}:${PORT_SHADOWSOCKS}#${NODE_NAME}%20ss")
+$(hint "ss://$(base64 -w0 <<< aes-128-gcm:${UUID} | sed "s/Cg==$//")@${SERVER_IP_1}:${PORT_SHADOWSOCKS}#${NODE_NAME}%20ss")
 EOF
   [ -n "$PORT_TROJAN" ] && cat >> $WORK_DIR/list << EOF
 ----------------------------
@@ -1103,7 +1179,7 @@ menu_setting() {
     [ "$STATUS" = "$(text 28)" ] && ACTION[2]() { systemctl disable --now sing-box; [ "$(systemctl is-active sing-box)" = 'inactive' ] && info " Sing-box $(text 27) $(text 37)" || error " Sing-box $(text 27) $(text 38) "; } || ACTION[2]() { systemctl enable --now sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 28) $(text 37)" || error " Sing-box $(text 28) $(text 38) "; }
     ACTION[3]() { change_start_port; }
     ACTION[4]() { version; }
-    ACTION[5]() { bash <(wget -qO- --no-check-certificate "https://raw.githubusercontents.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit; }
+    ACTION[5]() { bash <(wget -qO- --no-check-certificate "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit; }
     ACTION[6]() { uninstall; }
 
   else
@@ -1111,7 +1187,7 @@ menu_setting() {
     OPTION[2]="2.  $(text 32)"
 
     ACTION[1]() { install_sing-box; export_list; }
-    ACTION[2]() { bash <(wget -qO- --no-check-certificate "https://raw.githubusercontents.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit; }
+    ACTION[2]() { bash <(wget -qO- --no-check-certificate "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit; }
   fi
 }
 
