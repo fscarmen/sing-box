@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='beta 4'
+VERSION='beta 5'
 
 # 各变量默认值
 GH_PROXY='https://ghproxy.com'
@@ -12,7 +12,9 @@ MIN_PORT=1000
 MAX_PORT=65525
 TLS_SERVER=addons.mozilla.org
 CDN_DEFAULT=www.who.int
-CONSECUTIVE_PORTS=9
+PROTOCAL_LIST=("shadowTLS" "reality" "hysteria2" "tuic" "shadowsocks" "trojan" "vmess + ws" "vless + ws + tls")
+CONSECUTIVE_PORTS=${#PROTOCAL_LIST[@]}
+CDN_DOMAIN=("www.who.int" "cdn.anycast.eu.org" "443.cf.bestl.de" "cfip.gay")
 
 trap "rm -rf $TEMP_DIR >/dev/null 2>&1 ; echo -e '\n' ;exit 1" INT QUIT TERM EXIT
 
@@ -20,8 +22,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Add v2rayN client, ShadowTLS and Tuic based on sing-box kernel configuration file output; 2. Shadowsocks encryption from aes-256-gcm to aes-128-gcm; 3. Optimize the routing and dns of sing-box on the server side."
-C[1]="1. 补充 v2rayN 客户端中，ShadowTLS 和 Tuic 基于 sing-box 内核的配置文件输出; 2. Shadowsocks 加密从 aes-256-gcm 改为 aes-128-gcm; 3. 优化服务端 sing-box 的 路由和 dns"
+E[1]="1. Add the option to use Warp for returning to China; 2. Add a number of quality cdn's that are collected online"
+C[1]="1. 增加使用 Warp 回国选项; 2. 增加线上收录的若干优质 cdn"
 E[2]="This project is designed to add sing-box support for multiple protocols to VPS, details: [https://github.com/fscarmen/sing-box]\n Script Features:\n\t • Deploy multiple protocols with one click, there is always one for you!\n\t • Custom ports for nat machine with limited open ports.\n\t • Built-in warp chained proxy to unlock chatGPT.\n\t • No domain name is required.\n\t • Support system: Ubuntu, Debian, CentOS, Alpine and Arch Linux 3.\n\t • Support architecture: AMD,ARM and s390x\n"
 C[2]="本项目专为 VPS 添加 sing-box 支持的多种协议, 详细说明: [https://github.com/fscarmen/sing-box]\n 脚本特点:\n\t • 一键部署多协议，总有一款适合你\n\t • 自定义端口，适合有限开放端口的 nat 小鸡\n\t • 内置 warp 链式代理解锁 chatGPT\n\t • 不需要域名\n\t • 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 和 Arch Linux,请务必选择 LTS 系统\n\t • 支持硬件结构类型: AMD 和 ARM\n"
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -116,20 +118,32 @@ E[47]="No server ip, script exits. Feedback:[https://github.com/fscarmen/sing-bo
 C[47]="没有 server ip，脚本退出，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 E[48]="ShadowTLS - Copy the above two Neko links and manually set up the chained proxies in order. Tutorial: https://github.com/fscarmen/sing-box/blob/main/README.md#sekobox-%E8%AE%BE%E7%BD%AE-shadowtls-%E6%96%B9%E6%B3%95"
 C[48]="ShadowTLS - 复制上面两条 Neko links 进去，并按顺序手动设置链式代理，详细教程: https://github.com/fscarmen/sing-box/blob/main/README.md#sekobox-%E8%AE%BE%E7%BD%AE-shadowtls-%E6%96%B9%E6%B3%95"
-E[49]="Select more protocols to install (e.g. hgbd):\n a. all (default)\n b. shadowTLS\n c. reality\n d. hysteria2\n e .tuic\n f. shadowsocks\n g. trojan\n h. vmess + ws (resolving your own domain name in cloudflare is required.)\n i. vless + ws + tls (resolving your own domain in cloudflare is required.)\n\n Please select:"
-C[49]="多选需要安装协议(比如 hgbd):\n a. all (默认)\n b. shadowTLS\n c. reality\n d. hysteria2\n e .tuic\n f. shadowsocks\n g. trojan\n h. vmess + ws (必须在 cloudflare 解析自有域名)\n i. vless + ws + tls (必须在 cloudflare 解析自有域名)\n\n 请选择:"
+E[49]="Select more protocols to install (e.g. hgbd):\n a. all (default)"
+C[49]="多选需要安装协议(比如 hgbd):\n a. all (默认)"
 E[50]="Please enter the \$TYPE domain name:"
 C[50]="请输入 \$TYPE 域名:"
-E[51]="Please enter a cdn ip or domain name, http support is required. \(Default is: \${CDN_DEFAULT}\):"
-C[51]="请输入 cdn ip 或域名，要求支持 http \(默认为: \${CDN_DEFAULT}\):"
+E[51]="Please choose or custom a cdn, http support is required:"
+C[51]="请选择或输入 cdn，要求支持 http:"
 E[52]="Please set the ip \[\${WS_SERVER_IP}] to domain \[\${TYPE_HOST_DOMAIN}], and set the origin rule to \[\${TYPE_PORT_WS}] in Cloudflare."
 C[52]="请在 Cloudflare 绑定 \[\${WS_SERVER_IP}] 的域名为 \[\${TYPE_HOST_DOMAIN}], 并设置 origin rule 为 \[\${TYPE_PORT_WS}]"
-E[53]="I don't know how to configure it, if you do, please let me know."
-C[53]="我不会设置，知道的朋友请告诉我"
+E[53]="Please select or enter the preferred domain, the default is \${CDN_DOMAIN[0]}:"
+C[53]="请选择或者填入优选域名，默认为 \${CDN_DOMAIN[0]}:"
 E[54]="The contents of the \$V2RAYN_PROTOCAL configuration file need to be updated for the \$V2RAYN_KERNEL kernel."
 C[54]="\$V2RAYN_PROTOCAL 配置文件内容，需要更新 \$V2RAYN_KERNEL 内核"
 E[55]="Please set inSecure in tls to true."
 C[55]="请把 tls 里的 inSecure 设置为 true"
+E[56]="Do you use warp to access mainland websites?\n Pros: Increase security by using Cloudflare on 104.28.x.x to access domestic websites.\n Cons: Slows down access."
+C[56]="是否使用 warp 访问大陆网站功能?\n 优点: 使用 104.28.x.x 的 Cloudflare 访问国内网站，增加安全性\n 缺点: 减慢访问速度"
+E[57]="Use warp to access mainland websites"
+C[57]="warp 回国"
+E[58]="Install ArgoX scripts (argo + xray) [https://github.com/fscarmen/argox]"
+C[58]="安装 ArgoX 脚本 (argo + xray) [https://github.com/fscarmen/argox]"
+E[59]="Default: [Disabled]. Press [y] if you need it:"
+C[59]="默认为: [不需要]，如需开启请按 [y]:"
+E[60]="The order of the selected protocols and ports is as follows:"
+C[60]="选择的协议及端口次序如下:"
+E[61]="(DNS your own domain in Cloudflare is required.)"
+C[61]="(必须在 Cloudflare 解析自有域名)"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -188,6 +202,7 @@ check_install() {
   if [[ $STATUS = "$(text 26)" ]] && [ ! -s $WORK_DIR/sing-box ]; then
     {
     local ONLINE=$(wget -qO- "https://api.github.com/repos/SagerNet/sing-box/releases/latest" | grep "tag_name" | sed "s@.*\"v\(.*\)\",@\1@g")
+    ONLINE=${ONLINE:-'1.5.2'}
     wget -qO $TEMP_DIR/sing-box.tar.gz $GH_PROXY/https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$ARCH.tar.gz >/dev/null 2>&1
     tar xzf $TEMP_DIR/sing-box.tar.gz -C $TEMP_DIR sing-box-$ONLINE-linux-$ARCH/sing-box >/dev/null 2>&1
     mv $TEMP_DIR/sing-box-$ONLINE-linux-$ARCH/sing-box $TEMP_DIR >/dev/null 2>&1
@@ -269,21 +284,40 @@ sing-box_variable() {
   elif [ -n "$WAN4" ]; then
     SERVER_IP_DEFAULT=$WAN4
     WARP_ENDPOINT=162.159.193.10
+    DOMAIN_STRATEG=prefer_ipv4
   elif [ -n "$WAN6" ]; then
     SERVER_IP_DEFAULT=$WAN6
     WARP_ENDPOINT=2606:4700:d0::a29f:c101
+    DOMAIN_STRATEG=prefer_ipv6
   fi
 
   # 选择安装的协议，由于选项 a 为全部协议，所以选项数不是从 a 开始，而是从 b 开始，处理输入：把大写全部变为小写，把不符合的选项去掉，把重复的选项合并
   MAX_CHOOSE_PROTOCALS=$(asc $[CONSECUTIVE_PORTS+96+1])
-  [ -z "$CHOOSE_PROTOCALS" ] && reading "\n $(text 49) " CHOOSE_PROTOCALS
+  if [ -z "$CHOOSE_PROTOCALS" ]; then
+    hint "\n $(text 49) "
+    for ((e=0; e<${#PROTOCAL_LIST[@]}; e++)); do
+      [[ "$e" =~ '6'|'7' ]] && hint " $(asc $[e+98]). ${PROTOCAL_LIST[e]} $(text 61) " || hint " $(asc $[e+98]). ${PROTOCAL_LIST[e]} "
+    done
+    reading "\n $(text 24) " CHOOSE_PROTOCALS
+  fi
+
+  # 对选择协议的输入处理逻辑：先把所有的大写转为小写，并把所有没有去选项剔除掉，最后按输入的次序排序。如果选项为 a(all) 和其他选项并存，将会忽略 a，如 abc 则会处理为 bc
   CHOOSE_PROTOCALS=$(tr '[:upper:]' '[:lower:]' <<< "$CHOOSE_PROTOCALS")
   [[ ! "$CHOOSE_PROTOCALS" =~ [b-$MAX_CHOOSE_PROTOCALS] ]] && INSTALL_PROTOCALS=($(eval echo {b..$MAX_CHOOSE_PROTOCALS})) || INSTALL_PROTOCALS=($(grep -o . <<< "$CHOOSE_PROTOCALS" | sed "/[^b-$MAX_CHOOSE_PROTOCALS]/d" | awk '!seen[$0]++'))
 
-  reading "\n $(text_eval 10) " SERVER_IP
+  # 显示选择协议及其次序，输入开始端口号
+  if [ -z "$START_PORT" ]; then
+    hint "\n $(text 60) "
+    for ((d=0; d<${#INSTALL_PROTOCALS[@]}; d++)); do
+      hint " $[d+1]. ${PROTOCAL_LIST[$(($(asc ${INSTALL_PROTOCALS[d]}) - 98))]} "
+    done
+    enter_start_port ${#INSTALL_PROTOCALS[@]}
+  fi
+
+  # 输入服务器 IP,默认为检测到的服务器 IP，如果全部为空，则提示并退出脚本
+  [ -z "$SERVER_IP" ] && reading "\n $(text_eval 10) " SERVER_IP
   SERVER_IP=${SERVER_IP:-"$SERVER_IP_DEFAULT"} && WS_SERVER_IP=$SERVER_IP
   [ -z "$SERVER_IP" ] && error " $(text 47) "
-  [ -n "$SERVER_IP" ] && [ -z "$START_PORT" ] && enter_start_port ${#INSTALL_PROTOCALS[@]}
 
   # 如选择有 h. vmess + ws 或 i. vless + ws 时，先检测是否有支持的 http 端口可用，如有则要求输入域名和 cdn
   if [[ "${INSTALL_PROTOCALS[@]}" =~ 'h' ]]; then
@@ -302,12 +336,31 @@ sing-box_variable() {
     done
   fi
 
+  # 提供网上热心网友的anycast域名
   if [ -n "$VMESS_HOST_DOMAIN$VLESS_HOST_DOMAIN" ]; then
-    reading "\n $(text_eval 51) " CDN
-    CDN="${CDN:-"$CDN_DEFAULT"}"
+    echo ""
+    for ((c=0; c<${#CDN_DOMAIN[@]}; c++)); do hint " $[c+1]. ${CDN_DOMAIN[c]} "; done
+
+    reading "\n $(text_eval 53) " CUSTOM_CDN
+    case "$CUSTOM_CDN" in
+      [1-${#CDN_DOMAIN[@]}] )
+        CDN="${CDN_DOMAIN[$((CUSTOM_CDN-1))]}"
+      ;;
+      ?????* )
+        CDN="$CUSTOM_CDN"
+      ;;
+      * )
+        CDN="${CDN_DOMAIN[0]}"
+    esac
   fi
 
+  # 是否开启禁止归国模式，默认不开启
+  [ -z "$RETURN" ] && hint "\n $(text 56) " && reading "\n $(text 59) " RETURN
+  RETURN=$(tr 'A-Z' 'a-z' <<< "$RETURN")
+
   wait
+
+  # 输入 UUID ，错误超过 5 次将会退出
   UUID_DEFAULT=$($TEMP_DIR/sing-box generate uuid)
   [ -z "$UUID" ] && reading "\n $(text_eval 12) " UUID
   local UUID_ERROR_TIME=5
@@ -317,6 +370,7 @@ sing-box_variable() {
   done
   UUID=${UUID:-"$UUID_DEFAULT"}
 
+  # 输入节点名，以系统的 hostname 作为默认
   if [ -s /etc/hostname ]; then
     NODE_NAME_DEFAULT="$(cat /etc/hostname)"
   elif [ $(type -p hostname) ]; then
@@ -386,7 +440,7 @@ EOF
         {
             "type":"direct",
             "tag":"direct",
-            "domain_strategy":"prefer_ipv4"
+            "domain_strategy":"$DOMAIN_STRATEG"
         },
         {
             "type":"direct",
@@ -417,6 +471,10 @@ EOF
                 76
             ],
             "mtu":1280
+        },
+        {
+            "type":"block",
+            "tag":"block"
         }
     ]
 }
@@ -439,11 +497,27 @@ EOF
                     "openai"
                 ],
                 "outbound":"warp-IPv6-out"
+            },
+            {
+                "geosite":"cn",
+                "geoip":"cn",
+                "outbound":"direct"
+            },
+            {
+                "geosite":"cn",
+                "geoip":"cn",
+                "domain":[
+                    "6.ipchaxun.net"
+                ],
+                "outbound":"direct"
             }
         ]
     }
 }
 EOF
+
+  # 禁止回国开启时，修改路由规则文件
+  [[ "$RETURN" =~ 'y' ]] && local ROW_NUMS=($(grep -n '"outbound"' $WORK_DIR/conf/02_route.json | awk -F ':' '{print $1}')) && sed -i "${ROW_NUMS[1]}s/\(\"outbound\":\"\)[^\"]*/\1warp-IPv4-out/; ${ROW_NUMS[2]}s/\(\"outbound\":\"\)[^\"]*/\1warp-IPv6-out/;" $WORK_DIR/conf/02_route.json
 
   CHECK_PROTOCALS=b
   if [[ "${INSTALL_PROTOCALS[@]}" =~ "$CHECK_PROTOCALS" ]]; then
@@ -1158,6 +1232,23 @@ version() {
   fi
 }
 
+# 禁止回国切换
+switch_return() {
+  local ROW_NUMS=($(grep -n '"outbound"' $WORK_DIR/conf/02_route.json | awk -F ':' '{print $1}'))
+  if grep -q 'outbound.*direct' $WORK_DIR/conf/02_route.json; then
+    sed -i "${ROW_NUMS[1]}s/\(\"outbound\":\"\)[^\"]*/\1warp-IPv4-out/; ${ROW_NUMS[2]}s/\(\"outbound\":\"\)[^\"]*/\1warp-IPv6-out/;" $WORK_DIR/conf/02_route.json
+  else
+    sed -i "${ROW_NUMS[1]},${ROW_NUMS[2]}s/\(\"outbound\":\"\)[^\"]*/\1direct/;" $WORK_DIR/conf/02_route.json
+  fi
+
+  systemctl restart sing-box && sleep 2
+  if [ "$(systemctl is-active sing-box)" = 'active' ]; then
+    grep -q 'outbound.*direct' $WORK_DIR/conf/02_route.json && info "\n $(text 57) $(text 27) $(text 37) " || info "\n $(text 57) $(text 28) $(text 37) "
+  else
+    error "Sing-box $(text 28) $(text 38) "
+  fi
+}
+
 # 判断当前 Argo-X 的运行状态，并对应的给菜单和动作赋值
 menu_setting() {
   OPTION[0]="0.  $(text 35)"
@@ -1167,27 +1258,34 @@ menu_setting() {
     NOW_PORTS=$(awk -F ':|,' '/listen_port/{print $2}' $WORK_DIR/conf/*)
     NOW_START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$NOW_PORTS")
     NOW_CONSECUTIVE_PORTS=$(awk 'END { print NR }' <<< "$NOW_PORTS")
-    [ -s $WORK_DIR/sing-box ] && SING_BOX_INFO="version: $($WORK_DIR/sing-box version | awk '/version/{print $NF}') $(text_eval 45)"
+    [ -s $WORK_DIR/sing-box ] && SING_BOX_VERSION="version: $($WORK_DIR/sing-box version | awk '/version/{print $NF}')"
+    [ -s $WORK_DIR/conf/02_route.json ] && { grep -q 'direct' $WORK_DIR/conf/02_route.json && RETURN_STATUS=$(text 27) || RETURN_STATUS=$(text 28); }
     OPTION[1]="1.  $(text 29)"
     [ "$STATUS" = "$(text 28)" ] && OPTION[2]="2.  $(text 27) Sing-box" || OPTION[2]="2.  $(text 28) Sing-box"
     OPTION[3]="3.  $(text 30)"
     OPTION[4]="4.  $(text 31)"
     OPTION[5]="5.  $(text 32)"
-    OPTION[6]="6.  $(text 33)"
+    [ "$RETURN_STATUS" = "$(text 27)" ] && OPTION[6]="6.  $(text 28) $(text 57)" || OPTION[6]="6.  $(text 27) $(text 57)"
+    OPTION[7]="7.  $(text 33)"
+    OPTION[8]="8.  $(text 58)"
 
     ACTION[1]() { export_list; }
     [ "$STATUS" = "$(text 28)" ] && ACTION[2]() { systemctl disable --now sing-box; [ "$(systemctl is-active sing-box)" = 'inactive' ] && info " Sing-box $(text 27) $(text 37)" || error " Sing-box $(text 27) $(text 38) "; } || ACTION[2]() { systemctl enable --now sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 28) $(text 37)" || error " Sing-box $(text 28) $(text 38) "; }
     ACTION[3]() { change_start_port; }
     ACTION[4]() { version; }
     ACTION[5]() { bash <(wget -qO- --no-check-certificate "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit; }
-    ACTION[6]() { uninstall; }
+    ACTION[6]() { switch_return; }
+    ACTION[7]() { uninstall; }
+    ACTION[8]() { bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/argox/main/argox.sh) -$L; exit; }
 
   else
     OPTION[1]="1.  $(text 34)"
     OPTION[2]="2.  $(text 32)"
+    OPTION[3]="3.  $(text 58)"
 
     ACTION[1]() { install_sing-box; export_list; }
     ACTION[2]() { bash <(wget -qO- --no-check-certificate "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit; }
+    ACTION[3]() { bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/argox/main/argox.sh) -$L; exit; }
   fi
 }
 
@@ -1198,7 +1296,9 @@ menu() {
   info " $(text 17):$VERSION\n $(text 18):$(text 1)\n $(text 19):\n\t $(text 20):$SYS\n\t $(text 21):$(uname -r)\n\t $(text 22):$ARCHITECTURE\n\t $(text 23):$VIRT "
   info "\t IPv4: $WAN4 $WARPSTATUS4 $COUNTRY4  $ASNORG4 "
   info "\t IPv6: $WAN6 $WARPSTATUS6 $COUNTRY6  $ASNORG6 "
-  info "\t Sing-box: $STATUS\t $SING_BOX_INFO"
+  info "\t Sing-box: $STATUS\t $SING_BOX_VERSION "
+  [ -n "$NOW_START_PORT" ] && info "\t $(text_eval 45) "
+  [ -n "$RETURN_STATUS" ] && info "\t $(text 57): $RETURN_STATUS "
   echo -e "\n======================================================================================================================\n"
   for ((b=1;b<${#OPTION[*]};b++)); do hint " ${OPTION[b]} "; done
   hint " ${OPTION[0]} "
@@ -1216,7 +1316,7 @@ menu() {
 [[ "$*" =~ -[Ee] ]] && L=E
 [[ "$*" =~ -[Cc] ]] && L=C
 
-while getopts ":P:p:OoUuVvNnBb" OPTNAME; do
+while getopts ":P:p:OoUuVvNnBbRr" OPTNAME; do
   case "$OPTNAME" in
     'P'|'p' ) START_PORT=$OPTARG; select_language; check_install; [ "$STATUS" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; change_start_port; exit 0 ;;
     'O'|'o' ) select_language; check_install; [ "$STATUS" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; [ "$STATUS" = "$(text 28)" ] && ( systemctl disable --now sing-box; [ "$(systemctl is-active sing-box)" = 'inactive' ] && info " Sing-box $(text 27) $(text 37)" ) || ( systemctl enable --now sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 28) $(text 37)" ); exit 0;;
@@ -1224,6 +1324,7 @@ while getopts ":P:p:OoUuVvNnBb" OPTNAME; do
     'N'|'n' ) select_language; [ ! -s $WORK_DIR/list ] && error " Sing-box $(text 26) "; export_list; exit 0 ;;
     'V'|'v' ) select_language; check_arch; version; exit 0 ;;
     'B'|'b' ) select_language; bash <(wget -qO- --no-check-certificate "https://raw.githubusercontents.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit ;;
+    'R'|'r' ) select_language; switch_return; exit 0 ;;
   esac
 done
 

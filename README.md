@@ -15,6 +15,8 @@
 
 * * *
 ## 更新信息
+2023.10.10 beta5 1. Add the option of blocking on returning to China; 2. Add a number of quality cdn's that are collected online; 1. 增加禁止归国选项; 2. 增加线上收录的若干优质 cdn
+
 2023.10.9 beta4 1. Add v2rayN client, ShadowTLS and Tuic based on sing-box kernel configuration file output; 2. Shadowsocks encryption from aes-256-gcm to aes-128-gcm; 3. Optimize the routing and dns of sing-box on the server side; 1. 补充 v2rayN 客户端中，ShadowTLS 和 Tuic 基于 sing-box 内核的配置文件输出; 2. Shadowsocks 加密从 aes-256-gcm 改为 aes-128-gcm; 3. 优化服务端 sing-box 的 路由和 dns
 
 2023.10.6 beta3 1. Add vmess + ws / vless + ws + tls protocols; 2. Hysteria2 add obfuscated verification of obfs; 1. 增加 vmess + ws / vless + ws + tls 协议; 2. Hysteria2 增加 obfs 混淆验证
@@ -27,6 +29,7 @@
 ## 项目特点:
 
 * 一键部署多协议，可以单选、多选或全选 ShadowTLS v3 / Reality / Hysteria2 / Tuic V5 / ShadowSocks / Trojan / Vmess + ws / Vless + ws + tls, 总有一款适合你
+* 节点信息以 V2rayN / Clash Meta / 小火箭 / Nekobox 链接方式输出
 * 自定义端口，适合有限开放端口的 nat 小鸡
 * 内置 warp 链式代理解锁 chatGPT
 * 不需要域名 ( vmess / vless 方案例外)
@@ -49,6 +52,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   | -o              | Stop / Start the Sing-box service 停止/开启 Sing-box 服务 |
   | -v              | Sync Argo Xray to the newest 同步 Argo Xray 到最新版本 |
   | -b              | Upgrade kernel, turn on BBR, change Linux system 升级内核、安装BBR、DD脚本 |
+  | -r              | Enable or disalbe returning to China 切换禁止回国功能的开启和关闭 |
 
 
 ## Vmess / Vless 方案设置任意端口回源以使用 cdn
@@ -93,7 +97,8 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 |   |-- 16_TROJAN_inbounds.json              # Trojan 协议配置文件
 |   |-- 17_VMESS_WS_inbounds.json            # vmess + ws 协议配置文件
 |   `-- 18_VLESS_WS_inbounds.json            # vless + ws + tls 协议配置文件
-|-- geosite.db                               # 存储地理位置和域名信息文件，用于流量控制
+|-- geosite.db                               # 用于基于域名或网站分类来进行访问控制、内容过滤或安全策略
+|-- geoip.db                                 # 用于根据 IP 地址来进行地理位置策略或访问控制
 |-- language                                 # 存放脚本语言文件，E 为英文，C 为中文
 |-- list                                     # 节点信息列表
 |-- logs
