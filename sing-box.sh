@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='beta 5'
+VERSION='beta 6'
 
 # 各变量默认值
 GH_PROXY='https://ghproxy.com'
@@ -22,8 +22,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Add the option to use Warp for returning to China; 2. Add a number of quality cdn's that are collected online"
-C[1]="1. 增加使用 Warp 回国选项; 2. 增加线上收录的若干优质 cdn"
+E[1]="1. Support Alpine; 2. Add Sing-box PID, runtime, and memory usage to the menu; 3. Remove the option of using warp on returning to China."
+C[1]="1. 支持 Alpine; 2. 菜单中增加 sing-box 内存占用显示; 3. 去掉使用 warp 回国的选项"
 E[2]="This project is designed to add sing-box support for multiple protocols to VPS, details: [https://github.com/fscarmen/sing-box]\n Script Features:\n\t • Deploy multiple protocols with one click, there is always one for you!\n\t • Custom ports for nat machine with limited open ports.\n\t • Built-in warp chained proxy to unlock chatGPT.\n\t • No domain name is required.\n\t • Support system: Ubuntu, Debian, CentOS, Alpine and Arch Linux 3.\n\t • Support architecture: AMD,ARM and s390x\n"
 C[2]="本项目专为 VPS 添加 sing-box 支持的多种协议, 详细说明: [https://github.com/fscarmen/sing-box]\n 脚本特点:\n\t • 一键部署多协议，总有一款适合你\n\t • 自定义端口，适合有限开放端口的 nat 小鸡\n\t • 内置 warp 链式代理解锁 chatGPT\n\t • 不需要域名\n\t • 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 和 Arch Linux,请务必选择 LTS 系统\n\t • 支持硬件结构类型: AMD 和 ARM\n"
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -132,14 +132,14 @@ E[54]="The contents of the \$V2RAYN_PROTOCAL configuration file need to be updat
 C[54]="\$V2RAYN_PROTOCAL 配置文件内容，需要更新 \$V2RAYN_KERNEL 内核"
 E[55]="Please set inSecure in tls to true."
 C[55]="请把 tls 里的 inSecure 设置为 true"
-E[56]="Do you use warp to access mainland websites?\n Pros: Increase security by using Cloudflare on 104.28.x.x to access domestic websites.\n Cons: Slows down access."
-C[56]="是否使用 warp 访问大陆网站功能?\n 优点: 使用 104.28.x.x 的 Cloudflare 访问国内网站，增加安全性\n 缺点: 减慢访问速度"
-E[57]="Use warp to access mainland websites"
-C[57]="warp 回国"
-E[58]="Install ArgoX scripts (argo + xray) [https://github.com/fscarmen/argox]"
-C[58]="安装 ArgoX 脚本 (argo + xray) [https://github.com/fscarmen/argox]"
-E[59]="Default: [Disabled]. Press [y] if you need it:"
-C[59]="默认为: [不需要]，如需开启请按 [y]:"
+E[56]="Process ID"
+C[56]="进程ID"
+E[57]="Runtime"
+C[57]="运行时长"
+E[58]="Memory Usage"
+C[58]="内存占用"
+E[59]="Install ArgoX scripts (argo + xray) [https://github.com/fscarmen/argox]"
+C[59]="安装 ArgoX 脚本 (argo + xray) [https://github.com/fscarmen/argox]"
 E[60]="The order of the selected protocols and ports is as follows:"
 C[60]="选择的协议及端口次序如下:"
 E[61]="(DNS your own domain in Cloudflare is required.)"
@@ -210,10 +210,43 @@ check_install() {
   fi
 }
 
-# 判断虚拟化
+# 为了适配 alpine，定义 cmd_systemctl 的函数
+cmd_systemctl() {
+  local ENABLE_DISABLE=$1
+  local APP=$2
+  if [ "$ENABLE_DISABLE" = 'enable' ]; then
+    if [ "$SYSTEM" = 'Alpine' ]; then
+      systemctl start $APP
+      cat > /etc/local.d/$APP.start << EOF
+#!/usr/bin/env bash
+
+systemctl start $APP
+EOF
+      chmod +x /etc/local.d/$APP.start
+      rc-update add local >/dev/null 2>&1
+    else
+      systemctl enable --now $APP
+    fi
+
+  elif [ "$ENABLE_DISABLE" = 'disable' ]; then
+    if [ "$SYSTEM" = 'Alpine' ]; then
+      systemctl stop $APP
+      rm -f /etc/local.d/$APP.start
+    else
+      systemctl disable --now $APP
+    fi
+  fi
+}
+
 check_system_info() {
-  VIRT=$(systemd-detect-virt 2>/dev/null | tr 'A-Z' 'a-z')
-  [ -n "$VIRT" ] || VIRT=$(hostnamectl 2>/dev/null | tr 'A-Z' 'a-z' | grep virtualization | sed "s/.*://g")
+  # 判断虚拟化
+  if [ $(type -p systemd-detect-virt) ]; then
+    VIRT=$(systemd-detect-virt)
+  elif [ $(type -p hostnamectl) ]; then
+    VIRT=$(hostnamectl | awk '/Virtualization/{print $NF}')
+  elif [ $(type -p virt-what) ]; then
+    VIRT=$(virt-what)
+  fi
 
   [ -s /etc/os-release ] && SYS="$(grep -i pretty_name /etc/os-release | cut -d \" -f2)"
   [[ -z "$SYS" && $(type -p hostnamectl) ]] && SYS="$(hostnamectl | grep -i system | cut -d : -f2)"
@@ -224,7 +257,7 @@ check_system_info() {
 
   REGEX=("debian" "ubuntu" "centos|red hat|kernel|oracle linux|alma|rocky" "amazon linux" "arch linux" "alpine")
   RELEASE=("Debian" "Ubuntu" "CentOS" "CentOS" "Arch" "Alpine")
-  EXCLUDE=("bookworm")
+  EXCLUDE=("")
   MAJOR=("9" "16" "7" "7" "" "")
   PACKAGE_UPDATE=("apt -y update" "apt -y update" "yum -y update" "yum -y update" "pacman -Sy" "apk update -f")
   PACKAGE_INSTALL=("apt -y install" "apt -y install" "yum -y install" "yum -y install" "pacman -S --noconfirm" "apk add --no-cache")
@@ -270,7 +303,11 @@ enter_start_port() {
     START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}
     if [[ "$START_PORT" =~ ^[1-9][0-9]{3,4}$ && "$START_PORT" -ge "$MIN_PORT" && "$START_PORT" -le "$MAX_PORT" ]]; then
       for port in $(eval echo {$START_PORT..$[START_PORT+NUM-1]}); do
-        lsof -i:$port >/dev/null 2>&1 && IN_USED+=("$port")
+        if [ "$SYSTEM" = 'Alpine' ]; then
+          netstat -an | awk '/:[0-9]+/{print $4}' | awk -F ":" '{print $NF}' | grep -q $port && IN_USED+=("$port")
+        else
+          lsof -i:$port >/dev/null 2>&1 && IN_USED+=("$port")
+        fi
       done
       [ "${#IN_USED[*]}" -eq 0 ] && break || warning "\n $(text_eval 44) \n"
     fi
@@ -354,10 +391,6 @@ sing-box_variable() {
     esac
   fi
 
-  # 是否开启禁止归国模式，默认不开启
-  [ -z "$RETURN" ] && hint "\n $(text 56) " && reading "\n $(text 59) " RETURN
-  RETURN=$(tr 'A-Z' 'a-z' <<< "$RETURN")
-
   wait
 
   # 输入 UUID ，错误超过 5 次将会退出
@@ -388,8 +421,8 @@ check_dependencies() {
     CHECK_WGET=$(wget 2>&1 | head -n 1)
     grep -qi 'busybox' <<< "$CHECK_WGET" && ${PACKAGE_INSTALL[int]} wget >/dev/null 2>&1
 
-    DEPS_CHECK=("bash" "python3" "rc-update")
-    DEPS_INSTALL=("bash" "python3" "openrc")
+    DEPS_CHECK=("bash" "python3" "rc-update" "openssl" "virt-what")
+    DEPS_INSTALL=("bash" "python3" "openrc" "openssl" "virt-what")
     for ((g=0; g<${#DEPS_CHECK[@]}; g++)); do [ ! $(type -p ${DEPS_CHECK[g]}) ] && [[ ! "${DEPS[@]}" =~ "${DEPS_INSTALL[g]}" ]] && DEPS+=(${DEPS_INSTALL[g]}); done
     if [ "${#DEPS[@]}" -ge 1 ]; then
       info "\n $(text 7) ${DEPS[@]} \n"
@@ -402,8 +435,8 @@ check_dependencies() {
 
   # 检测 Linux 系统的依赖，升级库并重新安装依赖
   unset DEPS_CHECK DEPS_INSTALL DEPS
-  DEPS_CHECK=("wget" "systemctl" "ip" "unzip" "lsof" "bash")
-  DEPS_INSTALL=("wget" "systemctl" "iproute2" "unzip" "lsof" "bash")
+  DEPS_CHECK=("wget" "systemctl" "ip" "unzip" "lsof" "bash" "openssl")
+  DEPS_INSTALL=("wget" "systemctl" "iproute2" "unzip" "lsof" "bash" "openssl")
   for ((g=0; g<${#DEPS_CHECK[@]}; g++)); do [ ! $(type -p ${DEPS_CHECK[g]}) ] && [[ ! "${DEPS[@]}" =~ "${DEPS_INSTALL[g]}" ]] && DEPS+=(${DEPS_INSTALL[g]}); done
   if [ "${#DEPS[@]}" -ge 1 ]; then
     info "\n $(text 7) ${DEPS[@]} \n"
@@ -497,19 +530,6 @@ EOF
                     "openai"
                 ],
                 "outbound":"warp-IPv6-out"
-            },
-            {
-                "geosite":"cn",
-                "geoip":"cn",
-                "outbound":"direct"
-            },
-            {
-                "geosite":"cn",
-                "geoip":"cn",
-                "domain":[
-                    "6.ipchaxun.net"
-                ],
-                "outbound":"direct"
             }
         ]
     }
@@ -789,8 +809,8 @@ EOF
                 "server_name":"${VLESS_HOST_DOMAIN}",
                 "min_version":"1.3",
                 "max_version":"1.3",
-                "certificate_path":"/etc/sing-box/cert/cert.pem",
-                "key_path":"/etc/sing-box/cert/private.key"
+                "certificate_path":"${WORK_DIR}/cert/cert.pem",
+                "key_path":"${WORK_DIR}/cert/private.key"
             }
         }
     ]
@@ -835,7 +855,16 @@ install_sing-box() {
 
   # 再次检测状态，运行 Sing-box
   check_install
-  [[ $STATUS = "$(text 27)" ]] && systemctl enable --now sing-box && info "\n Sing-box $(text 28) $(text 37) \n" || warning "\n Sing-box $(text 28) $(text 38) \n"
+  case "$STATUS" in
+    "$(text 26)" )
+      warning "\n Sing-box $(text 28) $(text 38) \n"
+      ;;
+    "$(text 27)" )
+      cmd_systemctl enable sing-box && info "\n Sing-box $(text 28) $(text 37) \n" || warning "\n Sing-box $(text 28) $(text 38) \n"
+      ;;
+    "$(text 28)" )
+      info "\n Argo $(text 28) $(text 37) \n"
+  esac
 
   # 如果 Alpine 系统，放到开机自启动
   if [ "$SYSTEM" = 'Alpine' ]; then
@@ -844,8 +873,8 @@ install_sing-box() {
 
 systemctl start sing-box
 EOF
-    chmod +x /etc/local.d/argox.start
-    rc-update add local
+    chmod +x /etc/local.d/sing-box.start
+    rc-update add local >/dev/null 2>&1
   fi
 }
 
@@ -1199,7 +1228,7 @@ change_start_port() {
 
 uninstall() {
   if [ -d $WORK_DIR ]; then
-    systemctl disable --now sing-box 2>/dev/null
+    [ "$SYSTEM" = 'Alpine' ] && systemctl stop sing-box 2>/dev/null || cmd_systemctl disable sing-box 2>/dev/null
     rm -rf $WORK_DIR $TEMP_DIR /etc/systemd/system/sing-box.service
     info "\n $(text 16) \n"
   else
@@ -1207,7 +1236,7 @@ uninstall() {
   fi
 
   # 如果 Alpine 系统，删除开机自启动
-  [ "$SYSTEM" = 'Alpine' ] && ( rm -f /etc/local.d/argox.start; rc-update add local )
+  [ "$SYSTEM" = 'Alpine' ] && ( rm -f /etc/local.d/sing-box.start; rc-update add local >/dev/null 2>&1 )
 }
 
 # Sing-box 的最新版本
@@ -1232,29 +1261,26 @@ version() {
   fi
 }
 
-# 禁止回国切换
-switch_return() {
-  local ROW_NUMS=($(grep -n '"outbound"' $WORK_DIR/conf/02_route.json | awk -F ':' '{print $1}'))
-  if grep -q 'outbound.*direct' $WORK_DIR/conf/02_route.json; then
-    sed -i "${ROW_NUMS[1]}s/\(\"outbound\":\"\)[^\"]*/\1warp-IPv4-out/; ${ROW_NUMS[2]}s/\(\"outbound\":\"\)[^\"]*/\1warp-IPv6-out/;" $WORK_DIR/conf/02_route.json
-  else
-    sed -i "${ROW_NUMS[1]},${ROW_NUMS[2]}s/\(\"outbound\":\"\)[^\"]*/\1direct/;" $WORK_DIR/conf/02_route.json
-  fi
-
-  systemctl restart sing-box && sleep 2
-  if [ "$(systemctl is-active sing-box)" = 'active' ]; then
-    grep -q 'outbound.*direct' $WORK_DIR/conf/02_route.json && info "\n $(text 57) $(text 27) $(text 37) " || info "\n $(text 57) $(text 28) $(text 37) "
-  else
-    error "Sing-box $(text 28) $(text 38) "
-  fi
-}
-
 # 判断当前 Argo-X 的运行状态，并对应的给菜单和动作赋值
 menu_setting() {
   OPTION[0]="0.  $(text 35)"
   ACTION[0]() { exit; }
 
-  if [[ $STATUS =~ $(text 27)|$(text 28) ]]; then
+  if [[ "$STATUS" =~ $(text 27)|$(text 28) ]]; then
+    # 查进程号，sing-box 运行时长 和 内存占用
+    if [ "$STATUS" = "$(text 28)" ]; then
+      if [ "$SYSTEM" = 'Alpine' ]; then
+        PS=$(ps -ef | grep -nm1 "$WORK_DIR/conf/")
+        PS_ROW=$(awk -F ':' 'NR==1 {print $1}' <<< "$PS")
+        PID=$(awk '{print $2}' <<< "$PS")
+        RUNTIME=$(ps -o etime | sed -n ${PS_ROW}p)
+      else
+        SYSTEMCTL_STATUS=$(systemctl status sing-box)
+        PID=$(awk '/PID/{print $3}' <<< "$SYSTEMCTL_STATUS")
+        RUNTIME=$(awk '/Active:/{for (i=5;i<=NF;i++)printf("%s ", $i);print ""}' <<< "$SYSTEMCTL_STATUS")
+      fi
+      MEMORY_USAGE="$(awk '/VmRSS/{printf "%.1f\n", $2/1024}' /proc/$PID/status)"
+    fi
     NOW_PORTS=$(awk -F ':|,' '/listen_port/{print $2}' $WORK_DIR/conf/*)
     NOW_START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$NOW_PORTS")
     NOW_CONSECUTIVE_PORTS=$(awk 'END { print NR }' <<< "$NOW_PORTS")
@@ -1265,23 +1291,21 @@ menu_setting() {
     OPTION[3]="3.  $(text 30)"
     OPTION[4]="4.  $(text 31)"
     OPTION[5]="5.  $(text 32)"
-    [ "$RETURN_STATUS" = "$(text 27)" ] && OPTION[6]="6.  $(text 28) $(text 57)" || OPTION[6]="6.  $(text 27) $(text 57)"
-    OPTION[7]="7.  $(text 33)"
-    OPTION[8]="8.  $(text 58)"
+    OPTION[6]="6.  $(text 33)"
+    OPTION[7]="7.  $(text 59)"
 
     ACTION[1]() { export_list; }
-    [ "$STATUS" = "$(text 28)" ] && ACTION[2]() { systemctl disable --now sing-box; [ "$(systemctl is-active sing-box)" = 'inactive' ] && info " Sing-box $(text 27) $(text 37)" || error " Sing-box $(text 27) $(text 38) "; } || ACTION[2]() { systemctl enable --now sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 28) $(text 37)" || error " Sing-box $(text 28) $(text 38) "; }
+    [ "$STATUS" = "$(text 28)" ] && ACTION[2]() { cmd_systemctl disable sing-box; [ "$(systemctl is-active sing-box)" = 'inactive' ] && info " Sing-box $(text 27) $(text 37)" || error " Sing-box $(text 27) $(text 38) "; } || ACTION[2]() { cmd_systemctl enable sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 28) $(text 37)" || error " Sing-box $(text 28) $(text 38) "; }
     ACTION[3]() { change_start_port; }
     ACTION[4]() { version; }
     ACTION[5]() { bash <(wget -qO- --no-check-certificate "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit; }
-    ACTION[6]() { switch_return; }
-    ACTION[7]() { uninstall; }
-    ACTION[8]() { bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/argox/main/argox.sh) -$L; exit; }
+    ACTION[6]() { uninstall; }
+    ACTION[7]() { bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/argox/main/argox.sh) -$L; exit; }
 
   else
     OPTION[1]="1.  $(text 34)"
     OPTION[2]="2.  $(text 32)"
-    OPTION[3]="3.  $(text 58)"
+    OPTION[3]="3.  $(text 59)"
 
     ACTION[1]() { install_sing-box; export_list; }
     ACTION[2]() { bash <(wget -qO- --no-check-certificate "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit; }
@@ -1293,12 +1317,14 @@ menu() {
   clear
   hint " $(text 2) "
   echo -e "======================================================================================================================\n"
-  info " $(text 17):$VERSION\n $(text 18):$(text 1)\n $(text 19):\n\t $(text 20):$SYS\n\t $(text 21):$(uname -r)\n\t $(text 22):$ARCHITECTURE\n\t $(text 23):$VIRT "
+  info " $(text 17): $VERSION\n $(text 18): $(text 1)\n $(text 19):\n\t $(text 20): $SYS\n\t $(text 21): $(uname -r)\n\t $(text 22): $ARCH\n\t $(text 23): $VIRT "
   info "\t IPv4: $WAN4 $WARPSTATUS4 $COUNTRY4  $ASNORG4 "
   info "\t IPv6: $WAN6 $WARPSTATUS6 $COUNTRY6  $ASNORG6 "
   info "\t Sing-box: $STATUS\t $SING_BOX_VERSION "
+  [ -n "$PID" ] && info "\t $(text 56): $PID "
+  [ -n "$RUNTIME" ] && info "\t $(text 57): $RUNTIME "
+  [ -n "$MEMORY_USAGE" ] && info "\t $(text 58): $MEMORY_USAGE MB"
   [ -n "$NOW_START_PORT" ] && info "\t $(text_eval 45) "
-  [ -n "$RETURN_STATUS" ] && info "\t $(text 57): $RETURN_STATUS "
   echo -e "\n======================================================================================================================\n"
   for ((b=1;b<${#OPTION[*]};b++)); do hint " ${OPTION[b]} "; done
   hint " ${OPTION[0]} "
@@ -1316,15 +1342,14 @@ menu() {
 [[ "$*" =~ -[Ee] ]] && L=E
 [[ "$*" =~ -[Cc] ]] && L=C
 
-while getopts ":P:p:OoUuVvNnBbRr" OPTNAME; do
+while getopts ":P:p:OoUuVvNnBb" OPTNAME; do
   case "$OPTNAME" in
     'P'|'p' ) START_PORT=$OPTARG; select_language; check_install; [ "$STATUS" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; change_start_port; exit 0 ;;
-    'O'|'o' ) select_language; check_install; [ "$STATUS" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; [ "$STATUS" = "$(text 28)" ] && ( systemctl disable --now sing-box; [ "$(systemctl is-active sing-box)" = 'inactive' ] && info " Sing-box $(text 27) $(text 37)" ) || ( systemctl enable --now sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 28) $(text 37)" ); exit 0;;
-    'U'|'u' ) select_language; uninstall; exit 0 ;;
+    'O'|'o' ) select_language; check_system_info; check_install; [ "$STATUS" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; [ "$STATUS" = "$(text 28)" ] && ( cmd_systemctl disable sing-box; [ "$(systemctl is-active sing-box)" = 'inactive' ] && info "\n Sing-box $(text 27) $(text 37)" ) || ( cmd_systemctl enable sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info "\n Sing-box $(text 28) $(text 37)" ); exit 0;;
+    'U'|'u' ) select_language; check_system_info; uninstall; exit 0 ;;
     'N'|'n' ) select_language; [ ! -s $WORK_DIR/list ] && error " Sing-box $(text 26) "; export_list; exit 0 ;;
     'V'|'v' ) select_language; check_arch; version; exit 0 ;;
     'B'|'b' ) select_language; bash <(wget -qO- --no-check-certificate "https://raw.githubusercontents.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit ;;
-    'R'|'r' ) select_language; switch_return; exit 0 ;;
   esac
 done
 
