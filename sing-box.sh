@@ -4,7 +4,7 @@
 VERSION='beta 7'
 
 # 各变量默认值
-GH_PROXY='https://ghproxy.com'
+GH_PROXY='https://ghproxy.com/'
 TEMP_DIR='/tmp/sing-box'
 WORK_DIR='/etc/sing-box'
 START_PORT_DEFAULT='8881'
@@ -158,6 +158,8 @@ E[67]="(3/3) Confirm all protocols for reloading."
 C[67]="(3/3) 确认重装的所有协议"
 E[68]="Press [n] if there is an error, other keys to continue:"
 C[68]="如有错误请按 [n]，其他键继续:"
+E[69]="Install sba scripts (argo + sing-box) [https://github.com/fscarmen/sba]"
+C[69]="安装 sba 脚本 (argo + sing-box) [https://github.com/fscarmen/sba]"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -237,7 +239,7 @@ check_install() {
     {
     local ONLINE=$(wget -qO- "https://api.github.com/repos/SagerNet/sing-box/releases/latest" | grep "tag_name" | sed "s@.*\"v\(.*\)\",@\1@g")
     ONLINE=${ONLINE:-'1.5.2'}
-    wget -qO $TEMP_DIR/sing-box.tar.gz $GH_PROXY/https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$ARCH.tar.gz >/dev/null 2>&1
+    wget -qO $TEMP_DIR/sing-box.tar.gz ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$ARCH.tar.gz >/dev/null 2>&1
     tar xzf $TEMP_DIR/sing-box.tar.gz -C $TEMP_DIR sing-box-$ONLINE-linux-$ARCH/sing-box >/dev/null 2>&1
     mv $TEMP_DIR/sing-box-$ONLINE-linux-$ARCH/sing-box $TEMP_DIR >/dev/null 2>&1
     }&
@@ -311,9 +313,7 @@ check_system_info() {
   PACKAGE_INSTALL=("apt -y install" "apt -y install" "yum -y install" "yum -y install" "pacman -S --noconfirm" "apk add --no-cache")
   PACKAGE_UNINSTALL=("apt -y autoremove" "apt -y autoremove" "yum -y autoremove" "yum -y autoremove" "pacman -Rcnsu --noconfirm" "apk del -f")
 
-  for int in ${!REGEX[@]}; do
-    [[ $(tr 'A-Z' 'a-z' <<< "$SYS") =~ ${REGEX[int]} ]] && SYSTEM="${RELEASE[int]}" && break
-  done
+  for int in "${!REGEX[@]}"; do [[ $(tr 'A-Z' 'a-z' <<< "$SYS") =~ ${REGEX[int]} ]] && SYSTEM="${RELEASE[int]}" && break; done
   [ -z "$SYSTEM" ] && error " $(text 5) "
 
   # 先排除 EXCLUDE 里包括的特定系统，其他系统需要作大发行版本的比较
@@ -488,7 +488,7 @@ ssl_certificate() {
 
 # 生成 sing-box 配置文件
 sing-box_json() {
-  mkdir -p $WORK_DIR/conf
+  mkdir -p $WORK_DIR/conf $WORK_DIR/logs
   # 生成 dns 配置
   cat > $WORK_DIR/conf/00_log.json << EOF
 {
@@ -1463,7 +1463,7 @@ version() {
 
   if [[ "$UPDATE" = [Yy] ]]; then
     check_system_info
-    wget -O $TEMP_DIR/sing-box.tar.gz $GH_PROXY/https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$ARCH.tar.gz
+    wget -O $TEMP_DIR/sing-box.tar.gz ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$ARCH.tar.gz
     tar xzf $TEMP_DIR/sing-box.tar.gz -C $TEMP_DIR sing-box-$ONLINE-linux-$ARCH/sing-box
 
     if [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$ARCH/sing-box ]; then
@@ -1509,24 +1509,28 @@ menu_setting() {
     OPTION[6]="6.  $(text 62)"
     OPTION[7]="7.  $(text 33)"
     OPTION[8]="8.  $(text 59)"
+    OPTION[9]="9.  $(text 69)"
 
-    ACTION[1]() { export_list; }
+    ACTION[1]() { export_list; exit 0; }
     [ "$STATUS" = "$(text 28)" ] && ACTION[2]() { cmd_systemctl disable sing-box; [ "$(systemctl is-active sing-box)" = 'inactive' ] && info " Sing-box $(text 27) $(text 37)" || error " Sing-box $(text 27) $(text 38) "; } || ACTION[2]() { cmd_systemctl enable sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 28) $(text 37)" || error " Sing-box $(text 28) $(text 38) "; }
-    ACTION[3]() { change_start_port; }
-    ACTION[4]() { version; }
+    ACTION[3]() { change_start_port; exit; }
+    ACTION[4]() { version; exit; }
     ACTION[5]() { bash <(wget -qO- --no-check-certificate "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit; }
-    ACTION[6]() { change_protocals; }
-    ACTION[7]() { uninstall; }
+    ACTION[6]() { change_protocals; exit; }
+    ACTION[7]() { uninstall; exit; }
     ACTION[8]() { bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/argox/main/argox.sh) -$L; exit; }
+    ACTION[9]() { bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sba/main/sba.sh) -$L; exit; }
 
   else
     OPTION[1]="1.  $(text 34)"
     OPTION[2]="2.  $(text 32)"
     OPTION[3]="3.  $(text 59)"
+    OPTION[4]="4.  $(text 69)"
 
-    ACTION[1]() { install_sing-box; export_list; }
+    ACTION[1]() { install_sing-box; export_list; exit; }
     ACTION[2]() { bash <(wget -qO- --no-check-certificate "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit; }
     ACTION[3]() { bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/argox/main/argox.sh) -$L; exit; }
+    ACTION[4]() { bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sba/main/sba.sh) -$L; exit; }
   fi
 }
 
