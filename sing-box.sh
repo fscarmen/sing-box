@@ -112,8 +112,8 @@ E[44]="Ports are in used:  \${IN_USED[*]}"
 C[44]="正在使用中的端口: \${IN_USED[*]}"
 E[45]="Ports used: \${NOW_START_PORT} - \$((NOW_START_PORT+NOW_CONSECUTIVE_PORTS-1))"
 C[45]="使用端口: \${NOW_START_PORT} - \$((NOW_START_PORT+NOW_CONSECUTIVE_PORTS-1))"
-E[46]="Warp / warp-go was detected to be running. Please close and run this script again."
-C[46]="检测到 warp / warp-go 正在运行，请关闭后再次运行本脚本"
+E[46]="Warp / warp-go was detected to be running. Please enter the correct server IP:"
+C[46]="检测到 warp / warp-go 正在运行，请输入确认的服务器 IP:"
 E[47]="No server ip, script exits. Feedback:[https://github.com/fscarmen/sing-box/issues]"
 C[47]="没有 server ip，脚本退出，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 E[48]="ShadowTLS - Copy the above two Neko links and manually set up the chained proxies in order. Tutorial: https://github.com/fscarmen/sing-box/blob/main/README.md#sekobox-%E8%AE%BE%E7%BD%AE-shadowtls-%E6%96%B9%E6%B3%95"
@@ -130,8 +130,8 @@ E[53]="Please select or enter the preferred domain, the default is \${CDN_DOMAIN
 C[53]="请选择或者填入优选域名，默认为 \${CDN_DOMAIN[0]}:"
 E[54]="The contents of the \$V2RAYN_PROTOCAL configuration file need to be updated for the \$V2RAYN_KERNEL kernel."
 C[54]="\$V2RAYN_PROTOCAL 配置文件内容，需要更新 \$V2RAYN_KERNEL 内核"
-E[55]="Please set inSecure in tls to true."
-C[55]="请把 tls 里的 inSecure 设置为 true"
+E[55]="The script runs today: \$TODAY. Total: \$TOTAL"
+C[55]="脚本当天运行次数: \$TODAY，累计运行次数: \$TOTAL"
 E[56]="Process ID"
 C[56]="进程ID"
 E[57]="Runtime"
@@ -160,6 +160,8 @@ E[68]="Press [n] if there is an error, other keys to continue:"
 C[68]="如有错误请按 [n]，其他键继续:"
 E[69]="Install sba scripts (argo + sing-box) [https://github.com/fscarmen/sba]"
 C[69]="安装 sba 脚本 (argo + sing-box) [https://github.com/fscarmen/sba]"
+E[70]="Please set inSecure in tls to true."
+C[70]="请把 tls 里的 inSecure 设置为 true"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -175,6 +177,13 @@ translate() {
   [ -n "$@" ] && EN="$@"
   ZH=$(wget -qO- -t1T2 "https://translate.google.com/translate_a/t?client=any_client_id_works&sl=en&tl=zh&q=${EN//[[:space:]]/%20}")
   [[ "$ZH" =~ ^\[\".+\"\]$ ]] && cut -d \" -f2 <<< "$ZH"
+}
+
+# 脚本当天及累计运行次数统计
+statistics_of_run-times() {
+  local COUNT=$(curl --retry 2 -ksm2 "https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffscarmen%2Fsing-box%2Fmain%2Fsing-box.sh" 2>&1 | grep -m1 -oE "[0-9]+[ ]+/[ ]+[0-9]+") &&
+  TODAY=$(cut -d " " -f1 <<< "$COUNT") &&
+  TOTAL=$(cut -d " " -f3 <<< "$COUNT")
 }
 
 # 选择中英语言
@@ -365,7 +374,19 @@ enter_start_port() {
 # 定义 Sing-box 变量
 sing-box_variable() {
   if grep -qi 'cloudflare' <<< "$ASNORG4$ASNORG6"; then
-    error "\n $(text 46) \n"
+    local a=6
+    until [ -n "$SERVER_IP" ]; do
+      ((a--)) || true
+      [ "$a" = 0 ] && error "\n $(text 3) \n"
+      reading "\n $(text 46) " SERVER_IP
+    done
+    if [[ "$SERVER_IP" =~ : ]]; then
+      WARP_ENDPOINT=2606:4700:d0::a29f:c101
+      DOMAIN_STRATEG=prefer_ipv6
+    else
+      WARP_ENDPOINT=162.159.193.10
+      DOMAIN_STRATEG=prefer_ipv4     
+    fi
   elif [ -n "$WAN4" ]; then
     SERVER_IP_DEFAULT=$WAN4
     WARP_ENDPOINT=162.159.193.10
@@ -1078,7 +1099,7 @@ EOF
 ----------------------------
 $(info "trojan://${UUID}@${SERVER_IP_1}:${PORT_TROJAN}?security=tls&type=tcp&headerType=none#\"${NODE_NAME} trojan\"
 
-$(text 55)")
+$(text 70)")
 EOF
   [ -n "$PORT_VMESS_WS" ] && TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VMESS_WS && cat >> $WORK_DIR/list << EOF
 
@@ -1241,6 +1262,9 @@ EOF
 *******************************************
 EOF
   cat $WORK_DIR/list
+
+  # 显示脚本使用情况数据
+  info "\n $(text_eval 55) \n"
 }
 
 # 更换各协议的监听端口
@@ -1575,6 +1599,7 @@ while getopts ":P:p:OoUuVvNnBbRr" OPTNAME; do
   esac
 done
 
+statistics_of_run-times
 select_language
 check_root
 check_arch
