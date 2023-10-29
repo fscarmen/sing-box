@@ -15,19 +15,26 @@
 
 * * *
 ## 更新信息
-2023.10.18 beta7 1. You can add and remove protocols at any time, need to reinstall script; 2. Adjusted the order of some protocols; 1. 可以随时添加和删除协议，需要重新安装脚本; 2. 调整了部分协议的先后顺序
+2023.10.29 v1.0 正式版 1. Sing-box Family bucket v1.0; 2. After installing, add [sb] shortcut; 1. Sing-box 全家桶 v1.0; 2. 安装后，增加 [sb] 的快捷运行方式.
 
-2023.10.16 beta6 1. Support Alpine; 2. Add Sing-box PID, runtime, and memory usage to the menu; 3. Remove the option of using warp on returning to China; 支持 Alpine; 2. 菜单中增加 sing-box 内存占用显示; 3. 去掉使用 warp 回国的选项
+<details>
+    <summary>历史更新 history（点击即可展开或收起）</summary>
+<br>
 
-2023.10.10 beta5 1. Add the option of blocking on returning to China; 2. Add a number of quality cdn's that are collected online; 1. 增加禁止归国选项; 2. 增加线上收录的若干优质 cdn
-
-2023.10.9 beta4 1. Add v2rayN client, ShadowTLS and Tuic based on sing-box kernel configuration file output; 2. Shadowsocks encryption from aes-256-gcm to aes-128-gcm; 3. Optimize the routing and dns of sing-box on the server side; 1. 补充 v2rayN 客户端中，ShadowTLS 和 Tuic 基于 sing-box 内核的配置文件输出; 2. Shadowsocks 加密从 aes-256-gcm 改为 aes-128-gcm; 3. 优化服务端 sing-box 的 路由和 dns
-
-2023.10.6 beta3 1. Add vmess + ws / vless + ws + tls protocols; 2. Hysteria2 add obfuscated verification of obfs; 1. 增加 vmess + ws / vless + ws + tls 协议; 2. Hysteria2 增加 obfs 混淆验证
-
-2023.10.3 beta2 1. Single-select, multi-select or select all the required protocols; 2. Support according to the order of selection, the definition of the corresponding protocol listen port number; 1. 可以单选、多选或全选需要的协议; 2. 支持根据选择的先后次序，定义相应协议监听端口号
-
-2023.9.30 beta1 Sing-box 全家桶一键脚本 for vps
+>2023.10.18 beta7 1. You can add and remove protocols at any time, need to reinstall script; 2. Adjusted the order of some protocols; 1. 可以随时添加和删除协议，需要重新安装脚本; 2. 调整了部分协议的先后顺序
+>
+>2023.10.16 beta6 1. Support Alpine; 2. Add Sing-box PID, runtime, and memory usage to the menu; 3. Remove the option of using warp on returning to China; 支持 Alpine; 2. 菜单中增加 sing-box 内存占用显示; 3. 去掉使用 warp 回国的选项
+>
+>2023.10.10 beta5 1. Add the option of blocking on returning to China; 2. Add a number of quality cdn's that are collected online; 1. 增加禁止归国选项; 2. 增加线上收录的若干优质 cdn
+>
+>2023.10.9 beta4 1. Add v2rayN client, ShadowTLS and Tuic based on sing-box kernel configuration file output; 2. Shadowsocks encryption from aes-256-gcm to aes-128-gcm; 3. Optimize the routing and dns of sing-box on the server side; 1. 补充 v2rayN 客户端中，ShadowTLS 和 Tuic 基于 sing-box 内核的配置文件输出; 2. Shadowsocks 加密从 aes-256-gcm 改为 aes-128-gcm; 3. 优化服务端 sing-box 的 路由和 dns
+>
+>2023.10.6 beta3 1. Add vmess + ws / vless + ws + tls protocols; 2. Hysteria2 add obfuscated verification of obfs; 1. 增加 vmess + ws / vless + ws + tls 协议; 2. Hysteria2 增加 obfs 混淆验证
+>
+>2023.10.3 beta2 1. Single-select, multi-select or select all the required protocols; 2. Support according to the order of selection, the definition of the corresponding protocol listen port number; 1. 可以单选、多选或全选需要的协议; 2. 支持根据选择的先后次序，定义相应协议监听端口号
+>
+>2023.9.30 beta1 Sing-box 全家桶一键脚本 for vps
+</details>
 
 
 ## 项目特点:
@@ -46,10 +53,10 @@
 bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh)
 ```
 
-  | Option 参数      | Remark 备注 | 
+  | Option 参数      | Remark 备注 |
   | --------------- | ------ |
   | -c              | Chinese 中文 |
-  | -e              | English 英文 | 
+  | -e              | English 英文 |
   | -u              | Uninstall 卸载 |
   | -n              | Export Nodes list 显示节点信息 |
   | -p <start port> | Change the nodes start port 更改节点的起始端口 |
@@ -102,13 +109,14 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 |   |-- 16_TROJAN_inbounds.json              # Trojan 协议配置文件
 |   |-- 17_VMESS_WS_inbounds.json            # vmess + ws 协议配置文件
 |   `-- 18_VLESS_WS_inbounds.json            # vless + ws + tls 协议配置文件
+|-- logs
+|   `-- box.log                              # sing-box 运行日志文件
 |-- geosite.db                               # 用于基于域名或网站分类来进行访问控制、内容过滤或安全策略
 |-- geoip.db                                 # 用于根据 IP 地址来进行地理位置策略或访问控制
 |-- language                                 # 存放脚本语言文件，E 为英文，C 为中文
 |-- list                                     # 节点信息列表
-|-- logs
-|   `-- box.log                              # sing-box 运行日志文件
-`-- sing-box                                 # sing-box 主程序
+|-- sing-box                                 # sing-box 主程序
+`-- sb.sh                                    # 快捷方式脚本文件
 ```
 
 

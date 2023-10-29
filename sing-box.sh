@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='beta 7'
+VERSION='v1.0'
 
 # 各变量默认值
 GH_PROXY='https://ghproxy.com/'
@@ -22,16 +22,16 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. You can add and remove protocols at any time, need to reinstall script; 2. Adjusted the order of some protocols."
-C[1]="1. 可以随时添加和删除协议，需要重新安装脚本; 2. 调整了部分协议的先后顺序"
+E[1]="1. Sing-box Family bucket v1.0; 2. After installing, add [sb] shortcut."
+C[1]="1. Sing-box 全家桶 v1.0; 2. 安装后，增加 [sb] 的快捷运行方式"
 E[2]="This project is designed to add sing-box support for multiple protocols to VPS, details: [https://github.com/fscarmen/sing-box]\n Script Features:\n\t • Deploy multiple protocols with one click, there is always one for you!\n\t • Custom ports for nat machine with limited open ports.\n\t • Built-in warp chained proxy to unlock chatGPT.\n\t • No domain name is required.\n\t • Support system: Ubuntu, Debian, CentOS, Alpine and Arch Linux 3.\n\t • Support architecture: AMD,ARM and s390x\n"
 C[2]="本项目专为 VPS 添加 sing-box 支持的多种协议, 详细说明: [https://github.com/fscarmen/sing-box]\n 脚本特点:\n\t • 一键部署多协议，总有一款适合你\n\t • 自定义端口，适合有限开放端口的 nat 小鸡\n\t • 内置 warp 链式代理解锁 chatGPT\n\t • 不需要域名\n\t • 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 和 Arch Linux,请务必选择 LTS 系统\n\t • 支持硬件结构类型: AMD 和 ARM\n"
 E[3]="Input errors up to 5 times.The script is aborted."
 C[3]="输入错误达5次,脚本退出"
 E[4]="UUID should be 36 characters, please re-enter \(\${UUID_ERROR_TIME} times remaining\):"
 C[4]="UUID 应为36位字符,请重新输入 \(剩余\${UUID_ERROR_TIME}次\):"
-E[5]="The script supports Debian, Ubuntu, CentOS, Alpine or Arch systems only. Feedback: [https://github.com/fscarmen/sing-box/issues]"
-C[5]="本脚本只支持 Debian、Ubuntu、CentOS、Alpine 或 Arch 系统,问题反馈:[https://github.com/fscarmen/sing-box/issues]"
+E[5]="The script supports Debian, Ubuntu, CentOS, Alpine, Fedora or Arch systems only. Feedback: [https://github.com/fscarmen/sing-box/issues]"
+C[5]="本脚本只支持 Debian、Ubuntu、CentOS、Alpine、Fedora 或 Arch 系统,问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 E[6]="Curren operating system is \$SYS.\\\n The system lower than \$SYSTEM \${MAJOR[int]} is not supported. Feedback: [https://github.com/fscarmen/sing-box/issues]"
 C[6]="当前操作是 \$SYS\\\n 不支持 \$SYSTEM \${MAJOR[int]} 以下系统,问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 E[7]="Install dependence-list:"
@@ -78,16 +78,16 @@ E[27]="close"
 C[27]="关闭"
 E[28]="open"
 C[28]="开启"
-E[29]="View links"
-C[29]="查看节点信息"
-E[30]="Change listen ports"
-C[30]="更换监听端口"
-E[31]="Sync Sing-box to the latest version"
-C[31]="同步 Sing-box 至最新版本"
-E[32]="Upgrade kernel, turn on BBR, change Linux system"
-C[32]="升级内核、安装BBR、DD脚本"
-E[33]="Uninstall"
-C[33]="卸载"
+E[29]="View links (sb -n)"
+C[29]="查看节点信息 (sb -n)"
+E[30]="Change listen ports (sb -p)"
+C[30]="更换监听端口 (sb -p)"
+E[31]="Sync Sing-box to the latest version (sb -v)"
+C[31]="同步 Sing-box 至最新版本 (sb -v)"
+E[32]="Upgrade kernel, turn on BBR, change Linux system (sb -b)"
+C[32]="升级内核、安装BBR、DD脚本 (sb -b)"
+E[33]="Uninstall (sb -u)"
+C[33]="卸载 (sb -u)"
 E[34]="Install script"
 C[34]="安装脚本"
 E[35]="Exit"
@@ -144,8 +144,8 @@ E[60]="The order of the selected protocols and ports is as follows:"
 C[60]="选择的协议及端口次序如下:"
 E[61]="(DNS your own domain in Cloudflare is required.)"
 C[61]="(必须在 Cloudflare 解析自有域名)"
-E[62]="Add / Remove protocols"
-C[62]="增加 / 删除协议"
+E[62]="Add / Remove protocols (sb -r)"
+C[62]="增加 / 删除协议 (sb -r)"
 E[63]="(1/3) Installed protocols."
 C[63]="(1/3) 已安装的协议"
 E[64]="Please select the protocols to be removed (multiple selections possible):"
@@ -162,6 +162,8 @@ E[69]="Install sba scripts (argo + sing-box) [https://github.com/fscarmen/sba]"
 C[69]="安装 sba 脚本 (argo + sing-box) [https://github.com/fscarmen/sba]"
 E[70]="Please set inSecure in tls to true."
 C[70]="请把 tls 里的 inSecure 设置为 true"
+E[71]="Create shortcut [sb] successfully."
+C[71]="创建快捷 [sb] 指令成功!"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -169,8 +171,7 @@ error() { echo -e "\033[31m\033[01m$*\033[0m" && exit 1; } # 红色
 info() { echo -e "\033[32m\033[01m$*\033[0m"; }   # 绿色
 hint() { echo -e "\033[33m\033[01m$*\033[0m"; }   # 黄色
 reading() { read -rp "$(info "$1")" "$2"; }
-text() { eval echo "\${${L}[$*]}"; }
-text_eval() { eval echo "\$(eval echo "\${${L}[$*]}")"; }
+text() { grep -q '\$' <<< "${E[$*]}" && eval echo "\$(eval echo "\${${L}[$*]}")" || eval echo "\${${L}[$*]}"; }
 
 # 自定义友道或谷歌翻译函数
 translate() {
@@ -181,7 +182,7 @@ translate() {
 
 # 脚本当天及累计运行次数统计
 statistics_of_run-times() {
-  local COUNT=$(curl --retry 2 -ksm2 "https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffscarmen%2Fsing-box%2Fmain%2Fsing-box.sh" 2>&1 | grep -m1 -oE "[0-9]+[ ]+/[ ]+[0-9]+") &&
+  local COUNT=$(wget -qO- -t1T2 "https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffscarmen%2Fsing-box%2Fmain%2Fsing-box.sh" 2>&1 | grep -m1 -oE "[0-9]+[ ]+/[ ]+[0-9]+") &&
   TODAY=$(cut -d " " -f1 <<< "$COUNT") &&
   TOTAL=$(cut -d " " -f3 <<< "$COUNT")
 }
@@ -213,7 +214,7 @@ input_cdn() {
     echo ""
     for c in "${!CDN_DOMAIN[@]}"; do hint " $[c+1]. ${CDN_DOMAIN[c]} "; done
 
-    reading "\n $(text_eval 53) " CUSTOM_CDN
+    reading "\n $(text 53) " CUSTOM_CDN
     case "$CUSTOM_CDN" in
       [1-${#CDN_DOMAIN[@]}] )
         CDN="${CDN_DOMAIN[$((CUSTOM_CDN-1))]}"
@@ -234,10 +235,10 @@ check_root() {
 check_arch() {
   # 判断处理器架构
   case $(uname -m) in
-    aarch64|arm64 ) ARCH=arm64 ;;
-    x86_64|amd64 ) ARCH=amd64 ;;
-    armv7l ) ARCH=armv7 ;;
-    * ) error " $(text_eval 25) "
+    aarch64|arm64 ) SING_BOX_ARCH=arm64 ;;
+    x86_64|amd64 ) [[ "$(awk -F ':' '/flags/{print $2; exit}' /proc/cpuinfo)" =~ avx2 ]] && SING_BOX_ARCH=amd64v3 || SING_BOX_ARCH=amd64 ;;
+    armv7l ) SING_BOX_ARCH=armv7 ;;
+    * ) error " $(text 25) "
   esac
 }
 
@@ -248,15 +249,15 @@ check_install() {
     {
     local ONLINE=$(wget -qO- "https://api.github.com/repos/SagerNet/sing-box/releases/latest" | grep "tag_name" | sed "s@.*\"v\(.*\)\",@\1@g")
     ONLINE=${ONLINE:-'1.5.2'}
-    wget -qO $TEMP_DIR/sing-box.tar.gz ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$ARCH.tar.gz >/dev/null 2>&1
-    tar xzf $TEMP_DIR/sing-box.tar.gz -C $TEMP_DIR sing-box-$ONLINE-linux-$ARCH/sing-box >/dev/null 2>&1
-    mv $TEMP_DIR/sing-box-$ONLINE-linux-$ARCH/sing-box $TEMP_DIR >/dev/null 2>&1
+    wget -qO $TEMP_DIR/sing-box.tar.gz ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz >/dev/null 2>&1
+    tar xzf $TEMP_DIR/sing-box.tar.gz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box >/dev/null 2>&1
+    mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR >/dev/null 2>&1
     }&
   fi
 }
 
 # 检测 sing-box 的状态
-check_sing-bux_stats(){
+check_sing-box_stats(){
   case "$STATUS" in
     "$(text 26)" )
       error "\n Sing-box $(text 28) $(text 38) \n"
@@ -314,20 +315,20 @@ check_system_info() {
   [[ -z "$SYS" && -s /etc/redhat-release ]] && SYS="$(grep . /etc/redhat-release)"
   [[ -z "$SYS" && -s /etc/issue ]] && SYS="$(grep . /etc/issue | cut -d '\' -f1 | sed '/^[ ]*$/d')"
 
-  REGEX=("debian" "ubuntu" "centos|red hat|kernel|oracle linux|alma|rocky" "amazon linux" "arch linux" "alpine")
-  RELEASE=("Debian" "Ubuntu" "CentOS" "CentOS" "Arch" "Alpine")
+  REGEX=("debian" "ubuntu" "centos|red hat|kernel|oracle linux|alma|rocky" "amazon linux" "arch linux" "alpine" "fedora")
+  RELEASE=("Debian" "Ubuntu" "CentOS" "CentOS" "Arch" "Alpine" "Fedora")
   EXCLUDE=("")
-  MAJOR=("9" "16" "7" "7" "" "")
-  PACKAGE_UPDATE=("apt -y update" "apt -y update" "yum -y update" "yum -y update" "pacman -Sy" "apk update -f")
-  PACKAGE_INSTALL=("apt -y install" "apt -y install" "yum -y install" "yum -y install" "pacman -S --noconfirm" "apk add --no-cache")
-  PACKAGE_UNINSTALL=("apt -y autoremove" "apt -y autoremove" "yum -y autoremove" "yum -y autoremove" "pacman -Rcnsu --noconfirm" "apk del -f")
+  MAJOR=("9" "16" "7" "7" "3" "" "37")
+  PACKAGE_UPDATE=("apt -y update" "apt -y update" "yum -y update" "yum -y update" "pacman -Sy" "apk update -f" "dnf -y update")
+  PACKAGE_INSTALL=("apt -y install" "apt -y install" "yum -y install" "yum -y install" "pacman -S --noconfirm" "apk add --no-cache" "dnf -y install")
+  PACKAGE_UNINSTALL=("apt -y autoremove" "apt -y autoremove" "yum -y autoremove" "yum -y autoremove" "pacman -Rcnsu --noconfirm" "apk del -f" "dnf -y autoremove")
 
   for int in "${!REGEX[@]}"; do [[ $(tr 'A-Z' 'a-z' <<< "$SYS") =~ ${REGEX[int]} ]] && SYSTEM="${RELEASE[int]}" && break; done
   [ -z "$SYSTEM" ] && error " $(text 5) "
 
   # 先排除 EXCLUDE 里包括的特定系统，其他系统需要作大发行版本的比较
   for ex in "${EXCLUDE[@]}"; do [[ ! $(tr 'A-Z' 'a-z' <<< "$SYS")  =~ $ex ]]; done &&
-  [[ "$(echo "$SYS" | sed "s/[^0-9.]//g" | cut -d. -f1)" -lt "${MAJOR[int]}" ]] && error " $(text_eval 6) "
+  [[ "$(echo "$SYS" | sed "s/[^0-9.]//g" | cut -d. -f1)" -lt "${MAJOR[int]}" ]] && error " $(text 6) "
 }
 
 # 检测 IPv4 IPv6 信息
@@ -355,7 +356,7 @@ enter_start_port() {
     if [ "$PORT_ERROR_TIME" = 0 ]; then
       error "\n $(text 3) \n"
     else
-      [ -z "$START_PORT" ] && reading "\n $(text_eval 11) " START_PORT
+      [ -z "$START_PORT" ] && reading "\n $(text 11) " START_PORT
     fi
     START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}
     if [[ "$START_PORT" =~ ^[1-9][0-9]{3,4}$ && "$START_PORT" -ge "$MIN_PORT" && "$START_PORT" -le "$MAX_PORT" ]]; then
@@ -366,7 +367,7 @@ enter_start_port() {
           lsof -i:$port >/dev/null 2>&1 && IN_USED+=("$port")
         fi
       done
-      [ "${#IN_USED[*]}" -eq 0 ] && break || warning "\n $(text_eval 44) \n"
+      [ "${#IN_USED[*]}" -eq 0 ] && break || warning "\n $(text 44) \n"
     fi
   done
 }
@@ -385,7 +386,7 @@ sing-box_variable() {
       DOMAIN_STRATEG=prefer_ipv6
     else
       WARP_ENDPOINT=162.159.193.10
-      DOMAIN_STRATEG=prefer_ipv4     
+      DOMAIN_STRATEG=prefer_ipv4
     fi
   elif [ -n "$WAN4" ]; then
     SERVER_IP_DEFAULT=$WAN4
@@ -421,7 +422,7 @@ sing-box_variable() {
   fi
 
   # 输入服务器 IP,默认为检测到的服务器 IP，如果全部为空，则提示并退出脚本
-  [ -z "$SERVER_IP" ] && reading "\n $(text_eval 10) " SERVER_IP
+  [ -z "$SERVER_IP" ] && reading "\n $(text 10) " SERVER_IP
   SERVER_IP=${SERVER_IP:-"$SERVER_IP_DEFAULT"} && WS_SERVER_IP=$SERVER_IP
   [ -z "$SERVER_IP" ] && error " $(text 47) "
 
@@ -430,7 +431,7 @@ sing-box_variable() {
     local DOMAIN_ERROR_TIME=5
     until [ -n "$VMESS_HOST_DOMAIN" ]; do
       (( DOMAIN_ERROR_TIME-- )) || true
-      [ "$DOMAIN_ERROR_TIME" != 0 ] && TYPE=VMESS && reading "\n $(text_eval 50) " VMESS_HOST_DOMAIN || error "\n $(text 3) \n"
+      [ "$DOMAIN_ERROR_TIME" != 0 ] && TYPE=VMESS && reading "\n $(text 50) " VMESS_HOST_DOMAIN || error "\n $(text 3) \n"
     done
   fi
 
@@ -438,7 +439,7 @@ sing-box_variable() {
     local DOMAIN_ERROR_TIME=5
     until [ -n "$VLESS_HOST_DOMAIN" ]; do
       (( DOMAIN_ERROR_TIME-- )) || true
-      [ "$DOMAIN_ERROR_TIME" != 0 ] && TYPE=VLESS && reading "\n $(text_eval 50) " VLESS_HOST_DOMAIN || error "\n $(text 3) \n"
+      [ "$DOMAIN_ERROR_TIME" != 0 ] && TYPE=VLESS && reading "\n $(text 50) " VLESS_HOST_DOMAIN || error "\n $(text 3) \n"
     done
   fi
 
@@ -449,11 +450,11 @@ sing-box_variable() {
 
   # 输入 UUID ，错误超过 5 次将会退出
   UUID_DEFAULT=$($TEMP_DIR/sing-box generate uuid)
-  [ -z "$UUID" ] && reading "\n $(text_eval 12) " UUID
+  [ -z "$UUID" ] && reading "\n $(text 12) " UUID
   local UUID_ERROR_TIME=5
   until [[ -z "$UUID" || "$UUID" =~ ^[A-F0-9a-f]{8}-[A-F0-9a-f]{4}-[A-F0-9a-f]{4}-[A-F0-9a-f]{4}-[A-F0-9a-f]{12}$ ]]; do
     (( UUID_ERROR_TIME-- )) || true
-    [ "$UUID_ERROR_TIME" = 0 ] && error "\n $(text 3) \n" || reading "\n $(text_eval 4) \n" UUID
+    [ "$UUID_ERROR_TIME" = 0 ] && error "\n $(text 3) \n" || reading "\n $(text 4) \n" UUID
   done
   UUID=${UUID:-"$UUID_DEFAULT"}
 
@@ -465,7 +466,7 @@ sing-box_variable() {
   else
     NODE_NAME_DEFAULT="Sing-Box"
   fi
-  reading "\n $(text_eval 13) " NODE_NAME
+  reading "\n $(text 13) " NODE_NAME
   NODE_NAME="${NODE_NAME:-"$NODE_NAME_DEFAULT"}"
 }
 
@@ -509,9 +510,11 @@ ssl_certificate() {
 
 # 生成 sing-box 配置文件
 sing-box_json() {
+  local IS_CHANGE=$1
   mkdir -p $WORK_DIR/conf $WORK_DIR/logs
+
   # 生成 dns 配置
-  cat > $WORK_DIR/conf/00_log.json << EOF
+  [ "$IS_CHANGE" != 'change' ] && cat > $WORK_DIR/conf/00_log.json << EOF
 {
     "log":{
         "disabled":false,
@@ -522,7 +525,7 @@ sing-box_json() {
 }
 EOF
   # 生成 outbound 配置
-  cat > $WORK_DIR/conf/01_outbounds.json << EOF
+  [ "$IS_CHANGE" != 'change' ] && cat > $WORK_DIR/conf/01_outbounds.json << EOF
 {
     "outbounds":[
         {
@@ -569,7 +572,7 @@ EOF
 EOF
 
   # 生成 route 配置
-  cat > $WORK_DIR/conf/02_route.json << EOF
+  [ "$IS_CHANGE" != 'change' ] && cat > $WORK_DIR/conf/02_route.json << EOF
 {
     "route":{
         "geoip":{
@@ -929,7 +932,7 @@ EOF
   # 再次检测状态，运行 Sing-box
   check_install
 
-  check_sing-bux_stats
+  check_sing-box_stats
 }
 
 export_list() {
@@ -977,7 +980,7 @@ EOF
   [ -n "$PORT_HYSTERIA2" ] && V2RAYN_PROTOCAL=Hysteria2 && V2RAYN_KERNEL=hysteria2 && cat >> $WORK_DIR/list << EOF
 
 ----------------------------
-$(info "$(text_eval 54)
+$(info "$(text 54)
 
 server: \"${SERVER_IP_1}:${PORT_HYSTERIA2}\"
 auth: ${UUID}
@@ -1000,7 +1003,7 @@ EOF
   [ -n "$PORT_TUIC" ] && V2RAYN_PROTOCAL=Tuic && V2RAYN_KERNEL=sing_box && cat >> $WORK_DIR/list << EOF
 
 ----------------------------
-$(info "$(text_eval 54)
+$(info "$(text 54)
 
 {
     \"log\":{
@@ -1047,7 +1050,7 @@ EOF
   [ -n "$PORT_SHADOWTLS" ] && V2RAYN_PROTOCAL=ShadowTLS && V2RAYN_KERNEL=sing_box && cat >> $WORK_DIR/list << EOF
 
 ----------------------------
-$(info "$(text_eval 54)
+$(info "$(text 54)
 
 {
   \"log\":{
@@ -1106,14 +1109,14 @@ EOF
 ----------------------------
 $(info "vmess://$(base64 -w0 <<< "{ \"v\": \"2\", \"ps\": \"${NODE_NAME} vmess ws\", \"add\": \"${CDN}\", \"port\": \"80\", \"id\": \"${UUID}\", \"aid\": \"0\", \"scy\": \"none\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"${VMESS_HOST_DOMAIN}\", \"path\": \"/${UUID}-vmess\", \"tls\": \"\", \"sni\": \"\", \"alpn\": \"\" }" | sed "s/Cg==$//")
 
-$(text_eval 52)")
+$(text 52)")
 EOF
   [ -n "$PORT_VLESS_WS" ] && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && cat >> $WORK_DIR/list << EOF
 
 ----------------------------
 $(info "vless://${UUID}@${CDN}:443?encryption=none&security=tls&sni=${VLESS_HOST_DOMAIN}&type=ws&host=${VLESS_HOST_DOMAIN}&path=%2F${UUID}-vless%3Fed%3D2048#${NODE_NAME} vless ws
 
-$(text_eval 52)")
+$(text 52)")
 EOF
 
   cat >> $WORK_DIR/list << EOF
@@ -1154,14 +1157,14 @@ EOF
 ----------------------------
 $(hint "vmess://$(base64 -w0 <<< none:${UUID}@${CDN}:80 | sed "s/Cg==$//")?remarks=${NODE_NAME}%20vmess%20ws&obfsParam=${VMESS_HOST_DOMAIN}&path=/${UUID}-vmess&obfs=websocket&alterId=0
 
-$(text_eval 52)")
+$(text 52)")
 EOF
   [ -n "$PORT_VLESS_WS" ] && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && cat >> $WORK_DIR/list << EOF
 
 ----------------------------
 $(hint "vless://$(base64 -w0 <<< "auto:${UUID}@${CDN}:443" | sed "s/Cg==$//")?remarks=${NODE_NAME}%20vless%20ws&obfsParam=${VLESS_HOST_DOMAIN}&path=/${UUID}-vless?ed=2048&obfs=websocket&tls=1&peer=${VLESS_HOST_DOMAIN}&allowInsecure=1
 
-$(text_eval 52)")
+$(text 52)")
 EOF
   cat >> $WORK_DIR/list << EOF
 *******************************************
@@ -1201,14 +1204,14 @@ EOF
 ----------------------------
 $(info "- {name: \"${NODE_NAME} vmess ws\", type: vmess, server: ${CDN}, port: 80, uuid: ${UUID}, udp: true, tls: false, alterId: 0, cipher: none, skip-cert-verify: true, network: ws, ws-opts: { path: \"/${UUID}-vmess\", headers: { Host: ${VMESS_HOST_DOMAIN}, max-early-data: 2048, early-data-header-name: Sec-WebSocket-Protocol} } }
 
-$(text_eval 52)")
+$(text 52)")
 EOF
   [ -n "$PORT_VLESS_WS" ] && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && cat >> $WORK_DIR/list << EOF
 
 ----------------------------
 $(info "- {name: \"${NODE_NAME} vless ws\", type: vless, server: ${CDN}, port: 443, uuid: ${UUID}, udp: true, tls: true, servername: ${VLESS_HOST_DOMAIN}, network: ws, skip-cert-verify: true, ws-opts: { path: \"/${UUID}-vless?ed=2048\", headers: { Host: ${VLESS_HOST_DOMAIN} } } }
 
-$(text_eval 52)")
+$(text 52)")
 EOF
   cat >> $WORK_DIR/list << EOF
 *******************************************
@@ -1250,13 +1253,13 @@ EOF
 ----------------------------
 $(hint "vmess://$(base64 -w0 <<< "{\"add\":\"${CDN}\",\"aid\":\"0\",\"host\":\"${VMESS_HOST_DOMAIN}\",\"id\":\"${UUID}\",\"net\":\"ws\",\"path\":\"/${UUID}-vmess\",\"port\":\"80\",\"ps\":\"${NODE_NAME} vmess ws\",\"scy\":\"none\",\"sni\":\"\",\"tls\":\"\",\"type\":\"\",\"v\":\"2\"}" | sed "s/Cg==$//")
 
-$(text_eval 52)")
+$(text 52)")
 EOF
   [ -n "$PORT_VLESS_WS" ] && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && cat >> $WORK_DIR/list << EOF
 ----------------------------
 $(hint "vless://${UUID}@${CDN}:443?security=tls&sni=${VLESS_HOST_DOMAIN}&type=ws&path=/${UUID}-vless?ed%3D2048&host=${VLESS_HOST_DOMAIN}&encryption=none#${NODE_NAME}%20vless%20ws
 
-$(text_eval 52)")
+$(text 52)")
 EOF
   cat >> $WORK_DIR/list << EOF
 *******************************************
@@ -1264,7 +1267,19 @@ EOF
   cat $WORK_DIR/list
 
   # 显示脚本使用情况数据
-  info "\n $(text_eval 55) \n"
+  info "\n $(text 55) \n"
+}
+
+# 创建快捷方式
+create_shortcut() {
+  cat > $WORK_DIR/sb.sh << EOF
+#!/usr/bin/env bash
+
+bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh) \$1
+EOF
+  chmod +x $WORK_DIR/sb.sh
+  ln -sf $WORK_DIR/sb.sh /usr/bin/sb
+  [ -s /usr/bin/sb ] && info "\n $(text 71) "
 }
 
 # 更换各协议的监听端口
@@ -1431,7 +1446,7 @@ change_protocals() {
     local DOMAIN_ERROR_TIME=5
     until [ -n "$VMESS_HOST_DOMAIN" ]; do
       (( DOMAIN_ERROR_TIME-- )) || true
-      [ "$DOMAIN_ERROR_TIME" != 0 ] && TYPE=VMESS && reading "\n $(text_eval 50) " VMESS_HOST_DOMAIN || error "\n $(text 3) \n"
+      [ "$DOMAIN_ERROR_TIME" != 0 ] && TYPE=VMESS && reading "\n $(text 50) " VMESS_HOST_DOMAIN || error "\n $(text 3) \n"
     done
     PORT_VMESS_WS=${REINSTALL_PORTS[$(awk -v target=$CHECK_PROTOCALS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCALS[*]}")]}
   fi
@@ -1443,7 +1458,7 @@ change_protocals() {
     local DOMAIN_ERROR_TIME=5
     until [ -n "$VLESS_HOST_DOMAIN" ]; do
       (( DOMAIN_ERROR_TIME-- )) || true
-      [ "$DOMAIN_ERROR_TIME" != 0 ] && TYPE=VLESS && reading "\n $(text_eval 50) " VLESS_HOST_DOMAIN || error "\n $(text 3) \n"
+      [ "$DOMAIN_ERROR_TIME" != 0 ] && TYPE=VLESS && reading "\n $(text 50) " VLESS_HOST_DOMAIN || error "\n $(text 3) \n"
     done
     PORT_VLESS_WS=${REINSTALL_PORTS[$(awk -v target=$CHECK_PROTOCALS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCALS[*]}")]}
   fi
@@ -1452,14 +1467,14 @@ change_protocals() {
   input_cdn
 
   # 生成各协议的 json 文件
-  sing-box_json
+  sing-box_json change
 
   systemctl start sing-box
 
   # 再次检测状态，运行 Sing-box
   check_install
 
-  check_sing-bux_stats
+  check_sing-box_stats
 
   export_list
 }
@@ -1468,7 +1483,7 @@ change_protocals() {
 uninstall() {
   if [ -d $WORK_DIR ]; then
     [ "$SYSTEM" = 'Alpine' ] && systemctl stop sing-box 2>/dev/null || cmd_systemctl disable sing-box 2>/dev/null
-    rm -rf $WORK_DIR $TEMP_DIR /etc/systemd/system/sing-box.service
+    rm -rf $WORK_DIR $TEMP_DIR /etc/systemd/system/sing-box.service /usr/bin/sb
     info "\n $(text 16) \n"
   else
     error "\n $(text 15) \n"
@@ -1482,17 +1497,17 @@ uninstall() {
 version() {
   local ONLINE=$(wget -qO- "https://api.github.com/repos/SagerNet/sing-box/releases/latest" | grep "tag_name" | sed "s@.*\"v\(.*\)\",@\1@g")
   local LOCAL=$($WORK_DIR/sing-box version | awk '/version/{print $NF}')
-  info "\n $(text_eval 40) "
+  info "\n $(text 40) "
   [[ -n "$ONLINE" && "$ONLINE" != "$LOCAL" ]] && reading "\n $(text 9) " UPDATE || info " $(text 41) "
 
   if [[ "$UPDATE" = [Yy] ]]; then
     check_system_info
-    wget -O $TEMP_DIR/sing-box.tar.gz ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$ARCH.tar.gz
-    tar xzf $TEMP_DIR/sing-box.tar.gz -C $TEMP_DIR sing-box-$ONLINE-linux-$ARCH/sing-box
+    wget -O $TEMP_DIR/sing-box.tar.gz ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz
+    tar xzf $TEMP_DIR/sing-box.tar.gz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
 
-    if [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$ARCH/sing-box ]; then
+    if [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ]; then
       systemctl stop sing-box
-      chmod +x $TEMP_DIR/sing-box-$ONLINE-linux-$ARCH/sing-box && mv $TEMP_DIR/sing-box-$ONLINE-linux-$ARCH/sing-box $WORK_DIR/sing-box
+      chmod +x $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $WORK_DIR/sing-box
       systemctl start sing-box && sleep 2 && [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 28) $(text 37)" || error "Sing-box $(text 28) $(text 38) "
     else
       local error "\n $(text 42) "
@@ -1526,7 +1541,7 @@ menu_setting() {
     [ -s $WORK_DIR/sing-box ] && SING_BOX_VERSION="version: $($WORK_DIR/sing-box version | awk '/version/{print $NF}')"
     [ -s $WORK_DIR/conf/02_route.json ] && { grep -q 'direct' $WORK_DIR/conf/02_route.json && RETURN_STATUS=$(text 27) || RETURN_STATUS=$(text 28); }
     OPTION[1]="1.  $(text 29)"
-    [ "$STATUS" = "$(text 28)" ] && OPTION[2]="2.  $(text 27) Sing-box" || OPTION[2]="2.  $(text 28) Sing-box"
+    [ "$STATUS" = "$(text 28)" ] && OPTION[2]="2.  $(text 27) Sing-box (sb -o)" || OPTION[2]="2.  $(text 28) Sing-box (sb -o)"
     OPTION[3]="3.  $(text 30)"
     OPTION[4]="4.  $(text 31)"
     OPTION[5]="5.  $(text 32)"
@@ -1551,7 +1566,7 @@ menu_setting() {
     OPTION[3]="3.  $(text 59)"
     OPTION[4]="4.  $(text 69)"
 
-    ACTION[1]() { install_sing-box; export_list; exit; }
+    ACTION[1]() { install_sing-box; export_list; create_shortcut; exit; }
     ACTION[2]() { bash <(wget -qO- --no-check-certificate "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit; }
     ACTION[3]() { bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/argox/main/argox.sh) -$L; exit; }
     ACTION[4]() { bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sba/main/sba.sh) -$L; exit; }
@@ -1562,14 +1577,14 @@ menu() {
   clear
   hint " $(text 2) "
   echo -e "======================================================================================================================\n"
-  info " $(text 17): $VERSION\n $(text 18): $(text 1)\n $(text 19):\n\t $(text 20): $SYS\n\t $(text 21): $(uname -r)\n\t $(text 22): $ARCH\n\t $(text 23): $VIRT "
+  info " $(text 17): $VERSION\n $(text 18): $(text 1)\n $(text 19):\n\t $(text 20): $SYS\n\t $(text 21): $(uname -r)\n\t $(text 22): $SING_BOX_ARCH\n\t $(text 23): $VIRT "
   info "\t IPv4: $WAN4 $WARPSTATUS4 $COUNTRY4  $ASNORG4 "
   info "\t IPv6: $WAN6 $WARPSTATUS6 $COUNTRY6  $ASNORG6 "
   info "\t Sing-box: $STATUS\t $SING_BOX_VERSION "
   [ -n "$PID" ] && info "\t $(text 56): $PID "
   [ -n "$RUNTIME" ] && info "\t $(text 57): $RUNTIME "
   [ -n "$MEMORY_USAGE" ] && info "\t $(text 58): $MEMORY_USAGE MB"
-  [ -n "$NOW_START_PORT" ] && info "\t $(text_eval 45) "
+  [ -n "$NOW_START_PORT" ] && info "\t $(text 45) "
   echo -e "\n======================================================================================================================\n"
   for ((b=1;b<${#OPTION[*]};b++)); do hint " ${OPTION[b]} "; done
   hint " ${OPTION[0]} "
@@ -1582,6 +1597,8 @@ menu() {
     warning " $(text 36) [0-$((${#OPTION[*]}-1))] " && sleep 1 && menu
   fi
 }
+
+statistics_of_run-times
 
 # 传参
 [[ "$*" =~ -[Ee] ]] && L=E
@@ -1599,7 +1616,6 @@ while getopts ":P:p:OoUuVvNnBbRr" OPTNAME; do
   esac
 done
 
-statistics_of_run-times
 select_language
 check_root
 check_arch
