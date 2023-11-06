@@ -15,7 +15,7 @@
 
 * * *
 ## 更新信息
-2023.10.29 v1.0 正式版 1. Sing-box Family bucket v1.0; 2. After installing, add [sb] shortcut; 1. Sing-box 全家桶 v1.0; 2. 安装后，增加 [sb] 的快捷运行方式.
+2023.10.29 v1.0 正式版 1. Sing-box Family bucket v1.0; 2. After installing, add [sb] shortcut; 3. Output the configuration for Sing-box Client; 1. Sing-box 全家桶 v1.0; 2. 安装后，增加 [sb] 的快捷运行方式; 3. 输出 Sing-box Client 配置
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
@@ -40,7 +40,7 @@
 ## 项目特点:
 
 * 一键部署多协议，可以单选、多选或全选 ShadowTLS v3 / Reality / Hysteria2 / Tuic V5 / ShadowSocks / Trojan / Vmess + ws / Vless + ws + tls, 总有一款适合你
-* 节点信息以 V2rayN / Clash Meta / 小火箭 / Nekobox 链接方式输出
+* 节点信息输出到 V2rayN / Clash Meta / 小火箭 / Nekobox / Sing-box
 * 自定义端口，适合有限开放端口的 nat 小鸡
 * 内置 warp 链式代理解锁 chatGPT
 * 不需要域名 ( vmess / vless 方案例外)
@@ -121,7 +121,8 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 
 
 ## 鸣谢下列作者的文章和项目:
-千歌 sing-box 模板: https://github.com/chika0801/sing-box-examples
+千歌 sing-box 模板: https://github.com/chika0801/sing-box-examples   
+瞎折腾 sing-box 模板: https://t.me/ztvps/37
 
 
 ## 免责声明:

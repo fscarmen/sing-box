@@ -4,7 +4,7 @@
 VERSION='v1.0'
 
 # 各变量默认值
-GH_PROXY='https://ghproxy.com/'
+# GH_PROXY='https://ghproxy.com/' # 不稳定，暂不使用
 TEMP_DIR='/tmp/sing-box'
 WORK_DIR='/etc/sing-box'
 START_PORT_DEFAULT='8881'
@@ -22,8 +22,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Sing-box Family bucket v1.0; 2. After installing, add [sb] shortcut."
-C[1]="1. Sing-box 全家桶 v1.0; 2. 安装后，增加 [sb] 的快捷运行方式"
+E[1]="1. Sing-box Family bucket v1.0; 2. After installing, add [ sb ] shortcut; 3. Output the configuration for Sing-box Client"
+C[1]="1. Sing-box 全家桶 v1.0; 2. 安装后，增加 [ sb ] 的快捷运行方式; 3. 输出 Sing-box Client 的配置"
 E[2]="This project is designed to add sing-box support for multiple protocols to VPS, details: [https://github.com/fscarmen/sing-box]\n Script Features:\n\t • Deploy multiple protocols with one click, there is always one for you!\n\t • Custom ports for nat machine with limited open ports.\n\t • Built-in warp chained proxy to unlock chatGPT.\n\t • No domain name is required.\n\t • Support system: Ubuntu, Debian, CentOS, Alpine and Arch Linux 3.\n\t • Support architecture: AMD,ARM and s390x\n"
 C[2]="本项目专为 VPS 添加 sing-box 支持的多种协议, 详细说明: [https://github.com/fscarmen/sing-box]\n 脚本特点:\n\t • 一键部署多协议，总有一款适合你\n\t • 自定义端口，适合有限开放端口的 nat 小鸡\n\t • 内置 warp 链式代理解锁 chatGPT\n\t • 不需要域名\n\t • 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 和 Arch Linux,请务必选择 LTS 系统\n\t • 支持硬件结构类型: AMD 和 ARM\n"
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -162,8 +162,10 @@ E[69]="Install sba scripts (argo + sing-box) [https://github.com/fscarmen/sba]"
 C[69]="安装 sba 脚本 (argo + sing-box) [https://github.com/fscarmen/sba]"
 E[70]="Please set inSecure in tls to true."
 C[70]="请把 tls 里的 inSecure 设置为 true"
-E[71]="Create shortcut [sb] successfully."
-C[71]="创建快捷 [sb] 指令成功!"
+E[71]="Create shortcut [ sb ] successfully."
+C[71]="创建快捷 [ sb ] 指令成功!"
+E[72]="The full template can be found at: https://t.me/ztvps/37"
+C[72]="完整模板可参照: https://t.me/ztvps/37"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -248,10 +250,9 @@ check_install() {
   if [[ $STATUS = "$(text 26)" ]] && [ ! -s $WORK_DIR/sing-box ]; then
     {
     local ONLINE=$(wget -qO- "https://api.github.com/repos/SagerNet/sing-box/releases/latest" | grep "tag_name" | sed "s@.*\"v\(.*\)\",@\1@g")
-    ONLINE=${ONLINE:-'1.5.2'}
-    wget -qO $TEMP_DIR/sing-box.tar.gz ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz >/dev/null 2>&1
-    tar xzf $TEMP_DIR/sing-box.tar.gz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box >/dev/null 2>&1
-    mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR >/dev/null 2>&1
+    ONLINE=${ONLINE:-'1.6.0'}
+    wget -c ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
+    [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
     }&
   fi
 }
@@ -950,8 +951,8 @@ export_list() {
     [ -s $WORK_DIR/conf/*_SHADOWTLS_inbounds.json ] && PORT_SHADOWTLS=$(sed -n '/listen_port/s/[^0-9]\+//gp' $WORK_DIR/conf/*_SHADOWTLS_inbounds.json)
     [ -s $WORK_DIR/conf/*_SHADOWSOCKS_inbounds.json ] && PORT_SHADOWSOCKS=$(sed -n '/listen_port/s/[^0-9]\+//gp' $WORK_DIR/conf/*_SHADOWSOCKS_inbounds.json)
     [ -s $WORK_DIR/conf/*_TROJAN_inbounds.json ] && PORT_TROJAN=$(sed -n '/listen_port/s/[^0-9]\+//gp' $WORK_DIR/conf/*_TROJAN_inbounds.json)
-    [ -s $WORK_DIR/conf/*_VMESS_WS_inbounds.json ] && WS_SERVER_IP=${WS_SERVER_IP:-"$(grep -A2 "{name.*vmess[ ]\+ws" $WORK_DIR/list | awk -F'[][]' 'NR==3 {print $2}'))"} && VMESS_HOST_DOMAIN=${VMESS_HOST_DOMAIN:-"$(grep -A2 "{name.*vmess[ ]\+ws" $WORK_DIR/list | awk -F'[][]' 'NR==3 {print $4}')"} && PORT_VMESS_WS=${PORT_VMESS_WS:-"$(sed -n '/listen_port/s/[^0-9]\+//gp' $WORK_DIR/conf/*_VMESS_WS_inbounds.json)"} && CDN=${CDN:-"$(sed -n "s/.*{name.*vmess[ ]\+ws.*server:[ ]\+\([^,]\+\).*/\1/gp" $WORK_DIR/list)"}
-    [ -s $WORK_DIR/conf/*_VLESS_WS_inbounds.json ] && WS_SERVER_IP=${WS_SERVER_IP:-"$(grep -A2 "{name.*vless[ ]\+ws" $WORK_DIR/list | awk -F'[][]' 'NR==3 {print $2}'))"} && VLESS_HOST_DOMAIN=${VLESS_HOST_DOMAIN:-"$(grep -A2 "{name.*vless[ ]\+ws" $WORK_DIR/list | awk -F'[][]' 'NR==3 {print $4}')"} && PORT_VLESS_WS=${PORT_VLESS_WS:-"$(sed -n '/listen_port/s/[^0-9]\+//gp' $WORK_DIR/conf/*_VLESS_WS_inbounds.json)"} && CDN=${CDN:-"$(sed -n "s/.*{name.*vless[ ]\+ws.*server:[ ]\+\([^,]\+\).*/\1/gp" $WORK_DIR/list)"}
+    [ -s $WORK_DIR/conf/*_VMESS_WS_inbounds.json ] && WS_SERVER_IP=${WS_SERVER_IP:-"$(grep -A2 "{name.*vmess[ ]\+ws" $WORK_DIR/list | awk -F'[][]' 'NR==3 {print $2}')"} && VMESS_HOST_DOMAIN=${VMESS_HOST_DOMAIN:-"$(grep -A2 "{name.*vmess[ ]\+ws" $WORK_DIR/list | awk -F'[][]' 'NR==3 {print $4}')"} && PORT_VMESS_WS=${PORT_VMESS_WS:-"$(sed -n '/listen_port/s/[^0-9]\+//gp' $WORK_DIR/conf/*_VMESS_WS_inbounds.json)"} && CDN=${CDN:-"$(sed -n "s/.*{name.*vmess[ ]\+ws.*server:[ ]\+\([^,]\+\).*/\1/gp" $WORK_DIR/list)"}
+    [ -s $WORK_DIR/conf/*_VLESS_WS_inbounds.json ] && WS_SERVER_IP=${WS_SERVER_IP:-"$(grep -A2 "{name.*vless[ ]\+ws" $WORK_DIR/list | awk -F'[][]' 'NR==3 {print $2}')"} && VLESS_HOST_DOMAIN=${VLESS_HOST_DOMAIN:-"$(grep -A2 "{name.*vless[ ]\+ws" $WORK_DIR/list | awk -F'[][]' 'NR==3 {print $4}')"} && PORT_VLESS_WS=${PORT_VLESS_WS:-"$(sed -n '/listen_port/s/[^0-9]\+//gp' $WORK_DIR/conf/*_VLESS_WS_inbounds.json)"} && CDN=${CDN:-"$(sed -n "s/.*{name.*vless[ ]\+ws.*server:[ ]\+\([^,]\+\).*/\1/gp" $WORK_DIR/list)"}
   fi
 
   # IPv6 时的 IP 处理
@@ -1027,7 +1028,7 @@ $(info "$(text 54)
             \"password\":\"${UUID}\",
             \"server\":\"${SERVER_IP}\",
             \"server_port\":${PORT_TUIC},
-            \"tag\":\"proxy\",
+            \"tag\": \"proxy\",
             \"tls\":{
                 \"alpn\":[
                     \"h3\",
@@ -1063,7 +1064,7 @@ $(info "$(text 54)
           \"listen_port\":${PORT_SHADOWTLS},
           \"sniff\":true,
           \"sniff_override_destination\":false,
-          \"tag\":\"ShadowTLS\",
+          \"tag\": \"ShadowTLS\",
           \"type\":\"mixed\"
       }
   ],
@@ -1081,10 +1082,14 @@ $(info "$(text 54)
           \"password\":\"${UUID}\",
           \"server\":\"${SERVER_IP}\",
           \"server_port\":${PORT_SHADOWTLS},
-          \"tag\":\"shadowtls-out\",
+          \"tag\": \"shadowtls-out\",
           \"tls\":{
               \"enabled\":true,
-              \"server_name\":\"${TLS_SERVER}\"
+              \"server_name\":\"${TLS_SERVER}\",
+              \"utls\": {
+                \"enabled\": true,
+                \"fingerprint\": \"chrome\"
+              }
           },
           \"type\":\"shadowtls\",
           \"version\":3
@@ -1239,7 +1244,7 @@ $(hint "nekoray://custom#$(base64 -w0 <<< "{\"_v\":0,\"addr\":\"127.0.0.1\",\"cm
 
 nekoray://shadowsocks#$(base64 -w0 <<< "{\"_v\":0,\"method\":\"2022-blake3-aes-128-gcm\",\"name\":\"2-ss-not-use\",\"pass\":\"${SHADOWTLS_PASSWORD}\",\"port\":0,\"stream\":{\"ed_len\":0,\"insecure\":false,\"mux_s\":0,\"net\":\"tcp\"},\"uot\":0}")
 
-$(text 48)")
+ $(text 48)")
 EOF
   [ -n "$PORT_SHADOWSOCKS" ] && cat >> $WORK_DIR/list << EOF
 ----------------------------
@@ -1263,7 +1268,230 @@ $(text 52)")
 EOF
   cat >> $WORK_DIR/list << EOF
 *******************************************
+┌────────────────┐
+│                │
+│    $(warning "Sing-box")    │
+│                │
+└────────────────┘
+----------------------------
+$(info "{
+  \"outbounds\":[")
 EOF
+  [ -n "$PORT_REALITY" ] && cat >> $WORK_DIR/list << EOF
+$(info "      {
+        \"type\": \"vless\",
+        \"tag\": \"${NODE_NAME} vless-reality-vision\",
+        \"server\":\"${SERVER_IP}\",
+        \"server_port\":${PORT_REALITY},
+        \"uuid\":\"${UUID}\",
+        \"flow\":\"xtls-rprx-vision\",
+        \"packet_encoding\":\"xudp\",
+        \"tls\":{
+            \"enabled\":true,
+            \"server_name\":\"${TLS_SERVER}\",
+            \"utls\":{
+                \"enabled\":true,
+                \"fingerprint\":\"chrome\"
+            },
+            \"reality\":{
+                \"enabled\":true,
+                \"public_key\":\"${REALITY_PUBLIC}\",
+                \"short_id\":\"\"
+            }
+        },
+        \"multiplex\": {
+          \"enabled\": true,
+          \"protocol\": \"h2mux\",
+          \"max_connections\": 16,
+          \"padding\": true
+        }
+      },")
+EOF
+  [ -n "$PORT_HYSTERIA2" ] && cat >> $WORK_DIR/list << EOF
+$(info "      {
+        \"type\": \"hysteria2\",
+        \"tag\": \"${NODE_NAME} hysteria2\",
+        \"server\": \"${SERVER_IP}\",
+        \"server_port\": ${PORT_HYSTERIA2},
+        \"up_mbps\": 200,
+        \"down_mbps\": 1000,
+        \"obfs\": {
+          \"type\": \"salamander\",
+          \"password\": \"${UUID}\"
+        },
+        \"password\": \"${UUID}\",
+        \"tls\": {
+            \"enabled\": true,
+            \"insecure\": true,
+            \"server_name\": \"\",
+            \"alpn\": [ \"h3\" ]
+        }
+      },")
+EOF
+  [ -n "$PORT_TUIC" ] && cat >> $WORK_DIR/list << EOF
+$(info "      {
+        \"type\": \"tuic\",
+        \"tag\": \"${NODE_NAME} tuic\",
+        \"server\": \"${SERVER_IP}\",
+        \"server_port\": ${PORT_TUIC},
+        \"uuid\": \"${UUID}\",
+        \"password\": \"${UUID}\",
+        \"congestion_control\": \"bbr\",
+        \"udp_relay_mode\": \"native\",
+        \"zero_rtt_handshake\": false,
+        \"heartbeat\": \"10s\",
+        \"tls\": {
+            \"enabled\": true,
+            \"insecure\": true,
+            \"server_name\": \"\",
+            \"alpn\": [ \"h3\" ]
+        }
+      },")
+EOF
+  [ -n "$PORT_SHADOWTLS" ] && cat >> $WORK_DIR/list << EOF
+$(info "      {
+        \"type\": \"shadowsocks\",
+        \"tag\": \"${NODE_NAME} ShadowTLS v3\",
+        \"method\": \"2022-blake3-aes-128-gcm\",
+        \"password\": \"${SHADOWTLS_PASSWORD}\",
+        \"detour\": \"shadowtls-out\",
+        \"udp_over_tcp\": false,
+        \"multiplex\": {
+          \"enabled\": true,
+          \"protocol\": \"h2mux\",
+          \"max_connections\": 16,
+          \"padding\": true
+        }
+      },
+      {
+        \"type\": \"shadowtls\",
+        \"tag\": \"shadowtls-out\",
+        \"server\": \"${SERVER_IP}\",
+        \"server_port\": ${PORT_SHADOWTLS},
+        \"version\": 3,
+        \"password\": \"${UUID}\",
+        \"tls\": {
+          \"enabled\": true,
+          \"server_name\": \"${TLS_SERVER}\",
+          \"utls\": {
+            \"enabled\": true,
+            \"fingerprint\": \"chrome\"
+          }
+        }
+      },")
+EOF
+  [ -n "$PORT_SHADOWSOCKS" ] && cat >> $WORK_DIR/list << EOF
+$(info "      {
+        \"type\": \"shadowsocks\",
+        \"tag\": \"${NODE_NAME} ss\",
+        \"server\": \"${SERVER_IP}\",
+        \"server_port\": ${PORT_SHADOWSOCKS},
+        \"method\": \"aes-128-gcm\",
+        \"password\": \"${UUID}\",
+        \"multiplex\": {
+          \"enabled\": true,
+          \"protocol\": \"h2mux\",
+          \"max_connections\": 16,
+          \"padding\": true
+        }
+      },")
+EOF
+  [ -n "$PORT_TROJAN" ] && cat >> $WORK_DIR/list << EOF
+$(info "      {
+        \"type\": \"trojan\",
+        \"tag\": \"${NODE_NAME} trojan\",
+        \"server\": \"${SERVER_IP}\",
+        \"server_port\": ${PORT_TROJAN},
+        \"password\": \"${UUID}\",
+        \"tls\": {
+          \"enabled\":true,
+          \"insecure\": true,
+          \"server_name\":\"\",
+          \"utls\": {
+            \"enabled\":true,
+            \"fingerprint\":\"chrome\"
+          }
+        },
+        \"multiplex\": {
+          \"enabled\":true,
+          \"protocol\":\"h2mux\",
+          \"max_connections\": 16,
+          \"padding\":true
+        }
+      },")
+EOF
+  [ -n "$PORT_VMESS_WS" ] && TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VMESS_WS && cat >> $WORK_DIR/list << EOF
+$(info "      {
+        \"type\": \"vmess\",
+        \"tag\": \"${NODE_NAME} vmess ws\",
+        \"server\":\"${CDN}\",
+        \"server_port\":80,
+        \"uuid\":\"${UUID}\",
+        \"transport\": {
+          \"type\":\"ws\",
+          \"path\":\"/${UUID}-vmess\",
+          \"headers\": {
+            \"Host\": \"${VMESS_HOST_DOMAIN}\"
+          },
+          \"max_early_data\":2408,
+          \"early_data_header_name\":\"Sec-WebSocket-Protocol\"
+        },
+        \"multiplex\": {
+          \"enabled\":true,
+          \"protocol\":\"h2mux\",
+          \"max_streams\":16,
+          \"padding\":true
+        }
+      },")
+EOF
+  [ -n "$PORT_VLESS_WS" ] && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && cat >> $WORK_DIR/list << EOF
+$(info "      {
+        \"type\": \"vless\",
+        \"tag\": \"${NODE_NAME} vless ws\",
+        \"server\":\"${CDN}\",
+        \"server_port\":443,
+        \"uuid\":\"${UUID}\",
+        \"tls\": {
+          \"enabled\":true,
+          \"server_name\":\"${VLESS_HOST_DOMAIN}\",
+          \"utls\": {
+            \"enabled\":true,
+            \"fingerprint\":\"chrome\"
+          }
+        },
+        \"transport\": {
+          \"type\":\"ws\",
+          \"path\":\"/${UUID}-vless\",
+          \"headers\": {
+            \"Host\": \"${VLESS_HOST_DOMAIN}\"
+          },
+          \"max_early_data\":2408,
+          \"early_data_header_name\":\"Sec-WebSocket-Protocol\"
+        },
+        \"multiplex\": {
+          \"enabled\":true,
+          \"protocol\":\"h2mux\",
+          \"max_streams\":16,
+          \"padding\":true
+        }
+      },")
+EOF
+
+sed -i '$s/},/}/' $WORK_DIR/list
+
+  cat >> $WORK_DIR/list << EOF
+$(info "  ]
+}
+
+ $(text 72)")
+EOF
+
+  [ -n "$PORT_VMESS_WS" ] && TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VMESS_WS && hint "\n $(text 52)" >> $WORK_DIR/list
+
+  [ -n "$PORT_VLESS_WS" ] && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && hint "\n $(text 52)" >> $WORK_DIR/list
+
+
+  # 显示节点信息
   cat $WORK_DIR/list
 
   # 显示脚本使用情况数据
@@ -1502,8 +1730,7 @@ version() {
 
   if [[ "$UPDATE" = [Yy] ]]; then
     check_system_info
-    wget -O $TEMP_DIR/sing-box.tar.gz ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz
-    tar xzf $TEMP_DIR/sing-box.tar.gz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
+    wget -c ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
 
     if [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ]; then
       systemctl stop sing-box
@@ -1611,7 +1838,7 @@ while getopts ":P:p:OoUuVvNnBbRr" OPTNAME; do
     'U'|'u' ) select_language; check_system_info; uninstall; exit 0 ;;
     'N'|'n' ) select_language; [ ! -s $WORK_DIR/list ] && error " Sing-box $(text 26) "; export_list; exit 0 ;;
     'V'|'v' ) select_language; check_arch; version; exit 0 ;;
-    'B'|'b' ) select_language; bash <(wget -qO- --no-check-certificate "https://raw.githubusercontents.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit ;;
+    'B'|'b' ) select_language; bash <(wget -qO- --no-check-certificate "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit ;;
     'R'|'r' ) select_language; check_system_info; change_protocals; exit 0 ;;
   esac
 done
