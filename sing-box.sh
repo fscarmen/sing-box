@@ -4,7 +4,7 @@
 VERSION='v1.0'
 
 # 各变量默认值
-# GH_PROXY='https://ghproxy.com/' # 不稳定，暂不使用
+GH_PROXY='https://gh-proxy.com/' # 不稳定，暂不使用
 TEMP_DIR='/tmp/sing-box'
 WORK_DIR='/etc/sing-box'
 START_PORT_DEFAULT='8881'
@@ -166,6 +166,8 @@ E[71]="Create shortcut [ sb ] successfully."
 C[71]="创建快捷 [ sb ] 指令成功!"
 E[72]="The full template can be found at: https://t.me/ztvps/37"
 C[72]="完整模板可参照: https://t.me/ztvps/37"
+E[73]="There is no protocol left, if you are sure please re-run [ sb -u ] to uninstall all."
+C[73]="没有协议剩下，如确定请重新执行 [ sb -u ] 卸载所有"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -1571,8 +1573,9 @@ change_protocals() {
     done
   fi
 
-  # 重新安装 = 保留 + 新增
+  # 重新安装 = 保留 + 新增，如数量为 0 ，则触发卸载
   REINSTALL_PROTOCALS=(${KEEP_PROTOCALS[@]} ${ADD_PROTOCALS[@]})
+  [ "${#REINSTALL_PROTOCALS[@]}" = 0 ] && error "\n $(text 73) "
 
   # 显示重新安装的协议列表，并确认是否正确
   hint "\n $(text 67) (${#REINSTALL_PROTOCALS[@]})"
@@ -1751,10 +1754,7 @@ menu_setting() {
     # 查进程号，sing-box 运行时长 和 内存占用
     if [ "$STATUS" = "$(text 28)" ]; then
       if [ "$SYSTEM" = 'Alpine' ]; then
-        PS=$(ps -ef | grep -nm1 "$WORK_DIR/conf/")
-        PS_ROW=$(awk -F ':' 'NR==1 {print $1}' <<< "$PS")
-        PID=$(sed "s/[0-9]\+:[ ]*\([0-9]\+\) .*/\1/" <<< "$PS")
-        RUNTIME=$(ps -o etime | sed -n ${PS_ROW}p)
+        PID=$(pidof sing-box | sed -n 1p)
       else
         SYSTEMCTL_STATUS=$(systemctl status sing-box)
         PID=$(awk '/PID/{print $3}' <<< "$SYSTEMCTL_STATUS")
