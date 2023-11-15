@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.0'
+VERSION='v1.0.1'
 
 # 各变量默认值
 GH_PROXY='https://gh-proxy.com/' # 不稳定，暂不使用
@@ -11,10 +11,10 @@ START_PORT_DEFAULT='8881'
 MIN_PORT=1000
 MAX_PORT=65525
 TLS_SERVER=addons.mozilla.org
-CDN_DEFAULT=www.who.int
+CDN_DEFAULT=cn.azhz.eu.org
 PROTOCAL_LIST=("reality" "hysteria2" "tuic" "shadowTLS" "shadowsocks" "trojan" "vmess + ws" "vless + ws + tls")
 CONSECUTIVE_PORTS=${#PROTOCAL_LIST[@]}
-CDN_DOMAIN=("www.who.int" "cdn.anycast.eu.org" "443.cf.bestl.de" "cn.azhz.eu.org" "cfip.gay")
+CDN_DOMAIN=("cn.azhz.eu.org" "www.who.int" "cdn.anycast.eu.org" "443.cf.bestl.de" "cfip.gay")
 
 trap "rm -rf $TEMP_DIR >/dev/null 2>&1 ; echo -e '\n' ;exit 1" INT QUIT TERM EXIT
 
@@ -22,8 +22,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Sing-box Family bucket v1.0; 2. After installing, add [ sb ] shortcut; 3. Output the configuration for Sing-box Client"
-C[1]="1. Sing-box 全家桶 v1.0; 2. 安装后，增加 [ sb ] 的快捷运行方式; 3. 输出 Sing-box Client 的配置"
+E[1]="1. Support TCP brutal. Reinstall is required; 2. Use alpha verion instead of latest; 3. Change the default CDN to [ cn.azhz.eu.org ]"
+C[1]="1. 支持 TCP brutal，需要重新安装; 2. 由于 Sing-box 更新极快，将使用 alpha 版本替代 latest; 3. 默认优选改为 [ cn.azhz.eu.org ]"
 E[2]="This project is designed to add sing-box support for multiple protocols to VPS, details: [https://github.com/fscarmen/sing-box]\n Script Features:\n\t • Deploy multiple protocols with one click, there is always one for you!\n\t • Custom ports for nat machine with limited open ports.\n\t • Built-in warp chained proxy to unlock chatGPT.\n\t • No domain name is required.\n\t • Support system: Ubuntu, Debian, CentOS, Alpine and Arch Linux 3.\n\t • Support architecture: AMD,ARM and s390x\n"
 C[2]="本项目专为 VPS 添加 sing-box 支持的多种协议, 详细说明: [https://github.com/fscarmen/sing-box]\n 脚本特点:\n\t • 一键部署多协议，总有一款适合你\n\t • 自定义端口，适合有限开放端口的 nat 小鸡\n\t • 内置 warp 链式代理解锁 chatGPT\n\t • 不需要域名\n\t • 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 和 Arch Linux,请务必选择 LTS 系统\n\t • 支持硬件结构类型: AMD 和 ARM\n"
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -251,8 +251,8 @@ check_install() {
   STATUS=$(text 26) && [ -s /etc/systemd/system/sing-box.service ] && STATUS=$(text 27) && [ "$(systemctl is-active sing-box)" = 'active' ] && STATUS=$(text 28)
   if [[ $STATUS = "$(text 26)" ]] && [ ! -s $WORK_DIR/sing-box ]; then
     {
-    local ONLINE=$(wget -qO- "https://api.github.com/repos/SagerNet/sing-box/releases/latest" | grep "tag_name" | sed "s@.*\"v\(.*\)\",@\1@g")
-    ONLINE=${ONLINE:-'1.6.0'}
+    local ONLINE=$(wget -qO- "https://api.github.com/repos/SagerNet/sing-box/releases" | awk -F '["v]' '/tag_name.*alpha/{print $5; exit}')
+    ONLINE=${ONLINE:-'1.7.0-alpha.11'}
     wget -c ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
     }&
@@ -635,6 +635,15 @@ EOF
                         ""
                     ]
                 }
+            },
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
             }
         }
     ]
@@ -703,7 +712,8 @@ EOF
                     "password":"$UUID"
                 }
             ],
-            "congestion_control":"bbr",
+            "congestion_control": "bbr",
+            "zero_rtt_handshake": false,
             "tls":{
                 "enabled":true,
                 "alpn":[
@@ -751,7 +761,16 @@ EOF
             "listen":"127.0.0.1",
             "network":"tcp",
             "method":"2022-blake3-aes-128-gcm",
-            "password":"$SHADOWTLS_PASSWORD"
+            "password":"$SHADOWTLS_PASSWORD",
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
+            }
         }
     ]
 }
@@ -773,7 +792,16 @@ EOF
             "listen":"::",
             "listen_port":$PORT_SHADOWSOCKS,
             "method":"aes-128-gcm",
-            "password":"$UUID"
+            "password":"$UUID",
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
+            }
         }
     ]
 }
@@ -803,6 +831,15 @@ EOF
                 "enabled":true,
                 "certificate_path":"$WORK_DIR/cert/cert.pem",
                 "key_path":"$WORK_DIR/cert/private.key"
+            },
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
             }
         }
     ]
@@ -837,6 +874,15 @@ EOF
                 "path":"/${UUID}-vmess",
                 "max_early_data":2048,
                 "early_data_header_name":"Sec-WebSocket-Protocol"
+            },
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
             }
         }
     ]
@@ -879,6 +925,15 @@ EOF
                 "max_version":"1.3",
                 "certificate_path":"${WORK_DIR}/cert/cert.pem",
                 "key_path":"${WORK_DIR}/cert/private.key"
+            },
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
             }
         }
     ]
@@ -1077,7 +1132,13 @@ $(info "$(text 54)
           \"method\":\"2022-blake3-aes-128-gcm\",
           \"password\":\"${SHADOWTLS_PASSWORD}\",
           \"type\":\"shadowsocks\",
-          \"udp_over_tcp\":false
+          \"udp_over_tcp\": false,
+          \"multiplex\": {
+            \"enabled\": true,
+            \"protocol\": \"h2mux\",
+            \"max_connections\": 16,
+            \"padding\": true
+          }  
       },
       {
           \"domain_strategy\":\"\",
@@ -1092,6 +1153,10 @@ $(info "$(text 54)
                 \"enabled\": true,
                 \"fingerprint\": \"chrome\"
               }
+          },
+          \"multiplex\":{
+            \"enabled\":true,
+            \"padding\":true
           },
           \"type\":\"shadowtls\",
           \"version\":3
@@ -1418,7 +1483,7 @@ $(info "      {
           \"enabled\":true,
           \"protocol\":\"h2mux\",
           \"max_connections\": 16,
-          \"padding\":true
+          \"padding\": true
         }
       },")
 EOF
@@ -1442,7 +1507,7 @@ $(info "      {
           \"enabled\":true,
           \"protocol\":\"h2mux\",
           \"max_streams\":16,
-          \"padding\":true
+          \"padding\": true
         }
       },")
 EOF
@@ -1474,7 +1539,7 @@ $(info "      {
           \"enabled\":true,
           \"protocol\":\"h2mux\",
           \"max_streams\":16,
-          \"padding\":true
+          \"padding\": true
         }
       },")
 EOF
@@ -1726,7 +1791,7 @@ uninstall() {
 
 # Sing-box 的最新版本
 version() {
-  local ONLINE=$(wget -qO- "https://api.github.com/repos/SagerNet/sing-box/releases/latest" | grep "tag_name" | sed "s@.*\"v\(.*\)\",@\1@g")
+  local ONLINE=$(wget -qO- "https://api.github.com/repos/SagerNet/sing-box/releases" | awk -F '["v]' '/tag_name.*alpha/{print $5; exit}')
   local LOCAL=$($WORK_DIR/sing-box version | awk '/version/{print $NF}')
   info "\n $(text 40) "
   [[ -n "$ONLINE" && "$ONLINE" != "$LOCAL" ]] && reading "\n $(text 9) " UPDATE || info " $(text 41) "
