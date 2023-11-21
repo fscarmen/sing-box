@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.1.0'
+VERSION='v1.1.1'
 
 # 各变量默认值
 GH_PROXY='https://gh-proxy.com/'
@@ -22,8 +22,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Add [ H2 + Reality ] and [ gRPC + Reality ]. Reinstall is required; 2. Use beta verion instead of alpha; 3. Support TCP brutal and add the official install script."
-C[1]="1. 增加 [ H2 + Reality ] 和 [ gRPC + Reality ]，需要重新安装; 2. 由于 Sing-box 更新极快，将使用 beta 版本替代 alpha; 3. 支持 TCP brutal， 并提供官方安装脚本"
+E[1]="1. XTLS + REALITY remove flow: xtls-reality-vision to support multiplexing and TCP brutal (requires reinstallation); 2. Clash meta add multiplexing parameter."
+C[1]="1. XTLS + REALITY 去掉 xtls-reality-vision 流控以支持多路复用和 TCP brutal (需要重新安装); 2. Clash meta 增加多路复用参数"
 E[2]="This project is designed to add sing-box support for multiple protocols to VPS, details: [https://github.com/fscarmen/sing-box]\n Script Features:\n\t • Deploy multiple protocols with one click, there is always one for you!\n\t • Custom ports for nat machine with limited open ports.\n\t • Built-in warp chained proxy to unlock chatGPT.\n\t • No domain name is required.\n\t • Support system: Ubuntu, Debian, CentOS, Alpine and Arch Linux 3.\n\t • Support architecture: AMD,ARM and s390x\n"
 C[2]="本项目专为 VPS 添加 sing-box 支持的多种协议, 详细说明: [https://github.com/fscarmen/sing-box]\n 脚本特点:\n\t • 一键部署多协议，总有一款适合你\n\t • 自定义端口，适合有限开放端口的 nat 小鸡\n\t • 内置 warp 链式代理解锁 chatGPT\n\t • 不需要域名\n\t • 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 和 Arch Linux,请务必选择 LTS 系统\n\t • 支持硬件结构类型: AMD 和 ARM\n"
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -258,7 +258,7 @@ check_install() {
   if [[ $STATUS = "$(text 26)" ]] && [ ! -s $WORK_DIR/sing-box ]; then
     {
     local ONLINE=$(wget --no-check-certificate -qO- "https://api.github.com/repos/SagerNet/sing-box/releases" | awk -F '["v]' '/tag_name.*beta/{print $5; exit}')
-    ONLINE=${ONLINE:-'1.7.0-beta.3'}
+    ONLINE=${ONLINE:-'1.7.0-beta.5'}
     wget --no-check-certificate -c ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
     }&
@@ -624,7 +624,7 @@ EOF
             "users":[
                 {
                     "uuid":"$UUID",
-                    "flow":"xtls-rprx-vision"
+                    "flow":""
                 }
             ],
             "tls":{
@@ -1108,7 +1108,7 @@ export_list() {
     UUID=${UUID:-"$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | grep -m1 '{name' | sed -En 's/.*password:[ ]+[\"]*|.*uuid:[ ]+[\"]*(.*)/\1/gp' | sed "s/\([^,\"]\+\).*/\1/g")"}
     SHADOWTLS_PASSWORD=${SHADOWTLS_PASSWORD:-"$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | sed -n 's/.*{name.*password:[ ]*\"\([^\"]\+\)".*shadow-tls.*/\1/pg')"}
     TLS_SERVER=${TLS_SERVER:-"$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | grep -Em1 '\{name.*shadow-tls|\{name.*public-key' | sed -n "s/.*servername:[ ]\+\([^\,]\+\).*/\1/gp; s/.*host:[ ]\+\"\([^\"]\+\).*/\1/gp")"}
-    NODE_NAME=${NODE_NAME:-"$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | grep -m1 '{name' | sed 's/- {name:[ ]\+"//; s/[ ]\+ShadowTLS[ ]\+v3.*//; s/[ ]\+xtls-reality-vision.*//; s/[ ]\+hysteria2.*//; s/[ ]\+tuic.*//; s/[ ]\+ss.*//; s/[ ]\+trojan.*//; s/[ ]\+trojan.*//; s/[ ]\+vmess[ ]\+ws.*//; s/[ ]\+vless[ ]\+.*//')"}
+    NODE_NAME=${NODE_NAME:-"$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | grep -m1 '{name' | sed 's/- {name:[ ]\+"//; s/[ ]\+ShadowTLS[ ]\+v3.*//; s/[ ]\+xtls-reality.*//; s/[ ]\+hysteria2.*//; s/[ ]\+tuic.*//; s/[ ]\+ss.*//; s/[ ]\+trojan.*//; s/[ ]\+trojan.*//; s/[ ]\+vmess[ ]\+ws.*//; s/[ ]\+vless[ ]\+.*//')"}
     REALITY_PUBLIC=${REALITY_PUBLIC:-"$(sed -n 's/.*{name.*public-key:[ ]*\([^,]\+\).*/\1/pg' $WORK_DIR/list | sed -n 1p)"}
     [ -s $WORK_DIR/conf/*_XTLS_REALITY_inbounds.json ] && PORT_XTLS_REALITY=$(sed -n '/listen_port/s/[^0-9]\+//gp' $WORK_DIR/conf/*_XTLS_REALITY_inbounds.json)
     [ -s $WORK_DIR/conf/*_HYSTERIA2_inbounds.json ] && PORT_HYSTERIA2=$(sed -n '/listen_port/s/[^0-9]\+//gp' $WORK_DIR/conf/*_HYSTERIA2_inbounds.json)
@@ -1143,7 +1143,7 @@ EOF
   [ -n "$PORT_XTLS_REALITY" ] && cat >> $WORK_DIR/list << EOF
 
 ----------------------------
-$(info "vless://${UUID}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${TLS_SERVER}&fp=chrome&pbk=${REALITY_PUBLIC}&type=tcp&headerType=none#${NODE_NAME} xtls-reality-vision")
+$(info "vless://${UUID}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?encryption=none&security=reality&sni=${TLS_SERVER}&fp=chrome&pbk=${REALITY_PUBLIC}&type=tcp&headerType=none#${NODE_NAME} xtls-reality")
 EOF
   [ -n "$PORT_HYSTERIA2" ] && V2RAYN_PROTOCOL=Hysteria2 && V2RAYN_KERNEL=hysteria2 && cat >> $WORK_DIR/list << EOF
 
@@ -1246,7 +1246,8 @@ $(info "$(text 54)
           \"multiplex\": {
             \"enabled\": true,
             \"protocol\": \"h2mux\",
-            \"max_connections\": 16,
+            \"max_connections\": 8,
+            \"min_streams\": 16,
             \"padding\": true
           }
       },
@@ -1323,7 +1324,7 @@ EOF
 EOF
   [ -n "$PORT_XTLS_REALITY" ] && cat >> $WORK_DIR/list << EOF
 
-$(hint "vless://$(base64 -w0 <<< auto:$UUID@${SERVER_IP_2}:${PORT_XTLS_REALITY} | sed "s/Cg==$//")?remarks=${NODE_NAME}%20xtls-reality-vision&obfs=none&tls=1&peer=$TLS_SERVER&xtls=2&pbk=$REALITY_PUBLIC")
+$(hint "vless://$(base64 -w0 <<< auto:$UUID@${SERVER_IP_2}:${PORT_XTLS_REALITY} | sed "s/Cg==$//")?remarks=${NODE_NAME}%20xtls-reality&obfs=none&tls=1&peer=$TLS_SERVER&mux=1&pbk=$REALITY_PUBLIC")
 EOF
   [ -n "$PORT_HYSTERIA2" ] && cat >> $WORK_DIR/list << EOF
 
@@ -1382,7 +1383,7 @@ EOF
 EOF
   [ -n "$PORT_XTLS_REALITY" ] && cat >> $WORK_DIR/list << EOF
 
-$(info "- {name: \"${NODE_NAME} xtls-reality-vision\", type: vless, server: ${SERVER_IP}, port: ${PORT_XTLS_REALITY}, uuid: ${UUID}, network: tcp, udp: true, tls: true, servername: ${TLS_SERVER}, flow: xtls-rprx-vision, client-fingerprint: chrome, reality-opts: {public-key: ${REALITY_PUBLIC}, short-id: \"\"} }")
+$(info "- {name: \"${NODE_NAME} xtls-reality\", type: vless, server: ${SERVER_IP}, port: ${PORT_XTLS_REALITY}, uuid: ${UUID}, network: tcp, udp: true, tls: true, servername: ${TLS_SERVER}, client-fingerprint: chrome, reality-opts: {public-key: ${REALITY_PUBLIC}, short-id: \"\"}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }")
 EOF
   [ -n "$PORT_HYSTERIA2" ] && cat >> $WORK_DIR/list << EOF
 
@@ -1394,31 +1395,31 @@ $(info "- {name: \"${NODE_NAME} tuic\", type: tuic, server: ${SERVER_IP}, port: 
 EOF
   [ -n "$PORT_SHADOWTLS" ] && cat >> $WORK_DIR/list << EOF
 
-$(info "- {name: \"${NODE_NAME} ShadowTLS v3\", type: ss, server: ${SERVER_IP}, port: ${PORT_SHADOWTLS}, cipher: 2022-blake3-aes-128-gcm, password: \"${SHADOWTLS_PASSWORD}\", plugin: shadow-tls, client-fingerprint: chrome, plugin-opts: {host: \"${TLS_SERVER}\", password: \"${UUID}\", version: 3}}")
+$(info "- {name: \"${NODE_NAME} ShadowTLS v3\", type: ss, server: ${SERVER_IP}, port: ${PORT_SHADOWTLS}, cipher: 2022-blake3-aes-128-gcm, password: \"${SHADOWTLS_PASSWORD}\", plugin: shadow-tls, client-fingerprint: chrome, plugin-opts: {host: \"${TLS_SERVER}\", password: \"${UUID}\", version: 3}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }")
 EOF
   [ -n "$PORT_SHADOWSOCKS" ] && cat >> $WORK_DIR/list << EOF
 
-$(info "- {name: \"${NODE_NAME} ss\", type: ss, server: ${SERVER_IP}, port: ${PORT_SHADOWSOCKS}, cipher: aes-128-gcm, password: \"${UUID}\"}")
+$(info "- {name: \"${NODE_NAME} ss\", type: ss, server: ${SERVER_IP}, port: ${PORT_SHADOWSOCKS}, cipher: aes-128-gcm, password: \"${UUID}\", smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }")
 EOF
   [ -n "$PORT_TROJAN" ] && cat >> $WORK_DIR/list << EOF
 
-$(info "- {name: \"${NODE_NAME} trojan\", type: trojan, server: ${SERVER_IP}, port: ${PORT_TROJAN}, password: ${UUID}, client-fingerprint: random, skip-cert-verify: true}")
+$(info "- {name: \"${NODE_NAME} trojan\", type: trojan, server: ${SERVER_IP}, port: ${PORT_TROJAN}, password: ${UUID}, client-fingerprint: random, skip-cert-verify: true, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }")
 EOF
   [ -n "$PORT_VMESS_WS" ] && TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VMESS_WS && cat >> $WORK_DIR/list << EOF
 
-$(info "- {name: \"${NODE_NAME} vmess ws\", type: vmess, server: ${CDN}, port: 80, uuid: ${UUID}, udp: true, tls: false, alterId: 0, cipher: none, skip-cert-verify: true, network: ws, ws-opts: { path: \"/${UUID}-vmess\", headers: { Host: ${VMESS_HOST_DOMAIN}, max-early-data: 2048, early-data-header-name: Sec-WebSocket-Protocol} } }
+$(info "- {name: \"${NODE_NAME} vmess ws\", type: vmess, server: ${CDN}, port: 80, uuid: ${UUID}, udp: true, tls: false, alterId: 0, cipher: none, skip-cert-verify: true, network: ws, ws-opts: { path: \"/${UUID}-vmess\", headers: { Host: ${VMESS_HOST_DOMAIN}, max-early-data: 2048, early-data-header-name: Sec-WebSocket-Protocol} }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }
 
 $(text 52)")
 EOF
   [ -n "$PORT_VLESS_WS" ] && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && cat >> $WORK_DIR/list << EOF
 
-$(info "- {name: \"${NODE_NAME} vless ws\", type: vless, server: ${CDN}, port: 443, uuid: ${UUID}, udp: true, tls: true, servername: ${VLESS_HOST_DOMAIN}, network: ws, skip-cert-verify: true, ws-opts: { path: \"/${UUID}-vless?ed=2048\", headers: { Host: ${VLESS_HOST_DOMAIN} } } }
+$(info "- {name: \"${NODE_NAME} vless ws\", type: vless, server: ${CDN}, port: 443, uuid: ${UUID}, udp: true, tls: true, servername: ${VLESS_HOST_DOMAIN}, network: ws, skip-cert-verify: true, ws-opts: { path: \"/${UUID}-vless?ed=2048\", headers: { Host: ${VLESS_HOST_DOMAIN} } }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }
 
 $(text 52)")
 EOF
   [ -n "$PORT_GRPC_REALITY" ] && cat >> $WORK_DIR/list << EOF
 
-$(info "- {name: \"${NODE_NAME} vless-reality-grpc\", type: vless, server: ${SERVER_IP}, port: ${PORT_GRPC_REALITY}, uuid: ${UUID}, network: grpc, tls: true, udp: true, flow:, client-fingerprint: chrome, servername: ${TLS_SERVER}, grpc-opts: {  grpc-service-name: \"grpc\" }, reality-opts: { public-key: ${REALITY_PUBLIC}, short-id: \"\" } }")
+$(info "- {name: \"${NODE_NAME} vless-reality-grpc\", type: vless, server: ${SERVER_IP}, port: ${PORT_GRPC_REALITY}, uuid: ${UUID}, network: grpc, tls: true, udp: true, flow:, client-fingerprint: chrome, servername: ${TLS_SERVER}, grpc-opts: {  grpc-service-name: \"grpc\" }, reality-opts: { public-key: ${REALITY_PUBLIC}, short-id: \"\" }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }")
 EOF
 
   cat >> $WORK_DIR/list << EOF
@@ -1432,7 +1433,7 @@ EOF
 EOF
   [ -n "$PORT_XTLS_REALITY" ] && cat >> $WORK_DIR/list << EOF
 ----------------------------
-$(hint "vless://${UUID}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?security=reality&sni=${TLS_SERVER}&fp=chrome&pbk=${REALITY_PUBLIC}&type=tcp&flow=xtls-rprx-vision&encryption=none#${NODE_NAME}%20xtls-reality-vision")
+$(hint "vless://${UUID}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?security=reality&sni=${TLS_SERVER}&fp=chrome&pbk=${REALITY_PUBLIC}&type=tcp&encryption=none#${NODE_NAME}%20xtls-reality")
 EOF
   [ -n "$PORT_HYSTERIA2" ] && cat >> $WORK_DIR/list << EOF
 ----------------------------
@@ -1494,11 +1495,11 @@ EOF
   [ -n "$PORT_XTLS_REALITY" ] && cat >> $WORK_DIR/list << EOF
 $(info "      {
         \"type\": \"vless\",
-        \"tag\": \"${NODE_NAME} xtls-reality-vision\",
+        \"tag\": \"${NODE_NAME} xtls-reality\",
         \"server\":\"${SERVER_IP}\",
         \"server_port\":${PORT_XTLS_REALITY},
         \"uuid\":\"${UUID}\",
-        \"flow\":\"xtls-rprx-vision\",
+        \"flow\":\"\",
         \"packet_encoding\":\"xudp\",
         \"tls\":{
             \"enabled\":true,
@@ -1516,7 +1517,8 @@ $(info "      {
         \"multiplex\": {
           \"enabled\": true,
           \"protocol\": \"h2mux\",
-          \"max_connections\": 16,
+          \"max_connections\": 8,
+          \"min_streams\": 16,
           \"padding\": true
         }
       },")
@@ -1573,7 +1575,8 @@ $(info "      {
         \"multiplex\": {
           \"enabled\": true,
           \"protocol\": \"h2mux\",
-          \"max_connections\": 16,
+          \"max_connections\": 8,
+          \"min_streams\": 16,
           \"padding\": true
         }
       },
@@ -1605,7 +1608,8 @@ $(info "      {
         \"multiplex\": {
           \"enabled\": true,
           \"protocol\": \"h2mux\",
-          \"max_connections\": 16,
+          \"max_connections\": 8,
+          \"min_streams\": 16,
           \"padding\": true
         }
       },")
@@ -1629,7 +1633,8 @@ $(info "      {
         \"multiplex\": {
           \"enabled\":true,
           \"protocol\":\"h2mux\",
-          \"max_connections\": 16,
+          \"max_connections\": 8,
+          \"min_streams\": 16,
           \"padding\": true
         }
       },")
@@ -1647,7 +1652,7 @@ $(info "      {
           \"headers\": {
             \"Host\": \"${VMESS_HOST_DOMAIN}\"
           },
-          \"max_early_data\":2408,
+          \"max_early_data\":2048,
           \"early_data_header_name\":\"Sec-WebSocket-Protocol\"
         },
         \"multiplex\": {
@@ -1679,7 +1684,7 @@ $(info "      {
           \"headers\": {
             \"Host\": \"${VLESS_HOST_DOMAIN}\"
           },
-          \"max_early_data\":2408,
+          \"max_early_data\":2048,
           \"early_data_header_name\":\"Sec-WebSocket-Protocol\"
         },
         \"multiplex\": {
@@ -1878,7 +1883,7 @@ change_protocols() {
   if [ -s $WORK_DIR/list ]; then
     SERVER_IP=$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | sed -n "s/.*{name.*server:[ ]*\([^,]\+\).*/\1/pg" | sed -n '1p')
     UUID=$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | grep -m1 '{name' | sed -En 's/.*password:[ ]+[\"]*|.*uuid:[ ]+[\"]*(.*)/\1/gp' | sed "s/\([^,\"]\+\).*/\1/g")
-    NODE_NAME=$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | grep -m1 '{name' | sed 's/- {name:[ ]\+"//; s/[ ]\+ShadowTLS[ ]\+v3.*//; s/[ ]\+xtls-reality-vision.*//; s/[ ]\+hysteria2.*//; s/[ ]\+tuic.*//; s/[ ]\+ss.*//; s/[ ]\+trojan.*//; s/[ ]\+trojan.*//; s/[ ]\+vmess[ ]\+ws.*//; s/[ ]\+vless[ ]\+.*//')
+    NODE_NAME=$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | grep -m1 '{name' | sed 's/- {name:[ ]\+"//; s/[ ]\+ShadowTLS[ ]\+v3.*//; s/[ ]\+xtls-reality.*//; s/[ ]\+hysteria2.*//; s/[ ]\+tuic.*//; s/[ ]\+ss.*//; s/[ ]\+trojan.*//; s/[ ]\+trojan.*//; s/[ ]\+vmess[ ]\+ws.*//; s/[ ]\+vless[ ]\+.*//')
     EXISTED_PORTS=$(awk -F ':|,' '/listen_port/{print $2}' $WORK_DIR/conf/*)
     START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$EXISTED_PORTS")
     [ -s $WORK_DIR/conf/*_VMESS_WS_inbounds.json ] && WS_SERVER_IP=$(grep -A2 "{name.*vmess[ ]\+ws" $WORK_DIR/list | awk -F'[][]' 'NR==3 {print $2}') && VMESS_HOST_DOMAIN=$(grep -A2 "{name.*vmess[ ]\+ws" $WORK_DIR/list | awk -F'[][]' 'NR==3 {print $4}') && CDN=$(sed -n "s/.*{name.*vmess[ ]\+ws.*server:[ ]\+\([^,]\+\).*/\1/gp" $WORK_DIR/list)
