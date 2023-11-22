@@ -4,7 +4,7 @@
 VERSION='v1.1.1'
 
 # 各变量默认值
-GH_PROXY='https://gh-proxy.com/'
+GH_PROXY='https://mirror.ghproxy.com/'
 TEMP_DIR='/tmp/sing-box'
 WORK_DIR='/etc/sing-box'
 START_PORT_DEFAULT='8881'
