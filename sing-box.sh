@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.1.1'
+VERSION='v1.1.2'
 
 # 各变量默认值
 GH_PROXY='https://mirror.ghproxy.com/'
@@ -22,8 +22,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. XTLS + REALITY remove flow: xtls-reality-vision to support multiplexing and TCP brutal (requires reinstallation); 2. Clash meta add multiplexing parameter."
-C[1]="1. XTLS + REALITY 去掉 xtls-reality-vision 流控以支持多路复用和 TCP brutal (需要重新安装); 2. Clash meta 增加多路复用参数"
+E[1]="1. Support Sing-box 1.8.0 latest Rule Set and Experimental; 2. api.openai.com routes to WARP IPv4, other openai websites routes to WARP IPv6"
+C[1]="1. 支持 Sing-box 1.8.0 最新的 Rule Set 和 Experimental; 2. api.openai.com 分流到 WARP IPv4， 其他 openai 网站分流到 WARP IPv6"
 E[2]="This project is designed to add sing-box support for multiple protocols to VPS, details: [https://github.com/fscarmen/sing-box]\n Script Features:\n\t • Deploy multiple protocols with one click, there is always one for you!\n\t • Custom ports for nat machine with limited open ports.\n\t • Built-in warp chained proxy to unlock chatGPT.\n\t • No domain name is required.\n\t • Support system: Ubuntu, Debian, CentOS, Alpine and Arch Linux 3.\n\t • Support architecture: AMD,ARM and s390x\n"
 C[2]="本项目专为 VPS 添加 sing-box 支持的多种协议, 详细说明: [https://github.com/fscarmen/sing-box]\n 脚本特点:\n\t • 一键部署多协议，总有一款适合你\n\t • 自定义端口，适合有限开放端口的 nat 小鸡\n\t • 内置 warp 链式代理解锁 chatGPT\n\t • 不需要域名\n\t • 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 和 Arch Linux,请务必选择 LTS 系统\n\t • 支持硬件结构类型: AMD 和 ARM\n"
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -88,8 +88,8 @@ E[32]="Upgrade kernel, turn on BBR, change Linux system (sb -b)"
 C[32]="升级内核、安装BBR、DD脚本 (sb -b)"
 E[33]="Uninstall (sb -u)"
 C[33]="卸载 (sb -u)"
-E[34]="Install script"
-C[34]="安装脚本"
+E[34]="Install Sing-box multi-protocol script"
+C[34]="安装 Sing-box 协议全家桶脚本"
 E[35]="Exit"
 C[35]="退出"
 E[36]="Please enter the correct number"
@@ -100,8 +100,8 @@ E[38]="failed"
 C[38]="失败"
 E[39]="Sing-box is not installed."
 C[39]="Sing-box 未安装"
-E[40]="Sing-box local verion: \$LOCAL.\\\t The newest verion: \$ONLINE"
-C[40]="Sing-box 本地版本: \$LOCAL.\\\t 最新版本: \$ONLINE"
+E[40]="Sing-box local verion: \$LOCAL\\\t The newest verion: \$ONLINE"
+C[40]="Sing-box 本地版本: \$LOCAL\\\t 最新版本: \$ONLINE"
 E[41]="No upgrade required."
 C[41]="不需要升级"
 E[42]="Downloading the latest version Sing-box failed, script exits. Feedback:[https://github.com/fscarmen/sing-box/issues]"
@@ -186,7 +186,7 @@ text() { grep -q '\$' <<< "${E[$*]}" && eval echo "\$(eval echo "\${${L}[$*]}")"
 # 自定义友道或谷歌翻译函数
 translate() {
   [ -n "$@" ] && EN="$@"
-  ZH=$(wget --no-check-certificate -qO- --tries=1 --timeout=2 "https://translate.google.com/translate_a/t?client=any_client_id_works&sl=en&tl=zh&q=${EN//[[:space:]]/}")
+  ZH=$(wget --no-check-certificate -qO- --tries=1 --timeout=2 "https://translate.google.com/translate_a/t?client=any_client_id_works&sl=en&tl=zh&q=${EN//[[:space:]]/}" 2>/dev/null)
   [[ "$ZH" =~ ^\[\".+\"\]$ ]] && cut -d \" -f2 <<< "$ZH"
 }
 
@@ -257,8 +257,8 @@ check_install() {
   STATUS=$(text 26) && [ -s /etc/systemd/system/sing-box.service ] && STATUS=$(text 27) && [ "$(systemctl is-active sing-box)" = 'active' ] && STATUS=$(text 28)
   if [[ $STATUS = "$(text 26)" ]] && [ ! -s $WORK_DIR/sing-box ]; then
     {
-    local ONLINE=$(wget --no-check-certificate -qO- "https://api.github.com/repos/SagerNet/sing-box/releases" | awk -F '["v]' '/tag_name.*beta/{print $5; exit}')
-    ONLINE=${ONLINE:-'1.7.0-beta.5'}
+    local ONLINE=$(wget --no-check-certificate -qO- "https://api.github.com/repos/SagerNet/sing-box/releases" | awk -F '["v]' '/tag_name.*-/{print $5; exit}')
+    ONLINE=${ONLINE:-'1.8.0-rc.4'}
     wget --no-check-certificate -c ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
     }&
@@ -581,25 +581,39 @@ EOF
 EOF
 
   # 生成 route 配置
-  [ "$IS_CHANGE" != 'change' ] && cat > $WORK_DIR/conf/02_route.json << EOF
+  [ "$IS_CHANGE" != 'change' ] &&  cat > $WORK_DIR/conf/02_route.json << EOF
 {
     "route":{
-        "geoip":{
-            "download_url":"https://github.com/SagerNet/sing-geoip/releases/latest/download/geoip.db",
-            "download_detour":"direct"
-        },
-        "geosite":{
-            "download_url":"https://github.com/SagerNet/sing-geosite/releases/latest/download/geosite.db",
-            "download_detour":"direct"
-        },
+        "rule_set":[
+            {
+                "tag":"geosite-openai",
+                "type":"remote",
+                "format":"binary",
+                "url":"https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs"
+            }
+        ],
         "rules":[
             {
-                "geosite":[
-                    "openai"
-                ],
+                "domain":"api.openai.com",
+                "outbound":"warp-IPv4-out"
+            },
+            {
+                "rule_set":"geosite-openai",
                 "outbound":"warp-IPv6-out"
             }
         ]
+    }
+}
+EOF
+
+  # 生成缓存文件
+  [ "$IS_CHANGE" != 'change' ] && cat > $WORK_DIR/conf/03_experimental.json << EOF
+{
+    "experimental": {
+        "cache_file": {
+            "enabled": true,
+            "path": "$WORK_DIR/cache.db"
+        }
     }
 }
 EOF
@@ -2009,7 +2023,7 @@ uninstall() {
 
 # Sing-box 的最新版本
 version() {
-  local ONLINE=$(wget --no-check-certificate -qO- "https://api.github.com/repos/SagerNet/sing-box/releases" | awk -F '["v]' '/tag_name.*beta/{print $5; exit}')
+  local ONLINE=$(wget --no-check-certificate -qO- "https://api.github.com/repos/SagerNet/sing-box/releases" | awk -F '["v]' '/tag_name.*-/{print $5; exit}')
   local LOCAL=$($WORK_DIR/sing-box version | awk '/version/{print $NF}')
   info "\n $(text 40) "
   [[ -n "$ONLINE" && "$ONLINE" != "$LOCAL" ]] && reading "\n $(text 9) " UPDATE || info " $(text 41) "
