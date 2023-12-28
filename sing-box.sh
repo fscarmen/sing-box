@@ -14,7 +14,7 @@ TLS_SERVER=addons.mozilla.org
 CDN_DEFAULT=cn.azhz.eu.org
 PROTOCOL_LIST=("XTLS + reality" "hysteria2" "tuic" "shadowTLS" "shadowsocks" "trojan" "vmess + ws" "vless + ws + tls" "H2 + reality" "gRPC + reality")
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
-CDN_DOMAIN=("cn.azhz.eu.org" "www.who.int" "cdn.anycast.eu.org" "443.cf.bestl.de" "cfip.gay")
+CDN_DOMAIN=("cn.azhz.eu.org" "achk.cloudflarest.link" "jp.cloudflarest.link" "www.who.int" "skk.moe" "time.cloudflare.com" "csgo.com")
 
 trap "rm -rf $TEMP_DIR >/dev/null 2>&1 ; echo -e '\n' ;exit 1" INT QUIT TERM EXIT
 
