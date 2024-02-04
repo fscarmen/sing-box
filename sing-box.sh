@@ -4,7 +4,7 @@
 VERSION='v1.1.2'
 
 # 各变量默认值
-GH_PROXY='https://mirror.ghproxy.com/'
+GH_PROXY='cdn2.cloudflare.now.cc/https://'
 TEMP_DIR='/tmp/sing-box'
 WORK_DIR='/etc/sing-box'
 START_PORT_DEFAULT='8881'
@@ -164,8 +164,8 @@ E[70]="Please set inSecure in tls to true."
 C[70]="请把 tls 里的 inSecure 设置为 true"
 E[71]="Create shortcut [ sb ] successfully."
 C[71]="创建快捷 [ sb ] 指令成功!"
-E[72]="The full template can be found at: https://t.me/ztvps/37"
-C[72]="完整模板可参照: https://t.me/ztvps/37"
+E[72]="The full template can be found at:\n https://t.me/ztvps/67\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
+C[72]="完整模板可参照:\n https://t.me/ztvps/67\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
 E[73]="There is no protocol left, if you are sure please re-run [ sb -u ] to uninstall all."
 C[73]="没有协议剩下，如确定请重新执行 [ sb -u ] 卸载所有"
 E[74]="Keep protocols"
@@ -260,7 +260,7 @@ check_install() {
     local VERSION_LATEST=$(wget --no-check-certificate -qO- "https://api.github.com/repos/SagerNet/sing-box/releases" | awk -F '["v-]' '/tag_name/{print $5}' | sort -r | sed -n '1p')
     local ONLINE=$(wget --no-check-certificate -qO- "https://api.github.com/repos/SagerNet/sing-box/releases" | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
     ONLINE=${ONLINE:-'1.8.1'}
-    wget --no-check-certificate -c ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
+    wget --no-check-certificate -c https://${GH_PROXY}github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
     }&
   fi
@@ -1057,6 +1057,15 @@ EOF
             "transport": {
                 "type": "grpc",
                 "service_name": "grpc"
+            },
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
             }
         }
     ]
@@ -1122,9 +1131,9 @@ export_list() {
     SERVER_IP=${SERVER_IP:-"$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | sed -n "s/.*{name.*server:[ ]*\([^,]\+\).*/\1/pg" | sed -n '1p')"}
     UUID=${UUID:-"$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | grep -m1 '{name' | sed -En 's/.*password:[ ]+[\"]*|.*uuid:[ ]+[\"]*(.*)/\1/gp' | sed "s/\([^,\"]\+\).*/\1/g")"}
     SHADOWTLS_PASSWORD=${SHADOWTLS_PASSWORD:-"$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | sed -n 's/.*{name.*password:[ ]*\"\([^\"]\+\)".*shadow-tls.*/\1/pg')"}
-    TLS_SERVER=${TLS_SERVER:-"$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | grep -Em1 '\{name.*shadow-tls|\{name.*public-key' | sed -n "s/.*servername:[ ]\+\([^\,]\+\).*/\1/gp; s/.*host:[ ]\+\"\([^\"]\+\).*/\1/gp")"}
-    NODE_NAME=${NODE_NAME:-"$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | grep -m1 '{name' | sed 's/- {name:[ ]\+"//; s/[ ]\+ShadowTLS[ ]\+v3.*//; s/[ ]\+xtls-reality.*//; s/[ ]\+hysteria2.*//; s/[ ]\+tuic.*//; s/[ ]\+ss.*//; s/[ ]\+trojan.*//; s/[ ]\+trojan.*//; s/[ ]\+vmess[ ]\+ws.*//; s/[ ]\+vless[ ]\+.*//')"}
-    REALITY_PUBLIC=${REALITY_PUBLIC:-"$(sed -n 's/.*{name.*public-key:[ ]*\([^,]\+\).*/\1/pg' $WORK_DIR/list | sed -n 1p)"}
+    TLS_SERVER=${TLS_SERVER:-"$(awk -F '"' '/"server_name"/{print $4; exit}' $WORK_DIR/conf/*REALITY_inbounds.json)"}
+    NODE_NAME=${NODE_NAME:-"$(awk -F '"' '/"tag"/{print $4}' $WORK_DIR/list | grep -vE 'proxy|shadowtls-out|ShadowTLS' | awk '{print $1; exit}')"}
+    REALITY_PUBLIC=${REALITY_PUBLIC:-"$(awk -F '"' '/"public_key"/{print $4; exit}' $WORK_DIR/list)"}
     [ -s $WORK_DIR/conf/*_XTLS_REALITY_inbounds.json ] && PORT_XTLS_REALITY=$(sed -n '/listen_port/s/[^0-9]\+//gp' $WORK_DIR/conf/*_XTLS_REALITY_inbounds.json)
     [ -s $WORK_DIR/conf/*_HYSTERIA2_inbounds.json ] && PORT_HYSTERIA2=$(sed -n '/listen_port/s/[^0-9]\+//gp' $WORK_DIR/conf/*_HYSTERIA2_inbounds.json)
     [ -s $WORK_DIR/conf/*_TUIC_inbounds.json ] && PORT_TUIC=$(sed -n '/listen_port/s/[^0-9]\+//gp' $WORK_DIR/conf/*_TUIC_inbounds.json)
@@ -1432,9 +1441,12 @@ $(info "- {name: \"${NODE_NAME} vless ws\", type: vless, server: ${CDN}, port: 4
 
 $(text 52)")
 EOF
+
+  # Clash 的 H2 传输层未实现多路复用功能，在 Clash.Meta 中更建议使用 gRPC 协议，故不输出相关配置。 https://wiki.metacubex.one/config/proxies/vless/
+
   [ -n "$PORT_GRPC_REALITY" ] && cat >> $WORK_DIR/list << EOF
 
-$(info "- {name: \"${NODE_NAME} vless-reality-grpc\", type: vless, server: ${SERVER_IP}, port: ${PORT_GRPC_REALITY}, uuid: ${UUID}, network: grpc, tls: true, udp: true, flow:, client-fingerprint: chrome, servername: ${TLS_SERVER}, grpc-opts: {  grpc-service-name: \"grpc\" }, reality-opts: { public-key: ${REALITY_PUBLIC}, short-id: \"\" }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }")
+$(info "- {name: \"${NODE_NAME} grpc-reality-vision\", type: vless, server: ${SERVER_IP}, port: ${PORT_GRPC_REALITY}, uuid: ${UUID}, network: grpc, tls: true, udp: true, flow:, client-fingerprint: chrome, servername: ${TLS_SERVER}, grpc-opts: {  grpc-service-name: \"grpc\" }, reality-opts: { public-key: ${REALITY_PUBLIC}, short-id: \"\" }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }")
 EOF
 
   cat >> $WORK_DIR/list << EOF
@@ -1714,7 +1726,7 @@ EOF
 $(info "      {
         \"type\": \"vless\",
         \"tag\": \"${NODE_NAME} h2-reality-vision\",
-         \"server\": \"${SERVER_IP}\",
+        \"server\": \"${SERVER_IP}\",
         \"server_port\": ${PORT_H2_REALITY},
         \"uuid\":\"${UUID}\",
         \"tls\": {
@@ -1733,12 +1745,6 @@ $(info "      {
         \"packet_encoding\": \"xudp\",
         \"transport\": {
             \"type\": \"http\"
-        },
-        \"multiplex\": {
-          \"enabled\":true,
-          \"protocol\":\"h2mux\",
-          \"max_streams\":16,
-          \"padding\": true
         }
       },")
 EOF
@@ -1898,7 +1904,7 @@ change_protocols() {
   if [ -s $WORK_DIR/list ]; then
     SERVER_IP=$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | sed -n "s/.*{name.*server:[ ]*\([^,]\+\).*/\1/pg" | sed -n '1p')
     UUID=$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | grep -m1 '{name' | sed -En 's/.*password:[ ]+[\"]*|.*uuid:[ ]+[\"]*(.*)/\1/gp' | sed "s/\([^,\"]\+\).*/\1/g")
-    NODE_NAME=$(sed -r "s/\x1B\[[0-9;]*[mG]//g" $WORK_DIR/list | grep -m1 '{name' | sed 's/- {name:[ ]\+"//; s/[ ]\+ShadowTLS[ ]\+v3.*//; s/[ ]\+xtls-reality.*//; s/[ ]\+hysteria2.*//; s/[ ]\+tuic.*//; s/[ ]\+ss.*//; s/[ ]\+trojan.*//; s/[ ]\+trojan.*//; s/[ ]\+vmess[ ]\+ws.*//; s/[ ]\+vless[ ]\+.*//')
+    NODE_NAME=$(awk -F '"' '/"tag"/{print $4}' $WORK_DIR/list | grep -vE 'proxy|shadowtls-out|ShadowTLS' | awk '{print $1; exit}')
     EXISTED_PORTS=$(awk -F ':|,' '/listen_port/{print $2}' $WORK_DIR/conf/*)
     START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$EXISTED_PORTS")
     [ -s $WORK_DIR/conf/*_VMESS_WS_inbounds.json ] && WS_SERVER_IP=$(grep -A2 "{name.*vmess[ ]\+ws" $WORK_DIR/list | awk -F'[][]' 'NR==3 {print $2}') && VMESS_HOST_DOMAIN=$(grep -A2 "{name.*vmess[ ]\+ws" $WORK_DIR/list | awk -F'[][]' 'NR==3 {print $4}') && CDN=$(sed -n "s/.*{name.*vmess[ ]\+ws.*server:[ ]\+\([^,]\+\).*/\1/gp" $WORK_DIR/list)
@@ -1928,7 +1934,7 @@ change_protocols() {
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     if [[ "${KEEP_PROTOCOLS[@]}" =~ "reality" ]]; then
       REALITY_PRIVATE=$(awk -F '"' '/private_key/{print $4; exit}' $WORK_DIR/conf/*_REALITY_inbounds.json)
-      REALITY_PUBLIC=$(sed -n 's/.*{name.*public-key:[ ]*\([^,]\+\).*/\1/pg' $WORK_DIR/list | sed -n 1p)
+      REALITY_PUBLIC=$(awk -F '"' '/"public_key"/{print $4; exit}' $WORK_DIR/list)
     else
       REALITY_KEYPAIR=$($WORK_DIR/sing-box generate reality-keypair)
       REALITY_PRIVATE=$(awk '/PrivateKey/{print $NF}' <<< "$REALITY_KEYPAIR")
@@ -1992,6 +1998,34 @@ change_protocols() {
     PORT_VLESS_WS=${REINSTALL_PORTS[$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")]}
   fi
 
+  # 获取原始 H2 + Reality 配置信息
+  CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
+  if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
+    if [[ "${KEEP_PROTOCOLS[@]}" =~ "reality" ]]; then
+      REALITY_PRIVATE=$(awk -F '"' '/private_key/{print $4; exit}' $WORK_DIR/conf/*_REALITY_inbounds.json)
+      REALITY_PUBLIC=$(awk -F '"' '/"public_key"/{print $4; exit}' $WORK_DIR/list)
+    else
+      REALITY_KEYPAIR=$($WORK_DIR/sing-box generate reality-keypair)
+      REALITY_PRIVATE=$(awk '/PrivateKey/{print $NF}' <<< "$REALITY_KEYPAIR")
+      REALITY_PUBLIC=$(awk '/PublicKey/{print $NF}' <<< "$REALITY_KEYPAIR")
+    fi
+    PORT_H2_REALITY=${REINSTALL_PORTS[$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")]}
+  fi
+
+  # 获取原始 gRPC + Reality 配置信息
+  CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
+  if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
+    if [[ "${KEEP_PROTOCOLS[@]}" =~ "reality" ]]; then
+      REALITY_PRIVATE=$(awk -F '"' '/private_key/{print $4; exit}' $WORK_DIR/conf/*_REALITY_inbounds.json)
+      REALITY_PUBLIC=$(awk -F '"' '/"public_key"/{print $4; exit}' $WORK_DIR/list)
+    else
+      REALITY_KEYPAIR=$($WORK_DIR/sing-box generate reality-keypair)
+      REALITY_PRIVATE=$(awk '/PrivateKey/{print $NF}' <<< "$REALITY_KEYPAIR")
+      REALITY_PUBLIC=$(awk '/PublicKey/{print $NF}' <<< "$REALITY_KEYPAIR")
+    fi
+    PORT_GRPC_REALITY=${REINSTALL_PORTS[$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")]}
+  fi
+
   # 选择可以输入 cdn
   input_cdn
 
@@ -2032,7 +2066,7 @@ version() {
 
   if [[ "$UPDATE" = [Yy] ]]; then
     check_system_info
-    wget --no-check-certificate -c ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
+    wget --no-check-certificate -c https://${GH_PROXY}github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
 
     if [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ]; then
       systemctl stop sing-box
