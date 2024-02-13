@@ -4,7 +4,7 @@
 VERSION='v1.1.2'
 
 # 各变量默认值
-GH_PROXY='cdn2.cloudflare.now.cc/https://'
+GH_PROXY='https://cdn2.cloudflare.now.cc/'
 TEMP_DIR='/tmp/sing-box'
 WORK_DIR='/etc/sing-box'
 START_PORT_DEFAULT='8881'
