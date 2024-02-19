@@ -133,7 +133,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 
 ## 鸣谢下列作者的文章和项目:
 千歌 sing-box 模板: https://github.com/chika0801/sing-box-examples   
-瞎折腾 sing-box 模板: https://t.me/ztvps/37
+瞎折腾 sing-box 模板: https://t.me/ztvps/67
 
 
 ## 免责声明:

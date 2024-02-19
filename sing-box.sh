@@ -1492,7 +1492,7 @@ $(hint "ss://$(echo -n "$SHADOWSOCKS_METHOD:${UUID[15]}" | base64 -w0)@${SERVER_
 EOF
   [ -n "$PORT_TROJAN" ] && cat >> $WORK_DIR/list << EOF
 ----------------------------
-$(hint "trojan://$TROJAN_PASSWORD@${SERVER_IP_1}:$PORT_TROJAN?security=tls&allowInsecure=1&fp=random&type=tcp#${NODE_NAME} ${NODE_TAG[5]}")
+$(hint "trojan://$TROJAN_PASSWORD@${SERVER_IP_1}:$PORT_TROJAN?security=tls&allowInsecure=1&fp=random&type=tcp#${NODE_NAME[16]} ${NODE_TAG[5]}")
 EOF
   [ -n "$PORT_VMESS_WS" ] && WS_SERVER_IP=${WS_SERVER_IP[17]} && TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VMESS_WS && cat >> $WORK_DIR/list << EOF
 ----------------------------
@@ -1907,7 +1907,9 @@ change_protocols() {
 
   # 用于新节点的配置信息
   UUID=$(awk '{print $1}' <<< "${UUID[@]} $TROJAN_PASSWORD")
-  NODE_NAME=$(awk '{print $1}' <<< "${NODE_NAME[@]}")
+  for v in "${NODE_NAME[@]}"; do
+    [ -n "$v" ] && NODE_NAME="$v" && break
+  done
   [ "${#WS_SERVER_IP[@]}" -gt 0 ] && WS_SERVER_IP=$(awk '{print $1}' <<< "${WS_SERVER_IP[@]}") && CDN=$(awk '{print $1}' <<< "${CDN[@]}")
 
   # 寻找待删除协议的 inbound 文件名
