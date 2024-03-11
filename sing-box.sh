@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.1.4'
+VERSION='v1.1.5'
 
 # 各变量默认值
 GH_PROXY='https://cdn2.cloudflare.now.cc/'
@@ -16,6 +16,7 @@ NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
 CDN_DOMAIN=("cn.azhz.eu.org" "www.who.int" "skk.moe" "time.cloudflare.com" "csgo.com")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
+SUBSCRIBE_API=("back.889876.xyz" "api.v1.mk")
 
 trap "rm -rf $TEMP_DIR >/dev/null 2>&1 ; echo -e '\n' ;exit 1" INT QUIT TERM EXIT
 
@@ -23,8 +24,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Support V2rayN / NekoBox / Clash / sing-box / ShadowRocket subscribe. http://<server ip>:<nginx port>/<uuid>/<qr | clash | neko | proxies | shadowrocket | sing-box-pc | sing-box-phone | v2rayn>. Index of all subscribes: http://<server ip>:<nginx port>/<uuid>/  . Reinstall is required; 2. Adaptive the above clients. http://<server ip>:<nginx port>/<uuid>/auto"
-C[1]="增加 V2rayN / NekoBox / Clash / sing-box / ShadowRocket 订阅，http://<server ip>:<nginx port>/<uuid>/<qr | clash | neko | proxies | shadowrocket | sing-box-pc | sing-box-phone | v2rayn>， 所有订阅的索引: http://<server ip>:<nginx port>/<uuid>/，需要重新安装; 2. 自适应以上的客户端，http://<server ip>:<nginx port>/<uuid>/auto"
+E[1]="1. To protect node data security, use fake information to fetch subscribe api; 2. Adaptive the above clients. http://<server ip>:<nginx port>/<uuid>/<auto | auto2>"
+C[1]="1. 为保护节点数据安全，在 api 转订阅时，使用虚假信息; 2. 自适应以上的客户端，http://<server ip>:<nginx port>/<uuid>/<auto | auto2>"
 E[2]="This project is designed to add sing-box support for multiple protocols to VPS, details: [https://github.com/fscarmen/sing-box]\n Script Features:\n\t • Deploy multiple protocols with one click, there is always one for you!\n\t • Custom ports for nat machine with limited open ports.\n\t • Built-in warp chained proxy to unlock chatGPT.\n\t • No domain name is required.\n\t • Support system: Ubuntu, Debian, CentOS, Alpine and Arch Linux 3.\n\t • Support architecture: AMD,ARM and s390x\n"
 C[2]="本项目专为 VPS 添加 sing-box 支持的多种协议, 详细说明: [https://github.com/fscarmen/sing-box]\n 脚本特点:\n\t • 一键部署多协议，总有一款适合你\n\t • 自定义端口，适合有限开放端口的 nat 小鸡\n\t • 内置 warp 链式代理解锁 chatGPT\n\t • 不需要域名\n\t • 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 和 Arch Linux,请务必选择 LTS 系统\n\t • 支持硬件结构类型: AMD 和 ARM\n"
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -185,6 +186,8 @@ E[80]="subscribe"
 C[80]="订阅"
 E[81]="Adaptive Clash / V2rayN / NekoBox / ShadowRocket / SFI / SFA / SFM Clients"
 C[81]="自适应 Clash / V2rayN / NekoBox / ShadowRocket / SFI / SFA / SFM 客户端"
+E[82]="template"
+C[82]="模版"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -315,6 +318,88 @@ check_sing-box_stats(){
     "$(text 28)" )
       info "\n Sing-box $(text 28) $(text 37) \n"
   esac
+}
+
+# 订阅 api 函数，为保证节点数据的安全性，将置换为伪造数据去获取 api 配置信息，之后再置换为真实的
+fetch_subscribe() {
+  # 1. 获取参数
+  local TARGET=$1
+  local REAL_FILE=$2
+  local URL=$3
+
+  # 2. 获取重点键值，由于 sing-box 使用 v2ray 插件不成功的原因，所以 sing-box 去掉 shadowsocks+WSS 的协议
+  [ "$TARGET" = 'singbox' ] && local REAL_CONTENT=$(sed '/type: ss/d' $REAL_FILE) || local REAL_CONTENT=$(cat $REAL_FILE)
+  local REAL_NAME=($(sed -n 's/.*\-[ ]*{[ ]*name:[ ]*"\([^"]*\)".*/\1/gp' <<< "$REAL_CONTENT"))
+  local REAL_SERVER=($(sed -n 's/.*,[ ]*server:[ ]*\([^,]\+\),.*/\1/gp' <<< "$REAL_CONTENT"))
+  local REAL_SERVERNAME=($(sed -n 's/.*servername:[ ]*\([^,]\+\),.*/\1/gp' <<< "$REAL_CONTENT"))
+  local REAL_HOST=($(sed -n 's/.*ost:[ ]*\([^,}]\+\).*/\1/gp' <<< "$REAL_CONTENT"))
+  local REAL_PORT=($(sed -n 's/.*,[ ]*port:[ ]*\([^,]\+\),.*/\1/gp' <<< "$REAL_CONTENT"))
+  local REAL_UUID=($(sed -n 's/.*,[ ]*uuid:[ ]*\([^,]\+\),.*/\1/gp'  <<< "$REAL_CONTENT"))
+  local REAL_PASSWORD=($(sed -n 's/.*,[ ]*password:[ ]*\([^,]\+\),.*/\1/gp' <<< "$REAL_CONTENT"))
+  local REAL_PUBLIC=($(sed -n 's/.*{[ ]*public-key:[ ]*\([^,]\+\),.*/\1/gp'  <<< "$REAL_CONTENT"))
+  local REAL_PATH=($(sed -n 's/.*path:[ ]*"\/\([^"]\+\)",.*/\1/gp' <<< "$REAL_CONTENT"))
+
+  # 3. 混淆各键值
+  local FAKE_CONTENT=$REAL_CONTENT
+  local FAKE_FILE=${REAL_FILE}-${TARGET}-fake
+  local FAKE_URL=${URL}-${TARGET}-fake
+
+  for d in ${!REAL_NAME[@]}; do
+    local FAKE_NAME[d]=$(cat /proc/sys/kernel/random/uuid)
+    local FAKE_CONTENT=$(sed "1,/name: \"${REAL_NAME[d]}/s/${REAL_NAME[d]}/${FAKE_NAME[d]}/" <<< "$FAKE_CONTENT")
+  done
+  for d in ${!REAL_SERVER[@]}; do
+    local FAKE_SERVER[d]="$(cat /proc/sys/kernel/random/uuid)"
+    local FAKE_CONTENT=$(sed "1,/server: ${REAL_SERVER[d]}/s/server: ${REAL_SERVER[d]}/server: ${FAKE_SERVER[d]}/" <<< "$FAKE_CONTENT")
+  done
+  for d in ${!REAL_SERVERNAME[@]}; do
+    local FAKE_SERVERNAME[d]="$(cat /proc/sys/kernel/random/uuid)"
+    local FAKE_CONTENT=$(sed "1,/servername: ${REAL_SERVERNAME[d]}/s/servername: ${REAL_SERVERNAME[d]}/servername: ${FAKE_SERVERNAME[d]}/" <<< "$FAKE_CONTENT")
+  done
+  for d in ${!REAL_HOST[@]}; do
+    local FAKE_HOST[d]="$(cat /proc/sys/kernel/random/uuid)"
+    local FAKE_CONTENT=$(sed "1,/ost: ${REAL_HOST[d]}/s/ost: ${REAL_HOST[d]}/ost: ${FAKE_HOST[d]}/" <<< "$FAKE_CONTENT")
+  done
+  for d in ${!REAL_PORT[@]}; do
+    local FAKE_PORT[d]=$(shuf -i 10000-65535 -n 1)
+    local FAKE_CONTENT=$(sed "1,/port: ${REAL_PORT[d]}/s/port: ${REAL_PORT[d]}/port: ${FAKE_PORT[d]}/" <<< "$FAKE_CONTENT")
+  done
+  for d in ${!REAL_UUID[@]}; do
+    local FAKE_UUID[d]=$(cat /proc/sys/kernel/random/uuid)
+    local FAKE_CONTENT=$(sed "1,/uuid: ${REAL_UUID[d]}/s/uuid: ${REAL_UUID[d]}/uuid: ${FAKE_UUID[d]}/" <<< "$FAKE_CONTENT")
+  done
+  for d in ${!REAL_PASSWORD[@]}; do
+    local FAKE_PASSWORD[d]=$(cat /proc/sys/kernel/random/uuid)
+    local FAKE_CONTENT=$(sed "1,/password: ${REAL_PASSWORD[d]}/s/password: ${REAL_PASSWORD[d]}/password: ${FAKE_PASSWORD[d]}/" <<< "$FAKE_CONTENT")
+  done
+  for d in ${!REAL_PUBLIC[@]}; do
+    local FAKE_PUBLIC[d]=$(cat /proc/sys/kernel/random/uuid)
+    local FAKE_CONTENT=$(sed "1,/public-key: ${REAL_PUBLIC[d]}/s/public-key: ${REAL_PUBLIC[d]}/public-key: ${FAKE_PUBLIC[d]}/" <<< "$FAKE_CONTENT")
+  done
+  for d in ${!REAL_PATH[@]}; do
+    local FAKE_PATH[d]=$(cat /proc/sys/kernel/random/uuid)
+    local FAKE_CONTENT=$(sed "1,/path: \"${REAL_PATH[d]}\"/s#path: \"/${REAL_PATH[d]}#path: \"/${FAKE_PATH[d]}#" <<< "$FAKE_CONTENT")
+  done
+
+  # 4. 把混淆节点保存到本地，以让外网能访问
+  echo "$FAKE_CONTENT" > $FAKE_FILE
+
+  # 5. 通过转订阅后端 api 获取配置信息
+  local FROM_API=$(wget --no-check-certificate -qO- --tries=3 --timeout=2 "https://${SUBSCRIBE_API[0]}/sub?target=$TARGET&url=$FAKE_URL&insert=false&config=https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online.ini&emoji=true&list=false&tfo=false&scv=true&fdn=false&sort=false&new_name=true")
+
+  # 6. 删除临时文件
+  rm -f $FAKE_FILE
+
+  # 7. 还原数据
+  local REAL_CONFIG="$FROM_API"
+  local FAKE_ALL=(${FAKE_NAME[@]} ${FAKE_SERVER[@]} ${FAKE_SERVERNAME[@]} ${FAKE_HOST[@]} ${FAKE_PORT[@]} ${FAKE_UUID[@]} ${FAKE_PASSWORD[@]} ${FAKE_PUBLIC[@]} ${FAKE_PATH[@]})
+  local REAL_ALL=(${REAL_NAME[@]} ${REAL_SERVER[@]} ${REAL_SERVERNAME[@]} ${REAL_HOST[@]} ${REAL_PORT[@]} ${REAL_UUID[@]} ${REAL_PASSWORD[@]} ${REAL_PUBLIC[@]} ${REAL_PATH[@]})
+  for d in ${!FAKE_ALL[@]}; do
+    local REAL_CONFIG=$(sed "s/${FAKE_ALL[d]}/${REAL_ALL[d]}/g" <<< "$REAL_CONFIG")
+  done
+
+  # 8. 输出最终真实结果
+  echo "$REAL_CONFIG"
 }
 
 # 为了适配 alpine，定义 cmd_systemctl 的函数
@@ -470,8 +555,8 @@ sing-box_variable() {
   # 显示选择协议及其次序，输入开始端口号
   if [ -z "$START_PORT" ]; then
     hint "\n $(text 60) "
-    for d in "${!INSTALL_PROTOCOLS[@]}"; do
-      [ "$d" -ge 9 ] && hint " $[d+1]. ${PROTOCOL_LIST[$(($(asc ${INSTALL_PROTOCOLS[d]}) - 98))]} " || hint " $[d+1] . ${PROTOCOL_LIST[$(($(asc ${INSTALL_PROTOCOLS[d]}) - 98))]} "
+    for w in "${!INSTALL_PROTOCOLS[@]}"; do
+      [ "$w" -ge 9 ] && hint " $[w+1]. ${PROTOCOL_LIST[$(($(asc ${INSTALL_PROTOCOLS[w]}) - 98))]} " || hint " $[w+1] . ${PROTOCOL_LIST[$(($(asc ${INSTALL_PROTOCOLS[w]}) - 98))]} "
     done
     enter_start_port ${#INSTALL_PROTOCOLS[@]}
   fi
@@ -584,15 +669,24 @@ events {
 
 
 http {
-  map \$http_user_agent \$path {
-    default                   /;               # 默认路径
-    ~*v2rayN                  /v2rayn;         # 匹配 V2rayN 客户端
-    ~*clash                   /clash;          # 匹配 Clash 客户端
-    ~*Neko                    /neko;           # 匹配 Neko 客户端
-    ~*ShadowRocket            /shadowrocket;   # 匹配 ShadowRocket  客户端
-    ~*SFM                     /sing-box-pc;    # 匹配 Sing-box pc 客户端
-    ~*SFI|SFA                 /sing-box-phone; # 匹配 Sing-box phone 客户端
- #   ~*Chrome|Firefox|Mozilla  /;              # 添加更多的分流规则
+  map \$http_user_agent \$path1 {
+    default                    /;               # 默认路径
+    ~*v2rayN                   /v2rayn;         # 匹配 V2rayN 客户端
+    ~*clash                    /clash;          # 匹配 Clash 客户端
+    ~*Neko                     /neko;           # 匹配 Neko 客户端
+    ~*ShadowRocket             /shadowrocket;   # 匹配 ShadowRocket  客户端
+    ~*SFM                      /sing-box-pc;    # 匹配 Sing-box pc 客户端
+    ~*SFI|SFA                  /sing-box-phone; # 匹配 Sing-box phone 客户端
+#   ~*Chrome|Firefox|Mozilla   /;               # 添加更多的分流规则
+  }
+  map \$http_user_agent \$path2 {
+    default                    /;               # 默认路径
+    ~*v2rayN                   /v2rayn;         # 匹配 V2rayN 客户端
+    ~*clash                    /clash2;         # 匹配 Clash 客户端
+    ~*Neko                     /neko;           # 匹配 Neko 客户端
+    ~*ShadowRocket             /shadowrocket;   # 匹配 ShadowRocket  客户端
+    ~*SFM|SFI|SFA              /sing-box2;      # 匹配 Sing-box pc 和 phone 客户端
+#   ~*Chrome|Firefox|Mozilla   /;               # 添加更多的分流规则
   }
 
     include       /etc/nginx/mime.types;
@@ -626,9 +720,16 @@ http {
 #    ssl_stapling               off;
 #    ssl_stapling_verify        off;
 
+    # 来自 /auto2 的分流
+    location ~ ^/${UUID_CONFIRM}/auto2 {
+      default_type 'text/plain; charset=utf-8';
+      alias ${WORK_DIR}/subscribe/\$path2;
+    }
+
+    # 来自 /auto 的分流
     location ~ ^/${UUID_CONFIRM}/auto {
       default_type 'text/plain; charset=utf-8';
-      alias ${WORK_DIR}/subscribe/\$path;
+      alias ${WORK_DIR}/subscribe/\$path1;
     }
 
     location ~ ^/${UUID_CONFIRM}/(.*) {
@@ -1363,25 +1464,29 @@ export_list() {
   [ -n "$PORT_HYSTERIA2" ] && local CLASH_SUBSCRIBE+="
   - {name: \"${NODE_NAME[12]} ${NODE_TAG[1]}\", type: hysteria2, server: ${SERVER_IP}, port: ${PORT_HYSTERIA2}, up: \"200 Mbps\", down: \"1000 Mbps\", password: ${UUID[12]}, skip-cert-verify: true}
 "
-  [ -n "$PORT_TUIC" ] && local CLASH_SUBSCRIBE+="
-  - {name: \"${NODE_NAME[13]} ${NODE_TAG[2]}\", type: tuic, server: ${SERVER_IP}, port: ${PORT_TUIC}, uuid: ${UUID[13]}, password: ${TUIC_PASSWORD}, alpn: [h3], disable-sni: true, reduce-rtt: true, request-timeout: 8000, udp-relay-mode: native, congestion-controller: $TUIC_CONGESTION_CONTROL, skip-cert-verify: true}
+  [ -n "$PORT_TUIC" ] && local TUIC_INBOUND_INSERT="- {name: \"${NODE_NAME[13]} ${NODE_TAG[2]}\", type: tuic, server: ${SERVER_IP}, port: ${PORT_TUIC}, uuid: ${UUID[13]}, password: ${TUIC_PASSWORD}, alpn: [h3], disable-sni: true, reduce-rtt: true, request-timeout: 8000, udp-relay-mode: native, congestion-controller: $TUIC_CONGESTION_CONTROL, skip-cert-verify: true}" && local TUIC_NODE_INSERT="- ${NODE_NAME[13]} ${NODE_TAG[2]}" &&
+  local CLASH_SUBSCRIBE+="
+  $TUIC_INBOUND_INSERT
 "
-  [ -n "$PORT_SHADOWTLS" ] && local CLASH_SUBSCRIBE+="
-  - {name: \"${NODE_NAME[14]} ${NODE_TAG[3]}\", type: ss, server: ${SERVER_IP}, port: ${PORT_SHADOWTLS}, cipher: $SHADOWTLS_METHOD, password: \"$SHADOWTLS_PASSWORD\", plugin: shadow-tls, client-fingerprint: chrome, plugin-opts: {host: \"${TLS_SERVER[14]}\", password: \"${UUID[14]}\", version: 3}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }
+  [ -n "$PORT_SHADOWTLS" ] && local SHADOWTLS_VARIABLE=", plugin: shadow-tls, client-fingerprint: chrome, plugin-opts: {host: ${TLS_SERVER[14]}, password: \"${UUID[14]}\", version: 3} " && local CLASH_SUBSCRIBE+="
+  - {name: \"${NODE_NAME[14]} ${NODE_TAG[3]}\", type: ss, server: ${SERVER_IP}, port: ${PORT_SHADOWTLS}, cipher: $SHADOWTLS_METHOD, password: $SHADOWTLS_PASSWORD, plugin: shadow-tls, client-fingerprint: chrome, plugin-opts: {host: ${TLS_SERVER[14]}, password: \"${UUID[14]}\", version: 3}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }
 "
+
   [ -n "$PORT_SHADOWSOCKS" ] && local CLASH_SUBSCRIBE+="
-  - {name: \"${NODE_NAME[15]} ${NODE_TAG[4]}\", type: ss, server: ${SERVER_IP}, port: $PORT_SHADOWSOCKS, cipher: ${SHADOWSOCKS_METHOD}, password: \"${UUID[15]}\", smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }
+  - {name: \"${NODE_NAME[15]} ${NODE_TAG[4]}\", type: ss, server: ${SERVER_IP}, port: $PORT_SHADOWSOCKS, cipher: ${SHADOWSOCKS_METHOD}, password: ${UUID[15]}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }
 "
   [ -n "$PORT_TROJAN" ] && local CLASH_SUBSCRIBE+="
   - {name: \"${NODE_NAME[16]} ${NODE_TAG[5]}\", type: trojan, server: ${SERVER_IP}, port: $PORT_TROJAN, password: $TROJAN_PASSWORD, client-fingerprint: random, skip-cert-verify: true, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }
 "
-  [ -n "$PORT_VMESS_WS" ] && WS_SERVER_IP=${WS_SERVER_IP[17]} && TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VMESS_WS && local CLASH_SUBSCRIBE+="
-  - {name: \"${NODE_NAME[17]} ${NODE_TAG[6]}\", type: vmess, server: ${CDN[17]}, port: 80, uuid: ${UUID[17]}, udp: true, tls: false, alterId: 0, cipher: none, skip-cert-verify: true, network: ws, ws-opts: { path: \"/$VMESS_WS_PATH\", headers: { Host: $VMESS_HOST_DOMAIN, max-early-data: 2048, early-data-header-name: Sec-WebSocket-Protocol} }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }
+  [ -n "$PORT_VMESS_WS" ] && local WS_SERVER_IP=${WS_SERVER_IP[17]} && local TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && local TYPE_PORT_WS=$PORT_VMESS_WS &&
+  local CLASH_SUBSCRIBE+="
+  - {name: \"${NODE_NAME[17]} ${NODE_TAG[6]}\", type: vmess, server: ${CDN[17]}, port: 80, uuid: ${UUID[17]}, udp: true, tls: false, alterId: 0, cipher: none, skip-cert-verify: true, network: ws, ws-opts: { path: \"/$VMESS_WS_PATH\", headers: {Host: $VMESS_HOST_DOMAIN}, max-early-data: 2048, early-data-header-name: Sec-WebSocket-Protocol }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }
 
   # $(text 52)
 "
-  [ -n "$PORT_VLESS_WS" ] && WS_SERVER_IP=${WS_SERVER_IP[18]} && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && local CLASH_SUBSCRIBE+="
-  - {name: \"${NODE_NAME[18]} ${NODE_TAG[7]}\", type: vless, server: ${CDN[18]}, port: 443, uuid: ${UUID[18]}, udp: true, tls: true, servername: $VLESS_HOST_DOMAIN, network: ws, skip-cert-verify: true, ws-opts: { path: \"/$VLESS_WS_PATH?ed=2048\", headers: { Host: $VLESS_HOST_DOMAIN } }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }
+  [ -n "$PORT_VLESS_WS" ] && local WS_SERVER_IP=${WS_SERVER_IP[18]} && local TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && local TYPE_PORT_WS=$PORT_VLESS_WS &&
+  local CLASH_SUBSCRIBE+="
+  - {name: \"${NODE_NAME[18]} ${NODE_TAG[7]}\", type: vless, server: ${CDN[18]}, port: 443, uuid: ${UUID[18]}, udp: true, tls: true, servername: $VLESS_HOST_DOMAIN, network: ws, skip-cert-verify: true, ws-opts: { path: \"/$VLESS_WS_PATH\", headers: {Host: $VLESS_HOST_DOMAIN}, max-early-data: 2048, early-data-header-name: Sec-WebSocket-Protocol }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }
 
   # $(text 52)
 "
@@ -1395,6 +1500,17 @@ export_list() {
 
   # 生成 clash 订阅配置文件
   wget --no-check-certificate -qO- --tries=3 --timeout=2 ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/clash | sed "s#NODE_NAME#${NODE_NAME_CONFIRM}#g; s#PROXY_PROVIDERS_URL#http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/proxies#" > $WORK_DIR/subscribe/clash
+
+  local CLASH_YAML=$(fetch_subscribe clash $WORK_DIR/subscribe/proxies http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/proxies)
+
+  # tuic 在 api 处不支持，这协议需要手动处理
+  [ -n "$PORT_TUIC" ] && CLASH_YAML=$(echo "$CLASH_YAML" | sed "/^proxy-groups:$/i\  ${TUIC_INBOUND_INSERT//\"/}") &&
+  CLASH_YAML=$(echo "$CLASH_YAML" | sed -E "/name: (♻️ 自动选择|🌍 国外媒体|📲 电报信息|Ⓜ️ 微软服务|🍎 苹果服务|📢 谷歌FCM|🎯 全球直连)|^rules:$/i\      ${TUIC_NODE_INSERT}")
+
+  # shadowTLS 在 api 处不支持，这协议需要手动处理
+  [ -n "$PORT_SHADOWTLS" ] && local CLASH_YAML=$(echo "$CLASH_YAML" | sed "/ShadowTLS.*type: ss/s/\(.*\)\(}\)$/\1${SHADOWTLS_VARIABLE}\2/")
+
+  echo "$CLASH_YAML" > $WORK_DIR/subscribe/clash2
 
   # 生成 ShadowRocket 订阅配置文件
   [ -n "$PORT_XTLS_REALITY" ] && local SHADOWROCKET_SUBSCRIBE+="
@@ -1587,42 +1703,98 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
   echo -n "$NEKOBOX_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > $WORK_DIR/subscribe/neko
 
   # 生成 Sing-box 订阅文件
-  [ -n "$PORT_XTLS_REALITY" ] && local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[11]} ${NODE_TAG[0]}\", \"server\":\"${SERVER_IP}\", \"server_port\":${PORT_XTLS_REALITY}, \"uuid\":\"${UUID[11]}\", \"flow\":\"\", \"packet_encoding\":\"xudp\", \"tls\":{ \"enabled\":true, \"server_name\":\"${TLS_SERVER[11]}\", \"utls\":{ \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[11]}\", \"short_id\":\"\" } }, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true } }," && local NODE_REPLACE+="\"${NODE_NAME[11]} ${NODE_TAG[0]}\","
+  [ -n "$PORT_XTLS_REALITY" ] &&
+  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[11]} ${NODE_TAG[0]}\", \"server\":\"${SERVER_IP}\", \"server_port\":${PORT_XTLS_REALITY}, \"uuid\":\"${UUID[11]}\", \"flow\":\"\", \"packet_encoding\":\"xudp\", \"tls\":{ \"enabled\":true, \"server_name\":\"${TLS_SERVER[11]}\", \"utls\":{ \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[11]}\", \"short_id\":\"\" } }, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true } }," &&
+  local NODE_REPLACE+="\"${NODE_NAME[11]} ${NODE_TAG[0]}\","
 
-  [ -n "$PORT_HYSTERIA2" ] && local INBOUND_REPLACE+=" { \"type\": \"hysteria2\", \"tag\": \"${NODE_NAME[12]} ${NODE_TAG[1]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_HYSTERIA2}, \"up_mbps\": 200, \"down_mbps\": 1000, \"password\": \"${UUID[12]}\", \"tls\": { \"enabled\": true, \"insecure\": true, \"server_name\": \"\", \"alpn\": [ \"h3\" ] } }," && local NODE_REPLACE+="\"${NODE_NAME[12]} ${NODE_TAG[1]}\","
+  [ -n "$PORT_HYSTERIA2" ] &&
+  local INBOUND_REPLACE+=" { \"type\": \"hysteria2\", \"tag\": \"${NODE_NAME[12]} ${NODE_TAG[1]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_HYSTERIA2}, \"up_mbps\": 200, \"down_mbps\": 1000, \"password\": \"${UUID[12]}\", \"tls\": { \"enabled\": true, \"insecure\": true, \"server_name\": \"\", \"alpn\": [ \"h3\" ] } }," &&
+  local NODE_REPLACE+="\"${NODE_NAME[12]} ${NODE_TAG[1]}\","
 
-  [ -n "$PORT_TUIC" ] && local INBOUND_REPLACE+=" { \"type\": \"tuic\", \"tag\": \"${NODE_NAME[13]} ${NODE_TAG[2]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_TUIC}, \"uuid\": \"${UUID[13]}\", \"password\": \"${TUIC_PASSWORD}\", \"congestion_control\": \"$TUIC_CONGESTION_CONTROL\", \"udp_relay_mode\": \"native\", \"zero_rtt_handshake\": false, \"heartbeat\": \"10s\", \"tls\": { \"enabled\": true, \"insecure\": true, \"server_name\": \"\", \"alpn\": [ \"h3\" ] } }," && local NODE_REPLACE+="\"${NODE_NAME[13]} ${NODE_TAG[2]}\","
+  [ -n "$PORT_TUIC" ] &&
+  local TUIC_INBOUND=" { \"type\": \"tuic\", \"tag\": \"${NODE_NAME[13]} ${NODE_TAG[2]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_TUIC}, \"uuid\": \"${UUID[13]}\", \"password\": \"${TUIC_PASSWORD}\", \"congestion_control\": \"$TUIC_CONGESTION_CONTROL\", \"udp_relay_mode\": \"native\", \"zero_rtt_handshake\": false, \"heartbeat\": \"10s\", \"tls\": { \"enabled\": true, \"insecure\": true, \"server_name\": \"\", \"alpn\": [ \"h3\" ] } }," &&
+  local INBOUND_REPLACE+="${TUIC_INBOUND}" &&
+  local NODE_REPLACE+="\"${NODE_NAME[13]} ${NODE_TAG[2]}\"," &&
+  local INBOUND_INSERT+="${TUIC_INBOUND}" &&
+  local NODE_INSERT+=", \"${NODE_NAME[13]} ${NODE_TAG[2]}\""
 
-  [ -n "$PORT_SHADOWTLS" ] && local INBOUND_REPLACE+=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[14]} ${NODE_TAG[3]}\", \"method\": \"$SHADOWTLS_METHOD\", \"password\": \"$SHADOWTLS_PASSWORD\", \"detour\": \"shadowtls-out\", \"udp_over_tcp\": false, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true } }, { \"type\": \"shadowtls\", \"tag\": \"shadowtls-out\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_SHADOWTLS}, \"version\": 3, \"password\": \"${UUID[14]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER[14]}\", \"utls\": { \"enabled\": true, \"fingerprint\": \"chrome\" } } }," && local NODE_REPLACE+="\"${NODE_NAME[14]} ${NODE_TAG[3]}\","
+  [ -n "$PORT_SHADOWTLS" ] &&
+  local SHADOWTLS_INBOUND=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[14]} ${NODE_TAG[3]}\", \"method\": \"$SHADOWTLS_METHOD\", \"password\": \"$SHADOWTLS_PASSWORD\", \"detour\": \"shadowtls-out\", \"udp_over_tcp\": false, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true } }, { \"type\": \"shadowtls\", \"tag\": \"shadowtls-out\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_SHADOWTLS}, \"version\": 3, \"password\": \"${UUID[14]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER[14]}\", \"utls\": { \"enabled\": true, \"fingerprint\": \"chrome\" } } }," &&
+  local INBOUND_REPLACE+="${SHADOWTLS_INBOUND}" &&
+  local NODE_REPLACE+="\"${NODE_NAME[14]} ${NODE_TAG[3]}\"," &&
+  local INBOUND_INSERT+="${SHADOWTLS_INBOUND}" &&
+  local NODE_INSERT+=", \"${NODE_NAME[14]} ${NODE_TAG[3]}\""
 
-  [ -n "$PORT_SHADOWSOCKS" ] && local INBOUND_REPLACE+=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[15]} ${NODE_TAG[4]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_SHADOWSOCKS, \"method\": \"${SHADOWSOCKS_METHOD}\", \"password\": \"${UUID[14]}\", \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true } }," && local NODE_REPLACE+="\"${NODE_NAME[15]} ${NODE_TAG[4]}\","
+  [ -n "$PORT_SHADOWSOCKS" ] &&
+  local INBOUND_REPLACE+=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[15]} ${NODE_TAG[4]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_SHADOWSOCKS, \"method\": \"${SHADOWSOCKS_METHOD}\", \"password\": \"${UUID[14]}\", \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true } }," &&
+  local NODE_REPLACE+="\"${NODE_NAME[15]} ${NODE_TAG[4]}\","
 
-  [ -n "$PORT_TROJAN" ] && local INBOUND_REPLACE+=" { \"type\": \"trojan\", \"tag\": \"${NODE_NAME[16]} ${NODE_TAG[5]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_TROJAN, \"password\": \"$TROJAN_PASSWORD\", \"tls\": { \"enabled\":true, \"insecure\": true, \"server_name\":\"\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true } }," && local NODE_REPLACE+="\"${NODE_NAME[16]} ${NODE_TAG[5]}\","
+  [ -n "$PORT_TROJAN" ] &&
+  local INBOUND_REPLACE+=" { \"type\": \"trojan\", \"tag\": \"${NODE_NAME[16]} ${NODE_TAG[5]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_TROJAN, \"password\": \"$TROJAN_PASSWORD\", \"tls\": { \"enabled\":true, \"insecure\": true, \"server_name\":\"\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true } }," &&
+  local NODE_REPLACE+="\"${NODE_NAME[16]} ${NODE_TAG[5]}\","
 
-  [ -n "$PORT_VMESS_WS" ] && WS_SERVER_IP=${WS_SERVER_IP[17]} && TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VMESS_WS && local PROMPT+="
-  # $(text 52)" && local INBOUND_REPLACE+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${CDN[17]}\", \"server_port\":80, \"uuid\":\"${UUID[17]}\", \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$VMESS_HOST_DOMAIN\" }, \"max_early_data\":2048, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true } }," && local NODE_REPLACE+="\"${NODE_NAME[17]} ${NODE_TAG[6]}\","
+  [ -n "$PORT_VMESS_WS" ] &&
+  local WS_SERVER_IP=${WS_SERVER_IP[17]} &&
+  local TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN &&
+  local TYPE_PORT_WS=$PORT_VMESS_WS &&
+  local PROMPT+="
+  # $(text 52)" &&
+  local INBOUND_REPLACE+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${CDN[17]}\", \"server_port\":80, \"uuid\":\"${UUID[17]}\", \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$VMESS_HOST_DOMAIN\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true } }," && local NODE_REPLACE+="\"${NODE_NAME[17]} ${NODE_TAG[6]}\","
 
-  [ -n "$PORT_VLESS_WS" ] && WS_SERVER_IP=${WS_SERVER_IP[18]} && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && local PROMPT+="
-  # $(text 52)" && local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[18]} ${NODE_TAG[7]}\", \"server\":\"${CDN[18]}\", \"server_port\":443, \"uuid\":\"${UUID[18]}\", \"tls\": { \"enabled\":true, \"server_name\":\"$VLESS_HOST_DOMAIN\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VLESS_WS_PATH\", \"headers\": { \"Host\": \"$VLESS_HOST_DOMAIN\" }, \"max_early_data\":2048, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true } }," && local NODE_REPLACE+="\"${NODE_NAME[18]} ${NODE_TAG[7]}\","
+  [ -n "$PORT_VLESS_WS" ] &&
+  local WS_SERVER_IP=${WS_SERVER_IP[18]} &&
+  local TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN &&
+  local TYPE_PORT_WS=$PORT_VLESS_WS &&
+  local PROMPT+="
+  # $(text 52)" &&
+  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[18]} ${NODE_TAG[7]}\", \"server\":\"${CDN[18]}\", \"server_port\":443, \"uuid\":\"${UUID[18]}\", \"tls\": { \"enabled\":true, \"server_name\":\"$VLESS_HOST_DOMAIN\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VLESS_WS_PATH\", \"headers\": { \"Host\": \"$VLESS_HOST_DOMAIN\" }, \"max_early_data\":2048, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true } }," &&
+  local NODE_REPLACE+="\"${NODE_NAME[18]} ${NODE_TAG[7]}\","
 
-  [ -n "$PORT_H2_REALITY" ] && local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[19]} ${NODE_TAG[8]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_H2_REALITY}, \"uuid\":\"${UUID[19]}\", \"tls\": { \"enabled\":true, \"server_name\":\"${TLS_SERVER[19]}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[19]}\", \"short_id\":\"\" } }, \"packet_encoding\": \"xudp\", \"transport\": { \"type\": \"http\" } }," && local NODE_REPLACE+="\"${NODE_NAME[19]} ${NODE_TAG[8]}\","
+  [ -n "$PORT_H2_REALITY" ] &&
+  local REALITY_H2_INBOUND=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[19]} ${NODE_TAG[8]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_H2_REALITY}, \"uuid\":\"${UUID[19]}\", \"tls\": { \"enabled\":true, \"server_name\":\"${TLS_SERVER[19]}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[19]}\", \"short_id\":\"\" } }, \"packet_encoding\": \"xudp\", \"transport\": { \"type\": \"http\" } }," &&
+  local REALITY_H2_NODE="\"${NODE_NAME[19]} ${NODE_TAG[8]}\"" &&
+  local NODE_REPLACE+="${REALITY_H2_NODE}," &&
+  local INBOUND_REPLACE+=" ${REALITY_H2_INBOUND}" &&
+  local INBOUND_INSERT+=" ${REALITY_H2_INBOUND}" &&
+  local NODE_INSERT+=", ${REALITY_H2_NODE}"
 
-  [ -n "$PORT_GRPC_REALITY" ] && local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[20]} ${NODE_TAG[9]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_GRPC_REALITY}, \"uuid\":\"${UUID[20]}\", \"tls\": { \"enabled\":true, \"server_name\":\"${TLS_SERVER[20]}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[20]}\", \"short_id\":\"\" } }, \"packet_encoding\": \"xudp\", \"transport\": { \"type\": \"grpc\", \"service_name\": \"grpc\" } }," && local NODE_REPLACE+="\"${NODE_NAME[20]} ${NODE_TAG[9]}\","
+  [ -n "$PORT_GRPC_REALITY" ] &&
+  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[20]} ${NODE_TAG[9]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_GRPC_REALITY}, \"uuid\":\"${UUID[20]}\", \"tls\": { \"enabled\":true, \"server_name\":\"${TLS_SERVER[20]}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[20]}\", \"short_id\":\"\" } }, \"packet_encoding\": \"xudp\", \"transport\": { \"type\": \"grpc\", \"service_name\": \"grpc\" } }," &&
+  local NODE_REPLACE+="\"${NODE_NAME[20]} ${NODE_TAG[9]}\","
 
   local PC_TEMPLATE=$(wget --no-check-certificate -qO- --tries=3 --timeout=2 ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/sing-box-pc)
   local PHONE_TEMPLATE=$(wget --no-check-certificate -qO- --tries=3 --timeout=2 ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/sing-box-phone)
   echo $PC_TEMPLATE | sed "s#\"<INBOUND_REPLACE>\",#$INBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | jq > $WORK_DIR/subscribe/sing-box-pc
   echo $PHONE_TEMPLATE | sed "s#\"<INBOUND_REPLACE>\",#$INBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | jq > $WORK_DIR/subscribe/sing-box-phone
 
+  local SING_BOX_JSON2=$(fetch_subscribe singbox $WORK_DIR/subscribe/proxies http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/proxies)
+
+  # tuic , ShadowTLS 在 api 处不支持；clash 没有 H2 + reality 无法输入到 api。这3个协议需要手动处理; 由于sed支持最多9个捕获组，故分两段处理
+  [[ -n "$PORT_H2_REALITY" || -n "$PORT_H2_REALITY" ]] && SING_BOX_JSON2=$(echo $SING_BOX_JSON2 | sed "s/\(.*,\).*\({.*\"tag\":\"🚀 节点选择\"[^]]\+\)\(].*\"tag\":\"♻️ 自动选择\"[^]]\+\)\(].*\"tag\":\"🌍 国外媒体\"[^]]\+\)\(].*\"tag\":\"📲 电报信息\"[^]]\+\)\(].*\"tag\":\"Ⓜ️ 微软服务\"[^]]\+\)\(].*\"tag\":\"🍎 苹果服务\"[^]]\+\)\(].*\"tag\":\"📢 谷歌FCM\"[^]]\+\)\(].*\)/\1${INBOUND_INSERT}\2${NODE_INSERT}\3${NODE_INSERT}\4${NODE_INSERT}\5${NODE_INSERT}\6${NODE_INSERT}\7${NODE_INSERT}\8${NODE_INSERT}\9/") && SING_BOX_JSON2=$(echo $SING_BOX_JSON2 | sed "s/\(.*\"tag\":\"🐟 漏网之鱼\"[^]]\+\)\(].*\"tag\":\"GLOBAL\"[^]]\+\)\(].*\)/\1${NODE_INSERT}\2${NODE_INSERT}\3/")
+
+  echo $SING_BOX_JSON2 | jq > $WORK_DIR/subscribe/sing-box2
+
   # 生成二维码 url 文件
   cat > $WORK_DIR/subscribe/qr <<EOF
 $(text 81):
+$(text 82) 1:
 http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto
 
+$(text 82) 2:
+http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2
+
 $(text 80) QRcode:
+$(text 82) 1:
 https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto
 
-$(qrencode -s 10 -m 1 -t UTF8 <<< http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto)
+$(text 82) 2:
+https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2
+
+$(text 82) 1:
+$(qrencode -s 10 -m 1 -t UTF8 <<< "http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto")
+
+$(text 82) 2:
+$(qrencode -s 10 -m 1 -t UTF8 <<< "http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2")
 EOF
 
   # 生成配置文件
@@ -1692,6 +1864,7 @@ http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/neko")
 
 $(hint "Clash $(text 80):
 http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/clash
+http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/clash2
 
 sing-box for pc $(text 80):
 http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/sing-box-pc
@@ -1699,18 +1872,33 @@ http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/sing-box-pc
 sing-box for cellphone $(text 80):
 http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/sing-box-phone
 
+SFI / SFA / SFM $(text 80):
+http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/sing-box2
+
 ShadowRocket $(text 80):
 http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/proxies")
 
 *******************************************
 
 $(info " $(text 81):
+$(text 82) 1:
 http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto
 
- $(text 80) QRcode:
-https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto")
+$(text 82) 2:
+http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2
 
+ $(text 80) QRcode:
+$(text 82) 1:
+https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto
+
+$(text 82) 2:
+https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2")
+
+$(hint "$(text 82) 1:")
 $(qrencode -s 10 -m 1 -t UTF8 <<< http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto)
+
+$(hint "$(text 82) 2:")
+$(qrencode -s 10 -m 1 -t UTF8 <<< http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2)
 
 *******************************************
 EOF
