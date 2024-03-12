@@ -15,6 +15,8 @@
 
 * * *
 ## 更新信息
+2024.3.11 v1.1.6 1. Subscription api too many problems not working properly, instead put template-2 on Github; 2. Use native IP if it supports unlocking chatGPT, otherwise use warp chained proxy unlocking; 1. 在线转订阅 api 太多问题不能正常使用，改为把模板2放Github; 2. 如自身支持解锁 chatGPT，则使用原生 IP，否则使用 warp 链式代理解锁
+
 2024.3.10 v1.1.5 1. To protect node data security, use fake information to fetch subscribe api; 2. Adaptive the above clients. http://\<server ip\>:\<nginx port\>/\<uuid\>/<uuid>/<auto | auto2>; 1. 为保护节点数据安全，在 api 转订阅时，使用虚假信息; 2. 自适应以上的客户端，http://\<server ip\>:\<nginx port\>/\<uuid\>/<auto | auto2>
 
 2024.3.4 v1.1.4 1. Support V2rayN / Nekobox / Clash / sing-box / Shadowrocket subscribe. http://\<server ip\>:\<nginx port\>/\<uuid\>/\<qr | clash | neko | proxies | shadowrocket | sing-box-pc | sing-box-phone | v2rayn\>. Index of all subscribes: http://\<server ip\>:\<nginx port\>/\<uuid\>/  . Reinstall is required; 2. Adaptive the above clients. http://\<server ip\>:\<nginx port\>/\<uuid\>/auto ; 1. 增加 V2rayN / Nekobox / Clash / sing-box / Shadowrocket 订阅，http://\<server ip\>:\<nginx port\>/\<uuid\>/\<qr | clash | neko | proxies | shadowrocket | sing-box-pc | sing-box-phone | v2rayn\>， 所有订阅的索引: http://\<server ip\>:\<nginx port\>/\<uuid\>/，需要重新安装; 2. 自适应以上的客户端，http://\<server ip\>:\<nginx port\>/\<uuid\>/auto
