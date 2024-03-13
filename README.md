@@ -15,6 +15,8 @@
 
 * * *
 ## 更新信息
+2024.3.13 v1.1.7 Subscription made optional, no nginx and qrcode installed if not needed; 在线订阅改为可选项，如不需要，不安装 nginx 和 qrcode
+
 2024.3.11 v1.1.6 1. Subscription api too many problems not working properly, instead put template-2 on Github; 2. Use native IP if it supports unlocking chatGPT, otherwise use warp chained proxy unlocking; 1. 在线转订阅 api 太多问题不能正常使用，改为把模板2放Github; 2. 如自身支持解锁 chatGPT，则使用原生 IP，否则使用 warp 链式代理解锁
 
 2024.3.10 v1.1.5 1. To protect node data security, use fake information to fetch subscribe api; 2. Adaptive the above clients. http://\<server ip\>:\<nginx port\>/\<uuid\>/<uuid>/<auto | auto2>; 1. 为保护节点数据安全，在 api 转订阅时，使用虚假信息; 2. 自适应以上的客户端，http://\<server ip\>:\<nginx port\>/\<uuid\>/<auto | auto2>
@@ -117,6 +119,8 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 |   |-- 00_log.json                          # 日志配置文件
 |   |-- 01_outbounds.json                    # 服务端出站配置文件，已加了 warp 账户信息
 |   |-- 02_route.json                        # 路由配置文件，chatGPT 使用 warp ipv6 链式代理出站
+|   |-- 03_experimental.json                 # 缓存配置文件
+|   |-- 04_dns.json                          # DNS 规则文件
 |   |-- 11_xtls-reality_inbounds.json        # Reality vision 协议配置文件
 |   |-- 12_hysteria2_inbounds.json           # Hysteria2 协议配置文件
 |   |-- 13_tuic_inbounds.json                # Tuic V5 协议配置文件 # Hysteria2 协议配置文件
@@ -141,6 +145,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 |   |-- v2rayn                               # V2rayN 订阅文件
 |   `--  neko                                # Nekoray 订阅文件
 |-- cache.db                                 # sing-box 缓存文件
+|-- nginx.conf                               # 用于订阅服务的 nginx 配置文件
 |-- language                                 # 存放脚本语言文件，E 为英文，C 为中文
 |-- list                                     # 节点信息列表
 |-- sing-box                                 # sing-box 主程序

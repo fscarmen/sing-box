@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.1.6'
+VERSION='v1.1.7 (2024.03.13)'
 
 # 各变量默认值
 GH_PROXY='https://cdn2.cloudflare.now.cc/'
@@ -23,8 +23,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Subscription api too many problems not working properly, instead put template-2 on Github; 2. Use native IP if it supports unlocking chatGPT, otherwise use warp chained proxy unlocking"
-C[1]="1. 在线转订阅 api 太多问题不能正常使用，改为把模板2放Github; 2. 如自身支持解锁 chatGPT，则使用原生 IP，否则使用 warp 链式代理解锁"
+E[1]="Subscription made optional, no nginx and qrcode installed if not needed."
+C[1]="在线订阅改为可选项，如不需要，不安装 nginx 和 qrcode"
 E[2]="This project is designed to add sing-box support for multiple protocols to VPS, details: [https://github.com/fscarmen/sing-box]\n Script Features:\n\t • Deploy multiple protocols with one click, there is always one for you!\n\t • Custom ports for nat machine with limited open ports.\n\t • Built-in warp chained proxy to unlock chatGPT.\n\t • No domain name is required.\n\t • Support system: Ubuntu, Debian, CentOS, Alpine and Arch Linux 3.\n\t • Support architecture: AMD,ARM and s390x\n"
 C[2]="本项目专为 VPS 添加 sing-box 支持的多种协议, 详细说明: [https://github.com/fscarmen/sing-box]\n 脚本特点:\n\t • 一键部署多协议，总有一款适合你\n\t • 自定义端口，适合有限开放端口的 nat 小鸡\n\t • 内置 warp 链式代理解锁 chatGPT\n\t • 不需要域名\n\t • 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 和 Arch Linux,请务必选择 LTS 系统\n\t • 支持硬件结构类型: AMD 和 ARM\n"
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -41,14 +41,14 @@ E[8]="All dependencies already exist and do not need to be installed additionall
 C[8]="所有依赖已存在，不需要额外安装"
 E[9]="To upgrade, press [y]. No upgrade by default:"
 C[9]="升级请按 [y]，默认不升级:"
-E[10]="Please enter VPS IP \(Default is: \${SERVER_IP_DEFAULT}\):"
-C[10]="请输入 VPS IP \(默认为: \${SERVER_IP_DEFAULT}\):"
-E[11]="Please enter the starting port number. Must be \${MIN_PORT} - \${MAX_PORT}, consecutive \${NUM} free ports are required \(Default is: \${START_PORT_DEFAULT}\):"
-C[11]="请输入开始的端口号，必须是 \${MIN_PORT} - \${MAX_PORT}，需要连续\${NUM}个空闲的端口 \(默认为: \${START_PORT_DEFAULT}\):"
-E[12]="Please enter UUID \(Default is \${UUID_DEFAULT}\):"
-C[12]="请输入 UUID \(默认为 \${UUID_DEFAULT}\):"
-E[13]="Please enter the node name. \(Default is \${NODE_NAME_DEFAULT}\):"
-C[13]="请输入节点名称 \(默认为 \${NODE_NAME_DEFAULT}\):"
+E[10]="\(4/6\) Please enter VPS IP \(Default is: \${SERVER_IP_DEFAULT}\):"
+C[10]="\(4/6\) 请输入 VPS IP \(默认为: \${SERVER_IP_DEFAULT}\):"
+E[11]="\(2/6\) Please enter the starting port number. Must be \${MIN_PORT} - \${MAX_PORT}, consecutive \${NUM} free ports are required \(Default is: \${START_PORT_DEFAULT}\):"
+C[11]="\(2/6\) 请输入开始的端口号，必须是 \${MIN_PORT} - \${MAX_PORT}，需要连续\${NUM}个空闲的端口 \(默认为: \${START_PORT_DEFAULT}\):"
+E[12]="\(5/6\) Please enter UUID \(Default is \${UUID_DEFAULT}\):"
+C[12]="\(5/6\) 请输入 UUID \(默认为 \${UUID_DEFAULT}\):"
+E[13]="\(6/6\) Please enter the node name. \(Default is \${NODE_NAME_DEFAULT}\):"
+C[13]="\(6/6\) 请输入节点名称 \(默认为 \${NODE_NAME_DEFAULT}\):"
 E[14]="Node name only allow uppercase and lowercase letters and numeric characters, please re-enter \(\${a} times remaining\):"
 C[14]="节点名称只允许英文大小写及数字字符，请重新输入 \(剩余\${a}次\):"
 E[15]="Sing-box script has not been installed yet."
@@ -119,14 +119,14 @@ E[47]="No server ip, script exits. Feedback:[https://github.com/fscarmen/sing-bo
 C[47]="没有 server ip，脚本退出，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 E[48]="ShadowTLS - Copy the above two Neko links and manually set up the chained proxies in order. Tutorial: https://github.com/fscarmen/sing-box/blob/main/README.md#sekobox-%E8%AE%BE%E7%BD%AE-shadowtls-%E6%96%B9%E6%B3%95"
 C[48]="ShadowTLS - 复制上面两条 Neko links 进去，并按顺序手动设置链式代理，详细教程: https://github.com/fscarmen/sing-box/blob/main/README.md#sekobox-%E8%AE%BE%E7%BD%AE-shadowtls-%E6%96%B9%E6%B3%95"
-E[49]="Select more protocols to install (e.g. hgbd):\n a. all (default)"
-C[49]="多选需要安装协议(比如 hgbd):\n a. all (默认)"
+E[49]="(1/6) Select more protocols to install (e.g. hgbd):\n a. all (default)"
+C[49]="(1/6) 多选需要安装协议(比如 hgbd):\n a. all (默认)"
 E[50]="Please enter the \$TYPE domain name:"
 C[50]="请输入 \$TYPE 域名:"
 E[51]="Please choose or custom a cdn, http support is required:"
 C[51]="请选择或输入 cdn，要求支持 http:"
-E[52]="Please set the ip \[\${WS_SERVER_IP}] to domain \[\${TYPE_HOST_DOMAIN}], and set the origin rule to \[\${TYPE_PORT_WS}] in Cloudflare."
-C[52]="请在 Cloudflare 绑定 \[\${WS_SERVER_IP}] 的域名为 \[\${TYPE_HOST_DOMAIN}], 并设置 origin rule 为 \[\${TYPE_PORT_WS}]"
+E[52]="Please set the ip \[\${WS_SERVER_IP_SHOW}] to domain \[\${TYPE_HOST_DOMAIN}], and set the origin rule to \[\${TYPE_PORT_WS}] in Cloudflare."
+C[52]="请在 Cloudflare 绑定 \[\${WS_SERVER_IP_SHOW}] 的域名为 \[\${TYPE_HOST_DOMAIN}], 并设置 origin rule 为 \[\${TYPE_PORT_WS}]"
 E[53]="Please select or enter the preferred domain, the default is \${CDN_DOMAIN[0]}:"
 C[53]="请选择或者填入优选域名，默认为 \${CDN_DOMAIN[0]}:"
 E[54]="The contents of the ShadowTLS configuration file need to be updated for the sing_box kernel."
@@ -165,8 +165,8 @@ E[70]="Please set inSecure in tls to true."
 C[70]="请把 tls 里的 inSecure 设置为 true"
 E[71]="Create shortcut [ sb ] successfully."
 C[71]="创建快捷 [ sb ] 指令成功!"
-E[72]="The full template can be found at:\n https://t.me/ztvps/67\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
-C[72]="完整模板可参照:\n https://t.me/ztvps/67\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
+E[72]="Path to each client configuration file: $WORK_DIR/subscribe/\n The full template can be found at:\n https://t.me/ztvps/67\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
+C[72]="各客户端配置文件路径: $WORK_DIR/subscribe/\n 完整模板可参照:\n https://t.me/ztvps/67\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
 E[73]="There is no protocol left, if you are sure please re-run [ sb -u ] to uninstall all."
 C[73]="没有协议剩下，如确定请重新执行 [ sb -u ] 卸载所有"
 E[74]="Keep protocols"
@@ -179,14 +179,16 @@ E[77]="With sing-box installed, the script exits."
 C[77]="已安装 sing-box ，脚本退出"
 E[78]="Parameter [ $ERROR_PARAMETER ] error, script exits."
 C[78]="[ $ERROR_PARAMETER ] 参数错误，脚本退出"
-E[79]="Please enter the nginx port used to subscribe. Must be \${MIN_PORT} - \${MAX_PORT} \(Default is: \${PORT_NGINX_DEFAULT}\):"
-C[79]="请输入用于订阅服务的 nginx 端口号，必须是 \${MIN_PORT} - \${MAX_PORT} \(默认为: \${PORT_NGINX_DEFAULT}\):"
+E[79]="\(3/6\) Output subscription QR code and http service, need to install dependencies qrencode, nginx\\\n If not, please enter [n]\\\n If you need, please enter the port number of nginx used for subscription service. Must be \${MIN_PORT} - \${MAX_PORT} \(Default is: \${PORT_NGINX_DEFAULT}\):"
+C[79]="\(3/6\) 输出订阅二维码和 http 服务，需要安装依赖 qrencode, nginx\\\n 如不需要，请输入 [n]\\\n 如需要请输入用于订阅服务的 nginx 端口号，必须是 \${MIN_PORT} - \${MAX_PORT} \(默认为: \${PORT_NGINX_DEFAULT}\):"
 E[80]="subscribe"
 C[80]="订阅"
 E[81]="Adaptive Clash / V2rayN / NekoBox / ShadowRocket / SFI / SFA / SFM Clients"
 C[81]="自适应 Clash / V2rayN / NekoBox / ShadowRocket / SFI / SFA / SFM 客户端"
 E[82]="template"
 C[82]="模版"
+E[83]="To uninstall Nginx press [y], it is not uninstalled by default:"
+C[83]="如要卸载 Nginx 请按 [y]，默认不卸载:"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -263,8 +265,10 @@ input_cdn() {
   fi
 }
 
-# 输入订阅 Nginx 的服务端口
-enter_nginx_port() {
+# | 选择输出模式 | 订阅 二维码输出 | nginx 输出 |   额外依赖       |
+# |   mode 1   |        X      |     X     |       -         |
+# |   mode 2   |        √      |     √     | qrencode, nginx |
+enter_export_mode() {
   local NUM=$1
   local PORT_ERROR_TIME=6
   # 生成 1000 - 65535 随机默认端口数
@@ -278,7 +282,11 @@ enter_nginx_port() {
       [ -z "$PORT_NGINX" ] && reading "\n $(text 79) " PORT_NGINX
     fi
     PORT_NGINX=${PORT_NGINX:-"$PORT_NGINX_DEFAULT"}
-    if [[ "$PORT_NGINX" =~ ^[1-9][0-9]{2,4}$ && "$PORT_NGINX" -ge "$MIN_PORT" && "$PORT_NGINX" -le "$MAX_PORT" ]]; then
+    if [ "${PORT_NGINX,,}" = 'n' ]; then
+      EXPORT_MODE=1
+      break
+    elif [[ "$PORT_NGINX" =~ ^[1-9][0-9]{1,4}$ && "$PORT_NGINX" -ge "$MIN_PORT" && "$PORT_NGINX" -le "$MAX_PORT" ]]; then
+      EXPORT_MODE=2
       ss -nltup | grep -q ":$PORT_NGINX" && warning "\n $(text 44) \n" || break
     fi
   done
@@ -300,13 +308,14 @@ check_arch() {
 
 # 查安装及运行状态；状态码: 26 未安装， 27 已安装未运行， 28 运行中
 check_install() {
+  [ -s $WORK_DIR/nginx.conf ] && IS_NGINX=1 || IS_NGINX=0
   STATUS=$(text 26) && [ -s /etc/systemd/system/sing-box.service ] && STATUS=$(text 27) && [ "$(systemctl is-active sing-box)" = 'active' ] && STATUS=$(text 28)
   if [[ $STATUS = "$(text 26)" ]] && [ ! -s $WORK_DIR/sing-box ]; then
     {
     local VERSION_LATEST=$(wget --no-check-certificate -qO- "https://api.github.com/repos/SagerNet/sing-box/releases" | awk -F '["v-]' '/tag_name/{print $5}' | sort -r | sed -n '1p')
     local ONLINE=$(wget --no-check-certificate -qO- "https://api.github.com/repos/SagerNet/sing-box/releases" | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
-    ONLINE=${ONLINE:-'1.9.0-beta.7'}
-    wget --no-check-certificate -c ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
+    ONLINE=${ONLINE:-'1.9.0-beta.11'}
+    wget --no-check-certificate -c ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box >/dev/null 2>&1
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
     }&
   fi
@@ -332,13 +341,13 @@ cmd_systemctl() {
   local APP=$2
   if [ "$ENABLE_DISABLE" = 'enable' ]; then
     # 首先运行 nginx 服务
-    $(type -p nginx) -c $WORK_DIR/nginx.conf
+    [ "$IS_NGINX" = '1' ] && $(type -p nginx) -c $WORK_DIR/nginx.conf
     if [ "$SYSTEM" = 'Alpine' ]; then
       systemctl start $APP
       cat > /etc/local.d/$APP.start << EOF
 #!/usr/bin/env bash
 
-$(type -p nginx) -c $WORK_DIR/nginx.conf
+[ "$IS_NGINX" = '1' ] && $(type -p nginx) -c $WORK_DIR/nginx.conf
 systemctl start $APP
 EOF
       chmod +x /etc/local.d/$APP.start
@@ -348,10 +357,10 @@ EOF
     fi
   elif [ "$ENABLE_DISABLE" = 'stop' ]; then
     # 首先停掉 nginx 服务
-    ss -nltp | grep $(awk '/listen/{print $2; exit}' $WORK_DIR/nginx.conf) | tr ',' '\n' | awk -F '=' '/pid/{print $2}' | sort -u | xargs kill -15
+    [ "$IS_NGINX" = '1' ] && ss -nltp | grep $(awk '/listen/{print $2; exit}' $WORK_DIR/nginx.conf) | tr ',' '\n' | awk -F '=' '/pid/{print $2}' | sort -u | xargs kill -15
     systemctl stop $APP
   elif [ "$ENABLE_DISABLE" = 'disable' ]; then
-    ss -nltp | grep $(awk '/listen/{print $2; exit}' $WORK_DIR/nginx.conf) | tr ',' '\n' | awk -F '=' '/pid/{print $2}' | sort -u | xargs kill -15
+    [ "$IS_NGINX" = '1' ] && ss -nltp | grep $(awk '/listen/{print $2; exit}' $WORK_DIR/nginx.conf) | tr ',' '\n' | awk -F '=' '/pid/{print $2}' | sort -u | xargs kill -15
     if [ "$SYSTEM" = 'Alpine' ]; then
       systemctl stop $APP
       rm -f /etc/local.d/$APP.start
@@ -489,12 +498,12 @@ sing-box_variable() {
     enter_start_port ${#INSTALL_PROTOCOLS[@]}
   fi
 
-  # 输入用于订阅的 Nginx 服务端口号
-  enter_nginx_port
+  # 输出模式选择，输入用于订阅的 Nginx 服务端口号， 后台根据选择安装依赖
+  enter_export_mode
 
   # 输入服务器 IP,默认为检测到的服务器 IP，如果全部为空，则提示并退出脚本
   [ -z "$SERVER_IP" ] && reading "\n $(text 10) " SERVER_IP
-  SERVER_IP=${SERVER_IP:-"$SERVER_IP_DEFAULT"} && WS_SERVER_IP=$SERVER_IP
+  SERVER_IP=${SERVER_IP:-"$SERVER_IP_DEFAULT"} && WS_SERVER_IP_SHOW=$SERVER_IP
   [ -z "$SERVER_IP" ] && error " $(text 47) "
 
   # 如选择有 h. vmess + ws 或 i. vless + ws 时，先检测是否有支持的 http 端口可用，如有则要求输入域名和 cdn
@@ -517,10 +526,8 @@ sing-box_variable() {
   # 选择或者输入 cdn
   input_cdn
 
-  wait
-
   # 输入 UUID ，错误超过 5 次将会退出
-  UUID_DEFAULT=$($TEMP_DIR/sing-box generate uuid)
+  UUID_DEFAULT=$(cat /proc/sys/kernel/random/uuid)
   [ -z "$UUID_CONFIRM" ] && reading "\n $(text 12) " UUID_CONFIRM
   local UUID_ERROR_TIME=5
   until [[ -z "$UUID_CONFIRM" || "${UUID_CONFIRM,,}" =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ ]]; do
@@ -544,11 +551,11 @@ sing-box_variable() {
 check_dependencies() {
   # 如果是 Alpine，先升级 wget ，安装 systemctl-py 版
   if [ "$SYSTEM" = 'Alpine' ]; then
-    CHECK_WGET=$(wget 2>&1 | head -n 1)
+    local CHECK_WGET=$(wget 2>&1 | head -n 1)
     grep -qi 'busybox' <<< "$CHECK_WGET" && ${PACKAGE_INSTALL[int]} wget >/dev/null 2>&1
 
-    DEPS_CHECK=("bash" "rc-update" "virt-what" "qrencode")
-    DEPS_INSTALL=("bash" "openrc" "virt-what" "libqrencode")
+    local DEPS_CHECK=("bash" "rc-update" "virt-what")
+    local DEPS_INSTALL=("bash" "openrc" "virt-what")
     for g in "${!DEPS_CHECK[@]}"; do [ ! $(type -p ${DEPS_CHECK[g]}) ] && [[ ! "${DEPS[@]}" =~ "${DEPS_INSTALL[g]}" ]] && DEPS+=(${DEPS_INSTALL[g]}); done
     if [ "${#DEPS[@]}" -ge 1 ]; then
       info "\n $(text 7) $(sed "s/ /,&/g" <<< ${DEPS[@]}) \n"
@@ -561,9 +568,11 @@ check_dependencies() {
 
   # 检测 Linux 系统的依赖，升级库并重新安装依赖
   unset DEPS_CHECK DEPS_INSTALL DEPS
-  DEPS_CHECK=("wget" "systemctl" "ss" "unzip" "bash" "openssl" "jq" "qrencode" "nginx")
-  DEPS_INSTALL=("wget" "systemctl" "iproute2" "unzip" "bash" "openssl" "jq" "qrencode" "nginx")
-  for g in "${!DEPS_CHECK[@]}"; do [ ! $(type -p ${DEPS_CHECK[g]}) ] && [[ ! "${DEPS[@]}" =~ "${DEPS_INSTALL[g]}" ]] && DEPS+=(${DEPS_INSTALL[g]}); done
+  DEPS_CHECK=("wget" "systemctl" "ss" "unzip" "bash" "openssl" "jq")
+  DEPS_INSTALL=("wget" "systemctl" "iproute2" "unzip" "bash" "openssl" "jq")
+  for g in "${!DEPS_CHECK[@]}"; do
+    [ ! $(type -p ${DEPS_CHECK[g]}) ] && [[ ! "${DEPS[@]}" =~ "${DEPS_INSTALL[g]}" ]] && local DEPS+=(${DEPS_INSTALL[g]})
+  done
   if [ "${#DEPS[@]}" -ge 1 ]; then
     info "\n $(text 7) $(sed "s/ /,&/g" <<< ${DEPS[@]}) \n"
     ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
@@ -574,6 +583,21 @@ check_dependencies() {
 
   # 如果新安装的 Nginx ，先停掉服务
   [[ "${DEPS[@]}" =~ 'nginx' ]] && systemctl disable --now nginx >/dev/null 2>&1
+}
+
+check_dependencies_2nd() {
+  # 根据用户选择安装依赖
+  if [ "$1" = "2" ]; then
+    local DEPS_CHECK=("qrencode" "nginx")
+    [ "$SYSTEM" = 'Alpine' ] && local DEPS_INSTALL=("libqrencode" "nginx") || local DEPS_INSTALL=("qrencode" "nginx")
+  fi
+  for g in "${!DEPS_CHECK[@]}"; do
+    [ ! $(type -p ${DEPS_CHECK[g]}) ] && [[ ! "${DEPS[@]}" =~ "${DEPS_INSTALL[g]}" ]] && local DEPS+=(${DEPS_INSTALL[g]})
+  done
+  if [ "${#DEPS[@]}" -ge 1 ]; then
+    info "\n $(text 7) $(sed "s/ /,&/g" <<< ${DEPS[@]}) \n"
+    ${PACKAGE_INSTALL[int]} ${DEPS[@]} >/dev/null 2>&1
+  fi
 }
 
 # 生成100年的自签证书
@@ -1060,7 +1084,7 @@ EOF
     [ -z "$PORT_VMESS_WS" ] && PORT_VMESS_WS=$[START_PORT+$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")]
     NODE_NAME[17]=${NODE_NAME[17]:-"$NODE_NAME_CONFIRM"} && UUID[17]=${UUID[17]:-"$UUID_CONFIRM"} && WS_SERVER_IP[17]=${WS_SERVER_IP[17]:-"$SERVER_IP"} && CDN[17]=${CDN[17]:-"$CDN"} && VMESS_WS_PATH=${VMESS_WS_PATH:-"${UUID[17]}-vmess"}
     cat > $WORK_DIR/conf/17_${NODE_TAG[6]}_inbounds.json << EOF
-//  "WS_SERVER_IP": "${WS_SERVER_IP[17]}"
+//  "WS_SERVER_IP_SHOW": "${WS_SERVER_IP[17]}"
 //  "VMESS_HOST_DOMAIN": "$VMESS_HOST_DOMAIN"
 //  "CDN": "${CDN[17]}"
 {
@@ -1107,7 +1131,7 @@ EOF
     [ -z "$PORT_VLESS_WS" ] && PORT_VLESS_WS=$[START_PORT+$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")]
     NODE_NAME[18]=${NODE_NAME[18]:-"$NODE_NAME_CONFIRM"} && UUID[18]=${UUID[18]:-"$UUID_CONFIRM"} && WS_SERVER_IP[18]=${WS_SERVER_IP[18]:-"$SERVER_IP"} && CDN[18]=${CDN[18]:-"$CDN"} && VLESS_WS_PATH=${VLESS_WS_PATH:-"${UUID[18]}-vless"}
     cat > $WORK_DIR/conf/18_${NODE_TAG[7]}_inbounds.json << EOF
-//  "WS_SERVER_IP": "${WS_SERVER_IP[18]}"
+//  "WS_SERVER_IP_SHOW": "${WS_SERVER_IP[18]}"
 //  "CDN": "${CDN[18]}"
 {
     "inbounds":[
@@ -1291,7 +1315,7 @@ EOF
 
 # 获取原有各协议的参数，先清空所有的 key-value
 fetch_nodes_value() {
-  unset FILE NODE_NAME PORT_XTLS_REALITY UUID TLS_SERVER REALITY_PRIVATE REALITY_PUBLIC PORT_HYSTERIA2 OBFS PORT_TUIC TUIC_PASSWORD TUIC_CONGESTION_CONTROL PORT_SHADOWTLS SHADOWTLS_PASSWORD SHADOWSOCKS_METHOD PORT_SHADOWSOCKS PORT_TROJAN TROJAN_PASSWORD PORT_VMESS_WS VMESS_WS_PATH WS_SERVER_IP VMESS_HOST_DOMAIN CDN PORT_VLESS_WS VLESS_WS_PATH VLESS_HOST_DOMAIN PORT_H2_REALITY PORT_GRPC_REALITY
+  unset FILE NODE_NAME PORT_XTLS_REALITY UUID TLS_SERVER REALITY_PRIVATE REALITY_PUBLIC PORT_HYSTERIA2 OBFS PORT_TUIC TUIC_PASSWORD TUIC_CONGESTION_CONTROL PORT_SHADOWTLS SHADOWTLS_PASSWORD SHADOWSOCKS_METHOD PORT_SHADOWSOCKS PORT_TROJAN TROJAN_PASSWORD PORT_VMESS_WS VMESS_WS_PATH WS_SERVER_IP WS_SERVER_IP_SHOW VMESS_HOST_DOMAIN CDN PORT_VLESS_WS VLESS_WS_PATH VLESS_HOST_DOMAIN PORT_H2_REALITY PORT_GRPC_REALITY
 
   # 获取公共数据
   SERVER_IP=$(grep -A1 '"tag"' $WORK_DIR/list | sed -E '/-ws(-tls)*",$/{N;d}' | awk -F '"' '/"server"/{count++; if (count == 1) {print $4; exit}}')
@@ -1299,8 +1323,8 @@ fetch_nodes_value() {
   START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$EXISTED_PORTS")
 
   # 获取 Nginx 端口和路径
-  local NGINX_JSON=$(cat $WORK_DIR/nginx.conf)
-  PORT_NGINX=$(awk '/listen/{print $2; exit}' <<< "$NGINX_JSON")
+  [ "$IS_NGINX" = '1' ] && local NGINX_JSON=$(cat $WORK_DIR/nginx.conf) &&
+  PORT_NGINX=$(awk '/listen/{print $2; exit}' <<< "$NGINX_JSON") &&
   UUID_CONFIRM=$(awk -F '/' '/location ~ \^/{print $2; exit}' <<< "$NGINX_JSON")
 
   # 获取 XTLS + Reality key-value
@@ -1336,6 +1360,7 @@ fetch_nodes_value() {
 
 install_sing-box() {
   sing-box_variable
+  [ "$EXPORT_MODE" = '2' ] && check_dependencies_2nd "$EXPORT_MODE"
   [ ! -d /etc/systemd/system ] && mkdir -p /etc/systemd/system
   [ ! -d $WORK_DIR/logs ] && mkdir -p $WORK_DIR/logs
   ssl_certificate
@@ -1347,7 +1372,7 @@ install_sing-box() {
   sing-box_systemd
 
   # 生成 Nginx 配置文件
-  json_nginx
+  [ "$EXPORT_MODE" = '2' ] && json_nginx
 
   # 如果 Alpine 系统，放到开机自启动
   if [ "$SYSTEM" = 'Alpine' ]; then
@@ -1360,9 +1385,8 @@ EOF
     rc-update add local >/dev/null 2>&1
   fi
 
-  # 再次检测状态，运行 Sing-box
+  # 等待所有后台进程完成后,再次检测状态，运行 Sing-box
   check_install
-
   check_sing-box_stats
 }
 
@@ -1395,7 +1419,6 @@ export_list() {
   - {name: \"${NODE_NAME[12]} ${NODE_TAG[1]}\", type: hysteria2, server: ${SERVER_IP}, port: ${PORT_HYSTERIA2}, up: \"200 Mbps\", down: \"1000 Mbps\", password: ${UUID[12]}, skip-cert-verify: true}
 "
   [ -n "$PORT_TUIC" ] && local CLASH_TUIC="- {name: \"${NODE_NAME[13]} ${NODE_TAG[2]}\", type: tuic, server: ${SERVER_IP}, port: ${PORT_TUIC}, uuid: ${UUID[13]}, password: ${TUIC_PASSWORD}, alpn: [h3], disable-sni: true, reduce-rtt: true, request-timeout: 8000, udp-relay-mode: native, congestion-controller: $TUIC_CONGESTION_CONTROL, skip-cert-verify: true}" &&
-#######  local TUIC_NODE_INSERT="- ${NODE_NAME[13]} ${NODE_TAG[2]}" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_TUIC
 "
@@ -1413,14 +1436,14 @@ export_list() {
   $CLASH_TROJAN
 "
   [ -n "$PORT_VMESS_WS" ] && local CLASH_VMESS_WS="- {name: \"${NODE_NAME[17]} ${NODE_TAG[6]}\", type: vmess, server: ${CDN[17]}, port: 80, uuid: ${UUID[17]}, udp: true, tls: false, alterId: 0, cipher: none, skip-cert-verify: true, network: ws, ws-opts: { path: \"/$VMESS_WS_PATH\", headers: {Host: $VMESS_HOST_DOMAIN} }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }" &&
-  local WS_SERVER_IP=${WS_SERVER_IP[17]} && local TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && local TYPE_PORT_WS=$PORT_VMESS_WS &&
+  local WS_SERVER_IP_SHOW=${WS_SERVER_IP[17]} && local TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && local TYPE_PORT_WS=$PORT_VMESS_WS &&
   local CLASH_SUBSCRIBE+="
   $CLASH_VMESS_WS
 
   # $(text 52)
 "
   [ -n "$PORT_VLESS_WS" ] && local CLASH_VLESS_WS="- {name: \"${NODE_NAME[18]} ${NODE_TAG[7]}\", type: vless, server: ${CDN[18]}, port: 443, uuid: ${UUID[18]}, udp: true, tls: true, servername: $VLESS_HOST_DOMAIN, network: ws, skip-cert-verify: true, ws-opts: { path: \"/$VLESS_WS_PATH\", headers: {Host: $VLESS_HOST_DOMAIN}, max-early-data: 2048, early-data-header-name: Sec-WebSocket-Protocol }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }" &&
-  local WS_SERVER_IP=${WS_SERVER_IP[18]} && local TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && local TYPE_PORT_WS=$PORT_VLESS_WS &&
+  local WS_SERVER_IP_SHOW=${WS_SERVER_IP[18]} && local TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && local TYPE_PORT_WS=$PORT_VLESS_WS &&
   local CLASH_SUBSCRIBE+="
   $CLASH_VLESS_WS
 
@@ -1469,13 +1492,13 @@ ss://$(echo -n "${SHADOWSOCKS_METHOD}:${UUID[15]}@${SERVER_IP_2}:$PORT_SHADOWSOC
   [ -n "$PORT_TROJAN" ] && local SHADOWROCKET_SUBSCRIBE+="
 trojan://$TROJAN_PASSWORD@${SERVER_IP_1}:$PORT_TROJAN?allowInsecure=1#${NODE_NAME[16]}%20${NODE_TAG[5]}
 "
-  [ -n "$PORT_VMESS_WS" ] && WS_SERVER_IP=${WS_SERVER_IP[17]} && TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VMESS_WS && local SHADOWROCKET_SUBSCRIBE+="
+  [ -n "$PORT_VMESS_WS" ] && WS_SERVER_IP_SHOW=${WS_SERVER_IP[17]} && TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VMESS_WS && local SHADOWROCKET_SUBSCRIBE+="
 ----------------------------
 vmess://$(echo -n "none:${UUID[17]}@${CDN[17]}:80" | base64 -w0)?remarks=${NODE_NAME[17]}%20${NODE_TAG[6]}&obfsParam=$VMESS_HOST_DOMAIN&path=/$VMESS_WS_PATH&obfs=websocket&alterId=0
 
 # $(text 52)
 "
-  [ -n "$PORT_VLESS_WS" ] && WS_SERVER_IP=${WS_SERVER_IP[18]} && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && local SHADOWROCKET_SUBSCRIBE+="
+  [ -n "$PORT_VLESS_WS" ] && WS_SERVER_IP_SHOW=${WS_SERVER_IP[18]} && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && local SHADOWROCKET_SUBSCRIBE+="
 ----------------------------
 vless://$(echo -n "auto:${UUID[18]}@${CDN[18]}:443" | base64 -w0)?remarks=${NODE_NAME[18]}%20${NODE_TAG[7]}&obfsParam=$VLESS_HOST_DOMAIN&path=/$VLESS_WS_PATH?ed=2048&obfs=websocket&tls=1&peer=$VLESS_HOST_DOMAIN&allowInsecure=1
 
@@ -1569,13 +1592,13 @@ trojan://$TROJAN_PASSWORD@${SERVER_IP_1}:$PORT_TROJAN?security=tls&type=tcp&head
 
 # $(text 70)"
 
-  [ -n "$PORT_VMESS_WS" ] && WS_SERVER_IP=${WS_SERVER_IP[17]} && TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VMESS_WS && local V2RAYN_SUBSCRIBE+="
+  [ -n "$PORT_VMESS_WS" ] && WS_SERVER_IP_SHOW=${WS_SERVER_IP[17]} && TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VMESS_WS && local V2RAYN_SUBSCRIBE+="
 ----------------------------
 vmess://$(echo -n "{ \"v\": \"2\", \"ps\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"add\": \"${CDN[18]}\", \"port\": \"80\", \"id\": \"${UUID[18]}\", \"aid\": \"0\", \"scy\": \"none\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$VMESS_HOST_DOMAIN\", \"path\": \"/$VMESS_WS_PATH\", \"tls\": \"\", \"sni\": \"\", \"alpn\": \"\" }" | base64 -w0)
 
 # $(text 52)"
 
-  [ -n "$PORT_VLESS_WS" ] && WS_SERVER_IP=${WS_SERVER_IP[18]} && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && local V2RAYN_SUBSCRIBE+="
+  [ -n "$PORT_VLESS_WS" ] && WS_SERVER_IP_SHOW=${WS_SERVER_IP[18]} && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && local V2RAYN_SUBSCRIBE+="
 ----------------------------
 vless://${UUID[18]}@${CDN[18]}:443?encryption=none&security=tls&sni=$VLESS_HOST_DOMAIN&type=ws&host=$VLESS_HOST_DOMAIN&path=%2F$VLESS_WS_PATH%3Fed%3D2048#${NODE_NAME[18]// /%20}%20${NODE_TAG[7]}
 
@@ -1618,13 +1641,13 @@ ss://$(echo -n "${SHADOWSOCKS_METHOD}:${UUID[15]}" | base64 -w0)@${SERVER_IP_1}:
 ----------------------------
 trojan://$TROJAN_PASSWORD@${SERVER_IP_1}:$PORT_TROJAN?security=tls&allowInsecure=1&fp=random&type=tcp#${NODE_NAME[16]} ${NODE_TAG[5]}"
 
-  [ -n "$PORT_VMESS_WS" ] && WS_SERVER_IP=${WS_SERVER_IP[17]} && TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VMESS_WS && local NEKOBOX_SUBSCRIBE+="
+  [ -n "$PORT_VMESS_WS" ] && WS_SERVER_IP_SHOW=${WS_SERVER_IP[17]} && TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VMESS_WS && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
 vmess://$(echo -n "{\"add\":\"${CDN[17]}\",\"aid\":\"0\",\"host\":\"$VMESS_HOST_DOMAIN\",\"id\":\"${UUID[17]}\",\"net\":\"ws\",\"path\":\"/$VMESS_WS_PATH\",\"port\":\"80\",\"ps\":\"${NODE_NAME[17]} ${NODE_TAG[6]}\",\"scy\":\"none\",\"sni\":\"\",\"tls\":\"\",\"type\":\"\",\"v\":\"2\"}" | base64 -w0)
 
 # $(text 52)"
 
-  [ -n "$PORT_VLESS_WS" ] && WS_SERVER_IP=${WS_SERVER_IP[18]} && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && local NEKOBOX_SUBSCRIBE+="
+  [ -n "$PORT_VLESS_WS" ] && WS_SERVER_IP_SHOW=${WS_SERVER_IP[18]} && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
 vless://${UUID[18]}@${CDN[18]}:443?security=tls&sni=$VLESS_HOST_DOMAIN&type=ws&path=/$VLESS_WS_PATH?ed%3D2048&host=$VLESS_HOST_DOMAIN&encryption=none#${NODE_NAME[18]}%20${NODE_TAG[7]}
 
@@ -1672,7 +1695,7 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
   local NODE_REPLACE+="\"${NODE_NAME[16]} ${NODE_TAG[5]}\","
 
   [ -n "$PORT_VMESS_WS" ] &&
-  local WS_SERVER_IP=${WS_SERVER_IP[17]} &&
+  local WS_SERVER_IP_SHOW=${WS_SERVER_IP[17]} &&
   local TYPE_HOST_DOMAIN=$VMESS_HOST_DOMAIN &&
   local TYPE_PORT_WS=$PORT_VMESS_WS &&
   local PROMPT+="
@@ -1680,7 +1703,7 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
   local INBOUND_REPLACE+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${CDN[17]}\", \"server_port\":80, \"uuid\":\"${UUID[17]}\", \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$VMESS_HOST_DOMAIN\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true } }," && local NODE_REPLACE+="\"${NODE_NAME[17]} ${NODE_TAG[6]}\","
 
   [ -n "$PORT_VLESS_WS" ] &&
-  local WS_SERVER_IP=${WS_SERVER_IP[18]} &&
+  local WS_SERVER_IP_SHOW=${WS_SERVER_IP[18]} &&
   local TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN &&
   local TYPE_PORT_WS=$PORT_VLESS_WS &&
   local PROMPT+="
@@ -1711,7 +1734,7 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
   echo $SING_BOX_JSON2 | sed "s#\"<INBOUND_REPLACE>\",#$INBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | jq > $WORK_DIR/subscribe/sing-box2
 
   # 生成二维码 url 文件
-  cat > $WORK_DIR/subscribe/qr <<EOF
+  [ "$IS_NGINX" = '1' ] && cat > $WORK_DIR/subscribe/qr <<EOF
 $(text 81):
 $(text 82) 1:
 http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto
@@ -1734,8 +1757,7 @@ $(qrencode -s 10 -m 1 -t UTF8 <<< "http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CO
 EOF
 
   # 生成配置文件
-  cat > $WORK_DIR/list << EOF
-*******************************************
+  EXPORT_LIST_FILE="*******************************************
 ┌────────────────┐
 │                │
 │     $(warning "V2rayN")     │
@@ -1783,6 +1805,9 @@ $(info "$(echo "{ \"outbounds\":[ ${INBOUND_REPLACE%,} ] }" | jq)
 ${PROMPT}
 
   $(text 72)")
+"
+
+[ "$IS_NGINX" = '1' ] && EXPORT_LIST_FILE+="
 
 *******************************************
 
@@ -1835,15 +1860,14 @@ $(qrencode -s 10 -m 1 -t UTF8 <<< http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CON
 
 $(hint "$(text 82) 2:")
 $(qrencode -s 10 -m 1 -t UTF8 <<< http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2)
+"
 
-*******************************************
-EOF
-
-  # 显示节点信息
+  # 生成并显示节点信息
+  echo "$EXPORT_LIST_FILE" > $WORK_DIR/list
   cat $WORK_DIR/list
 
   # 显示脚本使用情况数据
-  hint "\n $(text 55) \n"
+  hint "\n*******************************************\n\n $(text 55) \n"
 }
 
 # 创建快捷方式
@@ -1955,7 +1979,7 @@ change_protocols() {
   for v in "${NODE_NAME[@]}"; do
     [ -n "$v" ] && NODE_NAME_CONFIRM="$v" && break
   done
-  [ "${#WS_SERVER_IP[@]}" -gt 0 ] && WS_SERVER_IP=$(awk '{print $1}' <<< "${WS_SERVER_IP[@]}") && CDN=$(awk '{print $1}' <<< "${CDN[@]}")
+  [ "${#WS_SERVER_IP[@]}" -gt 0 ] && WS_SERVER_IP_SHOW=$(awk '{print $1}' <<< "${WS_SERVER_IP[@]}") && CDN=$(awk '{print $1}' <<< "${CDN[@]}")
 
   # 寻找待删除协议的 inbound 文件名
   for o in "${REMOVE_PROTOCOLS[@]}"; do
@@ -2070,6 +2094,7 @@ change_protocols() {
   # 生成各协议的 json 文件
   sing-box_json change
 
+  # 运行 sing-box
   systemctl start sing-box
 
   # 再次检测状态，运行 Sing-box
@@ -2088,6 +2113,8 @@ uninstall() {
     else
       cmd_systemctl disable sing-box 2>/dev/null
     fi
+    [[ -s $WORK_DIR/nginx.conf && $(ps -ef | grep 'nginx' | wc -l) -le 1 ]] && reading "\n $(text 83) " REMOVE_NGINX
+    [ "${REMOVE_NGINX,,}" = 'y' ] && ${PACKAGE_UNINSTALL[int]} nginx
     rm -rf $WORK_DIR $TEMP_DIR /etc/systemd/system/sing-box.service /usr/bin/sb
     info "\n $(text 16) \n"
   else
@@ -2182,7 +2209,7 @@ menu_setting() {
 
 menu() {
   clear
-  hint " $(text 2) "
+  ### hint " $(text 2) "
   echo -e "======================================================================================================================\n"
   info " $(text 17): $VERSION\n $(text 18): $(text 1)\n $(text 19):\n\t $(text 20): $SYS\n\t $(text 21): $(uname -r)\n\t $(text 22): $SING_BOX_ARCH\n\t $(text 23): $VIRT "
   info "\t IPv4: $WAN4 $WARPSTATUS4 $COUNTRY4  $ASNORG4 "
