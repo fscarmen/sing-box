@@ -143,7 +143,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 |   |-- sing-box-phone                       # SFI / SFA 订阅文件1
 |   |-- sing-box2                            # SFI / SFA / SFM 订阅文件2
 |   |-- v2rayn                               # V2rayN 订阅文件
-|   `--  neko                                # Nekoray 订阅文件
+|   `-- neko                                 # Nekoray 订阅文件
 |-- cache.db                                 # sing-box 缓存文件
 |-- nginx.conf                               # 用于订阅服务的 nginx 配置文件
 |-- language                                 # 存放脚本语言文件，E 为英文，C 为中文
