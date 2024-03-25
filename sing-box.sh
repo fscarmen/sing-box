@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.1.8 (2024.03.18)'
+VERSION='v1.1.9 (2024.03.22)'
 
 # 各变量默认值
-GH_PROXY='https://cdn2.cloudflare.now.cc/'
+GH_PROXY=''
 TEMP_DIR='/tmp/sing-box'
 WORK_DIR='/etc/sing-box'
 START_PORT_DEFAULT='8881'
@@ -23,10 +23,10 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="Move nginx for subscription services to the systemd daemon, following sing-box startup and shutdown."
-C[1]="把用于订阅服务的 nginx 移到 systemd daemon，跟随 sing-box 启停"
-E[2]="This project is designed to add sing-box support for multiple protocols to VPS, details: [https://github.com/fscarmen/sing-box]\n Script Features:\n\t • Deploy multiple protocols with one click, there is always one for you!\n\t • Custom ports for nat machine with limited open ports.\n\t • Built-in warp chained proxy to unlock chatGPT.\n\t • No domain name is required.\n\t • Support system: Ubuntu, Debian, CentOS, Alpine and Arch Linux 3.\n\t • Support architecture: AMD,ARM and s390x\n"
-C[2]="本项目专为 VPS 添加 sing-box 支持的多种协议, 详细说明: [https://github.com/fscarmen/sing-box]\n 脚本特点:\n\t • 一键部署多协议，总有一款适合你\n\t • 自定义端口，适合有限开放端口的 nat 小鸡\n\t • 内置 warp 链式代理解锁 chatGPT\n\t • 不需要域名\n\t • 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 和 Arch Linux,请务必选择 LTS 系统\n\t • 支持硬件结构类型: AMD 和 ARM\n"
+E[1]="1. In the Sing-box client, add the brutal field in the TCP protocol to make it effective; 2. Compatible with CentOS 7,8,9; 3. Remove default Github CDN; 4. Dependency jq changed from apt install to official download binary."
+C[1]="1. 在 Sing-box 客户端，TCP 协议协议里加上 brutal 字段以生效; 2. 适配 CentOS 7,8,9; 3. 去掉默认的 Github 加速网; 4. 依赖 jq 从 apt 安装改为官方下载二进制"
+E[2]="Downloading Sing-box. Please wait a seconds ..."
+C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
 C[3]="输入错误达5次,脚本退出"
 E[4]="UUID should be 36 characters, please re-enter \(\${UUID_ERROR_TIME} times remaining\):"
@@ -189,6 +189,8 @@ E[82]="template"
 C[82]="模版"
 E[83]="To uninstall Nginx press [y], it is not uninstalled by default:"
 C[83]="如要卸载 Nginx 请按 [y]，默认不卸载:"
+E[84]="Set SElinux: enforcing --> disabled"
+C[84]="设置 SElinux: enforcing --> disabled"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -207,7 +209,7 @@ translate() {
 
 # 检测是否需要启用 Github CDN，如能直接连通，则不使用
 check_cdn() {
-  wget --server-response --quiet --output-document=/dev/null --no-check-certificate --tries=2 --timeout=3 https://raw.githubusercontent.com/fscarmen/sing-box/main/README.md >/dev/null 2>&1 && unset GH_PROXY
+    [ -n "$GH_PROXY" ] && wget --server-response --quiet --output-document=/dev/null --no-check-certificate --tries=2 --timeout=3 https://raw.githubusercontent.com/fscarmen/sing-box/main/README.md >/dev/null 2>&1 && unset GH_PROXY
 }
 
 # 检测是否解锁 chatGPT，以决定是否使用 warp 链式代理或者是 direct out
@@ -299,24 +301,25 @@ check_root() {
 check_arch() {
   # 判断处理器架构
   case $(uname -m) in
-    aarch64|arm64 ) SING_BOX_ARCH=arm64 ;;
-    x86_64|amd64 ) [[ "$(awk -F ':' '/flags/{print $2; exit}' /proc/cpuinfo)" =~ avx2 ]] && SING_BOX_ARCH=amd64v3 || SING_BOX_ARCH=amd64 ;;
-    armv7l ) SING_BOX_ARCH=armv7 ;;
+    aarch64|arm64 ) SING_BOX_ARCH=arm64 ; JQ_ARCH=arm64 ;;
+    x86_64|amd64 ) [[ "$(awk -F ':' '/flags/{print $2; exit}' /proc/cpuinfo)" =~ avx2 ]] && SING_BOX_ARCH=amd64v3 || SING_BOX_ARCH=amd64; JQ_ARCH=amd64 ;;
+    armv7l ) SING_BOX_ARCH=armv7; JQ_ARCH=armhf ;;
     * ) error " $(text 25) "
   esac
 }
 
 # 查安装及运行状态；状态码: 26 未安装， 27 已安装未运行， 28 运行中
 check_install() {
-  [ -s $WORK_DIR/nginx.conf ] && IS_NGINX=1 || IS_NGINX=0
+  [ -s $WORK_DIR/nginx.conf ] && IS_NGINX=is_nginx || IS_NGINX=no_nginx
   STATUS=$(text 26) && [ -s /etc/systemd/system/sing-box.service ] && STATUS=$(text 27) && [ "$(systemctl is-active sing-box)" = 'active' ] && STATUS=$(text 28)
   if [[ $STATUS = "$(text 26)" ]] && [ ! -s $WORK_DIR/sing-box ]; then
     {
     local VERSION_LATEST=$(wget --no-check-certificate -qO- "https://api.github.com/repos/SagerNet/sing-box/releases" | awk -F '["v-]' '/tag_name/{print $5}' | sort -r | sed -n '1p')
     local ONLINE=$(wget --no-check-certificate -qO- "https://api.github.com/repos/SagerNet/sing-box/releases" | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
-    ONLINE=${ONLINE:-'1.9.0-beta.11'}
-    wget --no-check-certificate -c ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box >/dev/null 2>&1
+    ONLINE=${ONLINE:-'1.9.0-rc.2'}
+    wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box >/dev/null 2>&1
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
+    wget --no-check-certificate --continue -qO $TEMP_DIR/jq ${GH_PROXY}https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$JQ_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/jq >/dev/null 2>&1
     }&
   fi
 }
@@ -349,15 +352,22 @@ systemctl start $APP
 EOF
       chmod +x /etc/local.d/$APP.start
       rc-update add local >/dev/null 2>&1
+    elif [ "$IS_CENTOS" = 'CentOS7' ]; then
+      systemctl enable --now $APP
+      [ "$IS_NGINX" = 'is_nginx' ] && $(type -p nginx) -c $WORK_DIR/nginx.conf
     else
       systemctl enable --now $APP
     fi
   elif [ "$ENABLE_DISABLE" = 'stop' ]; then
     systemctl stop $APP
+    [[ "$IS_NGINX" = 'is_nginx' && "$IS_CENTOS" = 'CentOS7' ]] && ss -nltp | grep $(awk '/listen/{print $2; exit}' $WORK_DIR/nginx.conf) | tr ',' '\n' | awk -F '=' '/pid/{print $2}' | sort -u | xargs kill -15 >/dev/null 2>&1
   elif [ "$ENABLE_DISABLE" = 'disable' ]; then
     if [ "$SYSTEM" = 'Alpine' ]; then
       systemctl stop $APP
       rm -f /etc/local.d/$APP.start
+    elif [ "$IS_CENTOS" = 'CentOS7' ]; then
+      systemctl disable --now $APP
+      [ "$IS_NGINX" = 'is_nginx' ] && ss -nltp | grep $(awk '/listen/{print $2; exit}' $WORK_DIR/nginx.conf) | tr ',' '\n' | awk -F '=' '/pid/{print $2}' | sort -u | xargs kill -15 >/dev/null 2>&1
     else
       systemctl disable --now $APP
     fi
@@ -379,7 +389,7 @@ check_system_info() {
   [[ -z "$SYS" && $(type -p lsb_release) ]] && SYS="$(lsb_release -sd)"
   [[ -z "$SYS" && -s /etc/lsb-release ]] && SYS="$(awk -F '"' 'tolower($0) ~ /distrib_description/{print $2}' /etc/lsb-release)"
   [[ -z "$SYS" && -s /etc/redhat-release ]] && SYS="$(cat /etc/redhat-release)"
-  [[ -z "$SYS" && -s /etc/issue ]] && SYS="$(sed -E '/^$|^\\/d' /etc/issue | awk -F '\' '{print $1}' | sed 's/[ ]*$//g')"
+  [[ -z "$SYS" && -s /etc/issue ]] && SYS="$(sed -E '/^$|^\\/d' /etc/issue | awk -F '\\' '{print $1}' | sed 's/[ ]*$//g')"
 
   REGEX=("debian" "ubuntu" "centos|red hat|kernel|alma|rocky" "arch linux" "alpine" "fedora")
   RELEASE=("Debian" "Ubuntu" "CentOS" "Arch" "Alpine" "Fedora")
@@ -401,6 +411,9 @@ check_system_info() {
   # 先排除 EXCLUDE 里包括的特定系统，其他系统需要作大发行版本的比较
   for ex in "${EXCLUDE[@]}"; do [[ ! "{$SYS,,}"  =~ $ex ]]; done &&
   [[ "$(echo "$SYS" | sed "s/[^0-9.]//g" | cut -d. -f1)" -lt "${MAJOR[int]}" ]] && error " $(text 6) "
+
+  # 针对部分系统作特殊处理
+  [ "$SYSTEM" = 'CentOS' ] && IS_CENTOS="CentOS$(echo "$SYS" | sed "s/[^0-9.]//g" | cut -d. -f1)"
 }
 
 # 检测 IPv4 IPv6 信息
@@ -531,10 +544,10 @@ sing-box_variable() {
   UUID_CONFIRM=${UUID_CONFIRM:-"$UUID_DEFAULT"}
 
   # 输入节点名，以系统的 hostname 作为默认
-  if [ -s /etc/hostname ]; then
-    NODE_NAME_DEFAULT="$(cat /etc/hostname)"
-  elif [ $(type -p hostname) ]; then
+  if [ $(type -p hostname) ]; then
     NODE_NAME_DEFAULT="$(hostname)"
+  elif [ -s /etc/hostname ]; then
+    NODE_NAME_DEFAULT="$(cat /etc/hostname)"
   else
     NODE_NAME_DEFAULT="Sing-Box"
   fi
@@ -548,8 +561,8 @@ check_dependencies() {
     local CHECK_WGET=$(wget 2>&1 | head -n 1)
     grep -qi 'busybox' <<< "$CHECK_WGET" && ${PACKAGE_INSTALL[int]} wget >/dev/null 2>&1
 
-    local DEPS_CHECK=("bash" "rc-update" "virt-what")
-    local DEPS_INSTALL=("bash" "openrc" "virt-what")
+    local DEPS_CHECK=("bash" "rc-update" "virt-what" "python3")
+    local DEPS_INSTALL=("bash" "openrc" "virt-what" "python3")
     for g in "${!DEPS_CHECK[@]}"; do [ ! $(type -p ${DEPS_CHECK[g]}) ] && [[ ! "${DEPS[@]}" =~ "${DEPS_INSTALL[g]}" ]] && DEPS+=(${DEPS_INSTALL[g]}); done
     if [ "${#DEPS[@]}" -ge 1 ]; then
       info "\n $(text 7) $(sed "s/ /,&/g" <<< ${DEPS[@]}) \n"
@@ -557,15 +570,15 @@ check_dependencies() {
       ${PACKAGE_INSTALL[int]} ${DEPS[@]} >/dev/null 2>&1
     fi
 
-    [ ! $(type -p systemctl) ] && wget --no-check-certificate https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement/master/files/docker/systemctl3.py -O /bin/systemctl && chmod a+x /bin/systemctl
+    [ ! $(type -p systemctl) ] && wget --no-check-certificate --quiet https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement/master/files/docker/systemctl3.py -O /bin/systemctl && chmod a+x /bin/systemctl
   fi
 
   # 检测 Linux 系统的依赖，升级库并重新安装依赖
   unset DEPS_CHECK DEPS_INSTALL DEPS
-  DEPS_CHECK=("wget" "systemctl" "ss" "unzip" "bash" "openssl" "jq")
-  DEPS_INSTALL=("wget" "systemctl" "iproute2" "unzip" "bash" "openssl" "jq")
+  local DEPS_CHECK=("wget" "systemctl" "ss" "bash" "openssl")
+  local DEPS_INSTALL=("wget" "systemctl" "iproute2" "bash" "openssl")
   for g in "${!DEPS_CHECK[@]}"; do
-    [ ! $(type -p ${DEPS_CHECK[g]}) ] && [[ ! "${DEPS[@]}" =~ "${DEPS_INSTALL[g]}" ]] && local DEPS+=(${DEPS_INSTALL[g]})
+    [ ! $(type -p ${DEPS_CHECK[g]}) ] && [[ ! "${DEPS[@]}" =~ "${DEPS_INSTALL[g]}" ]] && DEPS+=(${DEPS_INSTALL[g]})
   done
   if [ "${#DEPS[@]}" -ge 1 ]; then
     info "\n $(text 7) $(sed "s/ /,&/g" <<< ${DEPS[@]}) \n"
@@ -577,27 +590,43 @@ check_dependencies() {
 }
 
 check_dependencies_2nd() {
+  unset DEPS_CHECK DEPS_INSTALL DEPS
   # 根据用户选择安装依赖
   if [ "$1" = "2" ]; then
     local DEPS_CHECK=("qrencode" "nginx")
-    [ "$SYSTEM" = 'Alpine' ] && local DEPS_INSTALL=("libqrencode-tools" "nginx") || local DEPS_INSTALL=("qrencode" "nginx")
+    if [ "$SYSTEM" = 'Alpine' ]; then
+      local DEPS_INSTALL=("libqrencode-tools" "nginx")
+    elif [ "$IS_CENTOS" = 'CentOS9' ]; then
+      local DEPS_INSTALL=("nginx")
+    else
+      local DEPS_INSTALL=("qrencode" "nginx")
+    fi
   fi
   for g in "${!DEPS_CHECK[@]}"; do
-    [ ! $(type -p ${DEPS_CHECK[g]}) ] && [[ ! "${DEPS[@]}" =~ "${DEPS_INSTALL[g]}" ]] && local DEPS+=(${DEPS_INSTALL[g]})
+    [ ! $(type -p ${DEPS_CHECK[g]}) ] && [[ ! "${DEPS[@]}" =~ "${DEPS_INSTALL[g]}" ]] && DEPS_2ND+=(${DEPS_INSTALL[g]})
   done
-  if [ "${#DEPS[@]}" -ge 1 ]; then
-    info "\n $(text 7) $(sed "s/ /,&/g" <<< ${DEPS[@]}) \n"
-    ${PACKAGE_INSTALL[int]} ${DEPS[@]} >/dev/null 2>&1
+  if [ "${#DEPS_2ND[@]}" -ge 1 ]; then
+    info "\n $(text 7) $(sed "s/ /,&/g" <<< ${DEPS_2ND[@]}) \n"
+    ${PACKAGE_INSTALL[int]} ${DEPS_2ND[@]} >/dev/null 2>&1
   fi
 
   # 如果新安装的 Nginx ，先停掉服务
-  [[ "${DEPS[@]}" =~ 'nginx' ]] && systemctl disable --now nginx >/dev/null 2>&1
+  [[ "${DEPS_2ND[@]}" =~ 'nginx' ]] && systemctl disable --now nginx >/dev/null 2>&1
 }
 
 # 生成100年的自签证书
 ssl_certificate() {
   mkdir -p $WORK_DIR/cert
   openssl ecparam -genkey -name prime256v1 -out $WORK_DIR/cert/private.key && openssl req -new -x509 -days 36500 -key $WORK_DIR/cert/private.key -out $WORK_DIR/cert/cert.pem -subj "/CN=$(awk -F . '{print $(NF-1)"."$NF}' <<< "$TLS_SERVER_DEFAULT")"
+}
+
+# 处理防火墙规则
+check_firewall_configuration() {
+  if [[ -s /etc/selinux/config && $(type -p getenforce) && $(getenforce) = 'Enforcing' ]]; then
+    hint "\n $(text 84) "
+    setenforce 0
+    sed -i 's/^SELINUX=.*/# &/; /SELINUX=/a\SELINUX=disabled' /etc/selinux/config
+  fi
 }
 
 # Nginx 配置文件
@@ -1297,7 +1326,7 @@ NoNewPrivileges=yes
 TimeoutStartSec=0
 WorkingDirectory=$WORK_DIR
 "
-  [ "$EXPORT_MODE" = '2' ] && SING_BOX_SERVICE+="ExecStartPre=$(type -p nginx) -c $WORK_DIR/nginx.conf
+  [[ "$EXPORT_MODE" = '2' && "$IS_CENTOS" != 'CentOS7' ]] && SING_BOX_SERVICE+="ExecStartPre=$(type -p nginx) -c $WORK_DIR/nginx.conf
 "
   SING_BOX_SERVICE+="ExecStart=$WORK_DIR/sing-box run -C $WORK_DIR/conf/
 ExecReload=/bin/kill -HUP \$MAINPID
@@ -1321,7 +1350,7 @@ fetch_nodes_value() {
   START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$EXISTED_PORTS")
 
   # 获取 Nginx 端口和路径
-  [ "$IS_NGINX" = '1' ] && local NGINX_JSON=$(cat $WORK_DIR/nginx.conf) &&
+  [ "$IS_NGINX" = 'is_nginx' ] && local NGINX_JSON=$(cat $WORK_DIR/nginx.conf) &&
   PORT_NGINX=$(awk '/listen/{print $2; exit}' <<< "$NGINX_JSON") &&
   UUID_CONFIRM=$(awk -F '/' '/location ~ \^/{print $2; exit}' <<< "$NGINX_JSON")
 
@@ -1362,9 +1391,11 @@ install_sing-box() {
   [ ! -d /etc/systemd/system ] && mkdir -p /etc/systemd/system
   [ ! -d $WORK_DIR/logs ] && mkdir -p $WORK_DIR/logs
   ssl_certificate
+  [ "$SYSTEM" = 'CentOS' ] && check_firewall_configuration
+  hint "\n $(text 2) " && wait
   sing-box_json
   echo "$L" > $WORK_DIR/language
-  cp $TEMP_DIR/sing-box $WORK_DIR
+  cp $TEMP_DIR/sing-box $TEMP_DIR/jq $WORK_DIR
 
   # 生成 sing-box systemd 配置文件
   sing-box_systemd
@@ -1390,6 +1421,9 @@ EOF
 
 export_list() {
   IS_INSTALL=$1
+
+  # v1.1.9 处理的 jq 问题
+  [[ ! -s $WORK_DIR/jq && -s /usr/bin/jq ]] && cp /usr/bin/jq $WORK_DIR/
 
   check_install
 
@@ -1663,7 +1697,7 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
 
   # 生成 Sing-box 订阅文件
   [ -n "$PORT_XTLS_REALITY" ] &&
-  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[11]} ${NODE_TAG[0]}\", \"server\":\"${SERVER_IP}\", \"server_port\":${PORT_XTLS_REALITY}, \"uuid\":\"${UUID[11]}\", \"flow\":\"\", \"packet_encoding\":\"xudp\", \"tls\":{ \"enabled\":true, \"server_name\":\"${TLS_SERVER[11]}\", \"utls\":{ \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[11]}\", \"short_id\":\"\" } }, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[11]} ${NODE_TAG[0]}\", \"server\":\"${SERVER_IP}\", \"server_port\":${PORT_XTLS_REALITY}, \"uuid\":\"${UUID[11]}\", \"flow\":\"\", \"packet_encoding\":\"xudp\", \"tls\":{ \"enabled\":true, \"server_name\":\"${TLS_SERVER[11]}\", \"utls\":{ \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[11]}\", \"short_id\":\"\" } }, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
   local NODE_REPLACE+="\"${NODE_NAME[11]} ${NODE_TAG[0]}\","
 
   [ -n "$PORT_HYSTERIA2" ] &&
@@ -1678,18 +1712,18 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
   local NODE_INSERT+=", \"${NODE_NAME[13]} ${NODE_TAG[2]}\""
 
   [ -n "$PORT_SHADOWTLS" ] &&
-  local SHADOWTLS_INBOUND=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[14]} ${NODE_TAG[3]}\", \"method\": \"$SHADOWTLS_METHOD\", \"password\": \"$SHADOWTLS_PASSWORD\", \"detour\": \"shadowtls-out\", \"udp_over_tcp\": false, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true } }, { \"type\": \"shadowtls\", \"tag\": \"shadowtls-out\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_SHADOWTLS}, \"version\": 3, \"password\": \"${UUID[14]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER[14]}\", \"utls\": { \"enabled\": true, \"fingerprint\": \"chrome\" } } }," &&
+  local SHADOWTLS_INBOUND=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[14]} ${NODE_TAG[3]}\", \"method\": \"$SHADOWTLS_METHOD\", \"password\": \"$SHADOWTLS_PASSWORD\", \"detour\": \"shadowtls-out\", \"udp_over_tcp\": false, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } }, { \"type\": \"shadowtls\", \"tag\": \"shadowtls-out\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_SHADOWTLS}, \"version\": 3, \"password\": \"${UUID[14]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER[14]}\", \"utls\": { \"enabled\": true, \"fingerprint\": \"chrome\" } } }," &&
   local INBOUND_REPLACE+="${SHADOWTLS_INBOUND}" &&
   local NODE_REPLACE+="\"${NODE_NAME[14]} ${NODE_TAG[3]}\"," &&
   local INBOUND_INSERT+="${SHADOWTLS_INBOUND}" &&
   local NODE_INSERT+=", \"${NODE_NAME[14]} ${NODE_TAG[3]}\""
 
   [ -n "$PORT_SHADOWSOCKS" ] &&
-  local INBOUND_REPLACE+=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[15]} ${NODE_TAG[4]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_SHADOWSOCKS, \"method\": \"${SHADOWSOCKS_METHOD}\", \"password\": \"${UUID[15]}\", \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[15]} ${NODE_TAG[4]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_SHADOWSOCKS, \"method\": \"${SHADOWSOCKS_METHOD}\", \"password\": \"${UUID[15]}\", \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
   local NODE_REPLACE+="\"${NODE_NAME[15]} ${NODE_TAG[4]}\","
 
   [ -n "$PORT_TROJAN" ] &&
-  local INBOUND_REPLACE+=" { \"type\": \"trojan\", \"tag\": \"${NODE_NAME[16]} ${NODE_TAG[5]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_TROJAN, \"password\": \"$TROJAN_PASSWORD\", \"tls\": { \"enabled\":true, \"insecure\": true, \"server_name\":\"\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"trojan\", \"tag\": \"${NODE_NAME[16]} ${NODE_TAG[5]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_TROJAN, \"password\": \"$TROJAN_PASSWORD\", \"tls\": { \"enabled\":true, \"insecure\": true, \"server_name\":\"\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
   local NODE_REPLACE+="\"${NODE_NAME[16]} ${NODE_TAG[5]}\","
 
   [ -n "$PORT_VMESS_WS" ] &&
@@ -1698,7 +1732,7 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
   local TYPE_PORT_WS=$PORT_VMESS_WS &&
   local PROMPT+="
   # $(text 52)" &&
-  local INBOUND_REPLACE+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${CDN[17]}\", \"server_port\":80, \"uuid\":\"${UUID[17]}\", \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$VMESS_HOST_DOMAIN\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true } }," && local NODE_REPLACE+="\"${NODE_NAME[17]} ${NODE_TAG[6]}\","
+  local INBOUND_REPLACE+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${CDN[17]}\", \"server_port\":80, \"uuid\":\"${UUID[17]}\", \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$VMESS_HOST_DOMAIN\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } }," && local NODE_REPLACE+="\"${NODE_NAME[17]} ${NODE_TAG[6]}\","
 
   [ -n "$PORT_VLESS_WS" ] &&
   local WS_SERVER_IP_SHOW=${WS_SERVER_IP[18]} &&
@@ -1706,7 +1740,7 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
   local TYPE_PORT_WS=$PORT_VLESS_WS &&
   local PROMPT+="
   # $(text 52)" &&
-  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[18]} ${NODE_TAG[7]}\", \"server\":\"${CDN[18]}\", \"server_port\":443, \"uuid\":\"${UUID[18]}\", \"tls\": { \"enabled\":true, \"server_name\":\"$VLESS_HOST_DOMAIN\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VLESS_WS_PATH\", \"headers\": { \"Host\": \"$VLESS_HOST_DOMAIN\" }, \"max_early_data\":2048, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[18]} ${NODE_TAG[7]}\", \"server\":\"${CDN[18]}\", \"server_port\":443, \"uuid\":\"${UUID[18]}\", \"tls\": { \"enabled\":true, \"server_name\":\"$VLESS_HOST_DOMAIN\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VLESS_WS_PATH\", \"headers\": { \"Host\": \"$VLESS_HOST_DOMAIN\" }, \"max_early_data\":2048, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
   local NODE_REPLACE+="\"${NODE_NAME[18]} ${NODE_TAG[7]}\","
 
   [ -n "$PORT_H2_REALITY" ] &&
@@ -1723,16 +1757,15 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
 
   # 模板1
   local SING_BOX_JSON1=$(wget --no-check-certificate -qO- --tries=3 --timeout=2 ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/sing-box1)
-  echo $SING_BOX_JSON1 | sed 's#, {[^}]\+"tun-in"[^}]\+}##' | sed "s#\"<INBOUND_REPLACE>\",#$INBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | jq > $WORK_DIR/subscribe/sing-box-pc
-  echo $SING_BOX_JSON1 | sed 's# {[^}]\+"mixed"[^}]\+},##; s#, "auto_detect_interface": true##' | sed "s#\"<INBOUND_REPLACE>\",#$INBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | jq > $WORK_DIR/subscribe/sing-box-phone
+  echo $SING_BOX_JSON1 | sed 's#, {[^}]\+"tun-in"[^}]\+}##' | sed "s#\"<INBOUND_REPLACE>\",#$INBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | $WORK_DIR/jq > $WORK_DIR/subscribe/sing-box-pc
+  echo $SING_BOX_JSON1 | sed 's# {[^}]\+"mixed"[^}]\+},##; s#, "auto_detect_interface": true##' | sed "s#\"<INBOUND_REPLACE>\",#$INBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | $WORK_DIR/jq > $WORK_DIR/subscribe/sing-box-phone
 
   # 模板2
   local SING_BOX_JSON2=$(wget --no-check-certificate -qO- --tries=3 --timeout=2 ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/sing-box2)
-  echo $SING_BOX_JSON2 | sed "s#\"<INBOUND_REPLACE>\",#$INBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | jq > $WORK_DIR/subscribe/sing-box2
+  echo $SING_BOX_JSON2 | sed "s#\"<INBOUND_REPLACE>\",#$INBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | $WORK_DIR/jq > $WORK_DIR/subscribe/sing-box2
 
   # 生成二维码 url 文件
-  [ "$IS_NGINX" = '1' ] && cat > $WORK_DIR/subscribe/qr <<EOF
-$(text 81):
+  [ "$IS_NGINX" = 'is_nginx' ] && OUTPUT_QR="$(text 81):
 $(text 82) 1:
 http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto
 
@@ -1745,13 +1778,16 @@ https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://${SERVER_IP
 
 $(text 82) 2:
 https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2
+"
 
+   [ $(type -p qrencode) ] && OUTPUT_QR+="
 $(text 82) 1:
 $(qrencode -s 10 -m 1 -t UTF8 <<< "http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto")
 
 $(text 82) 2:
-$(qrencode -s 10 -m 1 -t UTF8 <<< "http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2")
-EOF
+$(qrencode -s 10 -m 1 -t UTF8 <<< "http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2")"
+
+  [ -n "$OUTPUT_QR" ] && echo "$OUTPUT_QR" > $WORK_DIR/subscribe/qr
 
   # 生成配置文件
   EXPORT_LIST_FILE="*******************************************
@@ -1797,14 +1833,14 @@ $(hint "${NEKOBOX_SUBSCRIBE}")
 └────────────────┘
 ----------------------------
 
-$(info "$(echo "{ \"outbounds\":[ ${INBOUND_REPLACE%,} ] }" | jq)
+$(info "$(echo "{ \"outbounds\":[ ${INBOUND_REPLACE%,} ] }" | $WORK_DIR/jq)
 
 ${PROMPT}
 
   $(text 72)")
 "
 
-[ "$IS_NGINX" = '1' ] && EXPORT_LIST_FILE+="
+[ "$IS_NGINX" = 'is_nginx' ] && EXPORT_LIST_FILE+="
 
 *******************************************
 
@@ -1851,7 +1887,9 @@ https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://${SERVER_IP
 
 $(text 82) 2:
 https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2")
+"
 
+   [ $(type -p qrencode) ] && EXPORT_LIST_FILE+="
 $(hint "$(text 82) 1:")
 $(qrencode -s 10 -m 1 -t UTF8 <<< http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto)
 
@@ -2106,6 +2144,7 @@ change_protocols() {
 uninstall() {
   if [ -d $WORK_DIR ]; then
     if [ "$SYSTEM" = 'Alpine' ]; then
+      systemctl --version | grep -q 'systemctl.py' && rm -f /bin/systemctl
       cmd_systemctl stop sing-box 2>/dev/null
     else
       cmd_systemctl disable sing-box 2>/dev/null
@@ -2132,7 +2171,7 @@ version() {
 
   if [ "${UPDATE,,}" = 'y' ]; then
     check_system_info
-    wget --no-check-certificate -c ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
+    wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
 
     if [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ]; then
       cmd_systemctl stop sing-box
@@ -2177,7 +2216,7 @@ menu_setting() {
     OPTION[10]="10.  $(text 76)"
 
     ACTION[1]() { export_list; exit 0; }
-    [ "$STATUS" = "$(text 28)" ] && ACTION[2]() { cmd_systemctl disable sing-box; [ "$(systemctl is-active sing-box)" = 'inactive' ] && info " Sing-box $(text 27) $(text 37)" || error " Sing-box $(text 27) $(text 38) "; } || ACTION[2]() { cmd_systemctl enable sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 28) $(text 37)" || error " Sing-box $(text 28) $(text 38) "; }
+    [ "$STATUS" = "$(text 28)" ] && ACTION[2]() { cmd_systemctl disable sing-box; [[ "$(systemctl is-active sing-box)" =~ 'inactive'|'unknown' ]] && info " Sing-box $(text 27) $(text 37)" || error " Sing-box $(text 27) $(text 38) "; } || ACTION[2]() { cmd_systemctl enable sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 28) $(text 37)" || error " Sing-box $(text 28) $(text 38) "; }
     ACTION[3]() { change_start_port; exit; }
     ACTION[4]() { version; exit; }
     ACTION[5]() { bash <(wget --no-check-certificate -qO- "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit; }
@@ -2206,7 +2245,6 @@ menu_setting() {
 
 menu() {
   clear
-  ### hint " $(text 2) "
   echo -e "======================================================================================================================\n"
   info " $(text 17): $VERSION\n $(text 18): $(text 1)\n $(text 19):\n\t $(text 20): $SYS\n\t $(text 21): $(uname -r)\n\t $(text 22): $SING_BOX_ARCH\n\t $(text 23): $VIRT "
   info "\t IPv4: $WAN4 $WARPSTATUS4 $COUNTRY4  $ASNORG4 "
@@ -2239,7 +2277,7 @@ statistics_of_run-times
 while getopts ":P:p:OoUuVvNnBbRr" OPTNAME; do
   case "${OPTNAME,,}" in
     p ) START_PORT=$OPTARG; select_language; check_install; [ "$STATUS" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; change_start_port; exit 0 ;;
-    o ) select_language; check_system_info; check_install; [ "$STATUS" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; [ "$STATUS" = "$(text 28)" ] && ( cmd_systemctl disable sing-box; [ "$(systemctl is-active sing-box)" = 'inactive' ] && info "\n Sing-box $(text 27) $(text 37)" ) || ( cmd_systemctl enable sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info "\n Sing-box $(text 28) $(text 37)" ); exit 0;;
+    o ) select_language; check_system_info; check_install; [ "$STATUS" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; [ "$STATUS" = "$(text 28)" ] && ( cmd_systemctl disable sing-box; [[ "$(systemctl is-active sing-box)" =~ 'inactive'|'unknown' ]] && info "\n Sing-box $(text 27) $(text 37)" ) || ( cmd_systemctl enable sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info "\n Sing-box $(text 28) $(text 37)" ); exit 0;;
     u ) select_language; check_system_info; uninstall; exit 0 ;;
     n ) select_language; [ ! -s $WORK_DIR/list ] && error " Sing-box $(text 26) "; export_list; exit 0 ;;
     v ) select_language; check_arch; version; exit 0 ;;
