@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.1.9 (2024.03.22)'
+VERSION='v1.1.10 (2024.03.26)'
 
 # 各变量默认值
 GH_PROXY=''
@@ -23,8 +23,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. In the Sing-box client, add the brutal field in the TCP protocol to make it effective; 2. Compatible with CentOS 7,8,9; 3. Remove default Github CDN; 4. Dependency jq changed from apt install to official download binary."
-C[1]="1. 在 Sing-box 客户端，TCP 协议协议里加上 brutal 字段以生效; 2. 适配 CentOS 7,8,9; 3. 去掉默认的 Github 加速网; 4. 依赖 jq 从 apt 安装改为官方下载二进制"
+E[1]="Thanks to UUb for the official change of the compilation, dependencies jq, qrencode from apt installation to download the binary file, reduce the installation time of about 15 seconds, the implementation of the project's positioning of lightweight, as far as possible to install the least system dependencies."
+C[1]="感谢 UUb 兄弟的官改编译，依赖 jq, qrencode 从 apt 安装改为下载二进制文件，缩减安装时间约15秒，贯彻项目轻量化的定位，尽最大可能安装最少的系统依赖"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -179,8 +179,8 @@ E[77]="With sing-box installed, the script exits."
 C[77]="已安装 sing-box ，脚本退出"
 E[78]="Parameter [ $ERROR_PARAMETER ] error, script exits."
 C[78]="[ $ERROR_PARAMETER ] 参数错误，脚本退出"
-E[79]="\(3/6\) Output subscription QR code and http service, need to install dependencies qrencode, nginx\\\n If not, please enter [n]\\\n If you need, please enter the port number of nginx used for subscription service. Must be \${MIN_PORT} - \${MAX_PORT} \(Default is: \${PORT_NGINX_DEFAULT}\):"
-C[79]="\(3/6\) 输出订阅二维码和 http 服务，需要安装依赖 qrencode, nginx\\\n 如不需要，请输入 [n]\\\n 如需要请输入用于订阅服务的 nginx 端口号，必须是 \${MIN_PORT} - \${MAX_PORT} \(默认为: \${PORT_NGINX_DEFAULT}\):"
+E[79]="\(3/6\) Output subscription QR code and http service, need to install nginx\\\n If not, please enter [n]\\\n If you need, please enter the port number of nginx used for subscription service. Must be \${MIN_PORT} - \${MAX_PORT} \(Default is: \${PORT_NGINX_DEFAULT}\):"
+C[79]="\(3/6\) 输出订阅二维码和 http 服务，需要安装依赖 nginx\\\n 如不需要，请输入 [n]\\\n 如需要请输入用于订阅服务的 nginx 端口号，必须是 \${MIN_PORT} - \${MAX_PORT} \(默认为: \${PORT_NGINX_DEFAULT}\):"
 E[80]="subscribe"
 C[80]="订阅"
 E[81]="Adaptive Clash / V2rayN / NekoBox / ShadowRocket / SFI / SFA / SFM Clients"
@@ -267,9 +267,9 @@ input_cdn() {
   fi
 }
 
-# | 选择输出模式 | 订阅 二维码输出 | nginx 输出 |   额外依赖       |
-# |   mode 1   |        X      |     X     |       -         |
-# |   mode 2   |        √      |     √     | qrencode, nginx |
+# | 选择输出模式 | 订阅 二维码输出 | nginx 输出 |  额外依赖 |
+# |   mode 1   |        X      |     X     |     -    |
+# |   mode 2   |        √      |     √     |   nginx  |
 enter_export_mode() {
   local NUM=$1
   local PORT_ERROR_TIME=6
@@ -298,12 +298,12 @@ check_root() {
   [ "$(id -u)" != 0 ] && error "\n $(text 43) \n"
 }
 
+# 判断处理器架构
 check_arch() {
-  # 判断处理器架构
   case $(uname -m) in
-    aarch64|arm64 ) SING_BOX_ARCH=arm64 ; JQ_ARCH=arm64 ;;
-    x86_64|amd64 ) [[ "$(awk -F ':' '/flags/{print $2; exit}' /proc/cpuinfo)" =~ avx2 ]] && SING_BOX_ARCH=amd64v3 || SING_BOX_ARCH=amd64; JQ_ARCH=amd64 ;;
-    armv7l ) SING_BOX_ARCH=armv7; JQ_ARCH=armhf ;;
+    aarch64|arm64 ) SING_BOX_ARCH=arm64; JQ_ARCH=arm64; QRENCODE_ARCH=arm64 ;;
+    x86_64|amd64 ) [[ "$(awk -F ':' '/flags/{print $2; exit}' /proc/cpuinfo)" =~ avx2 ]] && SING_BOX_ARCH=amd64v3 || SING_BOX_ARCH=amd64; JQ_ARCH=amd64; QRENCODE_ARCH=amd64 ;;
+    armv7l ) SING_BOX_ARCH=armv7; JQ_ARCH=armhf; QRENCODE_ARCH=arm ;;
     * ) error " $(text 25) "
   esac
 }
@@ -320,6 +320,7 @@ check_install() {
     wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box >/dev/null 2>&1
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
     wget --no-check-certificate --continue -qO $TEMP_DIR/jq ${GH_PROXY}https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$JQ_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/jq >/dev/null 2>&1
+    wget --no-check-certificate --continue -qO $TEMP_DIR/qrencode https://github.com/fscarmen/client_template/raw/main/qrencode-go/qrencode-go-linux-$QRENCODE_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/qrencode >/dev/null 2>&1
     }&
   fi
 }
@@ -358,12 +359,10 @@ EOF
     else
       systemctl enable --now $APP
     fi
-  elif [ "$ENABLE_DISABLE" = 'stop' ]; then
-    systemctl stop $APP
-    [[ "$IS_NGINX" = 'is_nginx' && "$IS_CENTOS" = 'CentOS7' ]] && ss -nltp | grep $(awk '/listen/{print $2; exit}' $WORK_DIR/nginx.conf) | tr ',' '\n' | awk -F '=' '/pid/{print $2}' | sort -u | xargs kill -15 >/dev/null 2>&1
   elif [ "$ENABLE_DISABLE" = 'disable' ]; then
     if [ "$SYSTEM" = 'Alpine' ]; then
       systemctl stop $APP
+      ss -nltp | grep $(awk '/listen/{print $2; exit}' $WORK_DIR/nginx.conf) | tr ',' '\n' | awk -F '=' '/pid/{print $2}' | sort -u | xargs kill -15 >/dev/null 2>&1
       rm -f /etc/local.d/$APP.start
     elif [ "$IS_CENTOS" = 'CentOS7' ]; then
       systemctl disable --now $APP
@@ -403,7 +402,7 @@ check_system_info() {
     [[ "${SYS,,}" =~ ${REGEX[int]} ]] && SYSTEM="${RELEASE[int]}" && break
   done
 
-  # 针对各厂运的订制系统
+  # 针对各厂商的订制系统
   if [ -z "$SYSTEM" ]; then
     [ $(type -p yum) ] && int=2 && SYSTEM='CentOS' || error " $(text 5) "
   fi
@@ -560,58 +559,44 @@ check_dependencies() {
   if [ "$SYSTEM" = 'Alpine' ]; then
     local CHECK_WGET=$(wget 2>&1 | head -n 1)
     grep -qi 'busybox' <<< "$CHECK_WGET" && ${PACKAGE_INSTALL[int]} wget >/dev/null 2>&1
-
     local DEPS_CHECK=("bash" "rc-update" "virt-what" "python3")
     local DEPS_INSTALL=("bash" "openrc" "virt-what" "python3")
-    for g in "${!DEPS_CHECK[@]}"; do [ ! $(type -p ${DEPS_CHECK[g]}) ] && [[ ! "${DEPS[@]}" =~ "${DEPS_INSTALL[g]}" ]] && DEPS+=(${DEPS_INSTALL[g]}); done
-    if [ "${#DEPS[@]}" -ge 1 ]; then
-      info "\n $(text 7) $(sed "s/ /,&/g" <<< ${DEPS[@]}) \n"
+    for g in "${!DEPS_CHECK[@]}"; do
+      [ ! $(type -p ${DEPS_CHECK[g]}) ] && DEPS_ALPINE+=(${DEPS_INSTALL[g]})
+    done
+    if [ "${#DEPS_ALPINE[@]}" -ge 1 ]; then
+      info "\n $(text 7) $(sed "s/ /,&/g" <<< ${DEPS_ALPINE[@]}) \n"
       ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
-      ${PACKAGE_INSTALL[int]} ${DEPS[@]} >/dev/null 2>&1
+      ${PACKAGE_INSTALL[int]} >/dev/null 2>&1
+      ${DEPS_ALPINE[@]} >/dev/null 2>&1
     fi
 
     [ ! $(type -p systemctl) ] && wget --no-check-certificate --quiet https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement/master/files/docker/systemctl3.py -O /bin/systemctl && chmod a+x /bin/systemctl
   fi
 
   # 检测 Linux 系统的依赖，升级库并重新安装依赖
-  unset DEPS_CHECK DEPS_INSTALL DEPS
   local DEPS_CHECK=("wget" "systemctl" "ss" "bash" "openssl")
   local DEPS_INSTALL=("wget" "systemctl" "iproute2" "bash" "openssl")
   for g in "${!DEPS_CHECK[@]}"; do
-    [ ! $(type -p ${DEPS_CHECK[g]}) ] && [[ ! "${DEPS[@]}" =~ "${DEPS_INSTALL[g]}" ]] && DEPS+=(${DEPS_INSTALL[g]})
+    [ ! $(type -p ${DEPS_CHECK[g]}) ] && DEPS+=(${DEPS_INSTALL[g]})
   done
   if [ "${#DEPS[@]}" -ge 1 ]; then
     info "\n $(text 7) $(sed "s/ /,&/g" <<< ${DEPS[@]}) \n"
-    ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
+    [ "$SYSTEM" != 'CentOS' ] && ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
     ${PACKAGE_INSTALL[int]} ${DEPS[@]} >/dev/null 2>&1
   else
     info "\n $(text 8) \n"
   fi
 }
 
-check_dependencies_2nd() {
-  unset DEPS_CHECK DEPS_INSTALL DEPS
-  # 根据用户选择安装依赖
-  if [ "$1" = "2" ]; then
-    local DEPS_CHECK=("qrencode" "nginx")
-    if [ "$SYSTEM" = 'Alpine' ]; then
-      local DEPS_INSTALL=("libqrencode-tools" "nginx")
-    elif [ "$IS_CENTOS" = 'CentOS9' ]; then
-      local DEPS_INSTALL=("nginx")
-    else
-      local DEPS_INSTALL=("qrencode" "nginx")
-    fi
+# 检查并安装 nginx
+check_nginx() {
+  if [ ! $(type -p nginx) ]; then
+    info "\n $(text 7) nginx \n"
+    ${PACKAGE_INSTALL[int]} nginx >/dev/null 2>&1
+    # 如果新安装的 Nginx ，先停掉服务
+    systemctl disable --now nginx >/dev/null 2>&1
   fi
-  for g in "${!DEPS_CHECK[@]}"; do
-    [ ! $(type -p ${DEPS_CHECK[g]}) ] && [[ ! "${DEPS[@]}" =~ "${DEPS_INSTALL[g]}" ]] && DEPS_2ND+=(${DEPS_INSTALL[g]})
-  done
-  if [ "${#DEPS_2ND[@]}" -ge 1 ]; then
-    info "\n $(text 7) $(sed "s/ /,&/g" <<< ${DEPS_2ND[@]}) \n"
-    ${PACKAGE_INSTALL[int]} ${DEPS_2ND[@]} >/dev/null 2>&1
-  fi
-
-  # 如果新安装的 Nginx ，先停掉服务
-  [[ "${DEPS_2ND[@]}" =~ 'nginx' ]] && systemctl disable --now nginx >/dev/null 2>&1
 }
 
 # 生成100年的自签证书
@@ -1387,7 +1372,7 @@ fetch_nodes_value() {
 
 install_sing-box() {
   sing-box_variable
-  [ "$EXPORT_MODE" = '2' ] && check_dependencies_2nd "$EXPORT_MODE"
+  [ "$EXPORT_MODE" = '2' ] && check_nginx
   [ ! -d /etc/systemd/system ] && mkdir -p /etc/systemd/system
   [ ! -d $WORK_DIR/logs ] && mkdir -p $WORK_DIR/logs
   ssl_certificate
@@ -1396,6 +1381,7 @@ install_sing-box() {
   sing-box_json
   echo "$L" > $WORK_DIR/language
   cp $TEMP_DIR/sing-box $TEMP_DIR/jq $WORK_DIR
+  [ -x $TEMP_DIR/qrencode ] && cp $TEMP_DIR/qrencode $WORK_DIR
 
   # 生成 sing-box systemd 配置文件
   sing-box_systemd
@@ -1422,10 +1408,16 @@ EOF
 export_list() {
   IS_INSTALL=$1
 
-  # v1.1.9 处理的 jq 问题
-  [[ ! -s $WORK_DIR/jq && -s /usr/bin/jq ]] && cp /usr/bin/jq $WORK_DIR/
-
   check_install
+
+  #### v1.1.9 处理的 jq 和 qrencode 二进制文件代替系统依赖的问题，此处预计6月30日删除
+  if [ "$IS_NGINX" = 'is_nginx' ]; then
+    [[ ! -s $WORK_DIR/jq && -s /usr/bin/jq ]] && cp /usr/bin/jq $WORK_DIR/
+    if [ ! -s $WORK_DIR/qrencode ]; then
+      check_arch
+      wget -qO $WORK_DIR/qrencode https://github.com/fscarmen/client_template/raw/main/qrencode-go/qrencode-go-linux-$QRENCODE_ARCH && chmod +x $WORK_DIR/qrencode
+    fi
+  fi
 
   [ "$IS_INSTALL" != 'install' ] && fetch_nodes_value
 
@@ -1765,7 +1757,8 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
   echo $SING_BOX_JSON2 | sed "s#\"<INBOUND_REPLACE>\",#$INBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | $WORK_DIR/jq > $WORK_DIR/subscribe/sing-box2
 
   # 生成二维码 url 文件
-  [ "$IS_NGINX" = 'is_nginx' ] && OUTPUT_QR="$(text 81):
+  [ "$IS_NGINX" = 'is_nginx' ] && cat > $WORK_DIR/subscribe/qr << EOF
+$(text 81):
 $(text 82) 1:
 http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto
 
@@ -1778,16 +1771,13 @@ https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://${SERVER_IP
 
 $(text 82) 2:
 https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2
-"
 
-   [ $(type -p qrencode) ] && OUTPUT_QR+="
 $(text 82) 1:
-$(qrencode -s 10 -m 1 -t UTF8 <<< "http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto")
+$($WORK_DIR/qrencode "http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto")
 
 $(text 82) 2:
-$(qrencode -s 10 -m 1 -t UTF8 <<< "http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2")"
-
-  [ -n "$OUTPUT_QR" ] && echo "$OUTPUT_QR" > $WORK_DIR/subscribe/qr
+$($WORK_DIR/qrencode "http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2")
+EOF
 
   # 生成配置文件
   EXPORT_LIST_FILE="*******************************************
@@ -1887,14 +1877,12 @@ https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://${SERVER_IP
 
 $(text 82) 2:
 https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2")
-"
 
-   [ $(type -p qrencode) ] && EXPORT_LIST_FILE+="
 $(hint "$(text 82) 1:")
-$(qrencode -s 10 -m 1 -t UTF8 <<< http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto)
+$($WORK_DIR/qrencode http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto)
 
 $(hint "$(text 82) 2:")
-$(qrencode -s 10 -m 1 -t UTF8 <<< http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2)
+$($WORK_DIR/qrencode http://${SERVER_IP_1}:${PORT_NGINX}/${UUID_CONFIRM}/auto2)
 "
 
   # 生成并显示节点信息
@@ -1923,11 +1911,11 @@ change_start_port() {
   OLD_START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$OLD_PORTS")
   OLD_CONSECUTIVE_PORTS=$(awk 'END { print NR }' <<< "$OLD_PORTS")
   enter_start_port $OLD_CONSECUTIVE_PORTS
-  cmd_systemctl stop sing-box
+  cmd_systemctl disable sing-box
   for ((a=0; a<$OLD_CONSECUTIVE_PORTS; a++)) do
     [ -s $WORK_DIR/conf/${CONF_FILES[a]} ] && sed -i "s/\(.*listen_port.*:\)$((OLD_START_PORT+a))/\1$((START_PORT+a))/" $WORK_DIR/conf/*
   done
-  systemctl start sing-box
+  systemctl enable sing-box
   sleep 2
   export_list
   [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 30) $(text 37) " || error " Sing-box $(text 30) $(text 38) "
@@ -2004,7 +1992,7 @@ change_protocols() {
     done
   done
 
-  cmd_systemctl stop sing-box
+  cmd_systemctl disable sing-box
 
   # 获取各节点信息
   fetch_nodes_value
@@ -2144,21 +2132,26 @@ change_protocols() {
 uninstall() {
   if [ -d $WORK_DIR ]; then
     if [ "$SYSTEM" = 'Alpine' ]; then
-      systemctl --version | grep -q 'systemctl.py' && rm -f /bin/systemctl
-      cmd_systemctl stop sing-box 2>/dev/null
+      cmd_systemctl disable sing-box 2>/dev/null
+#      systemctl --version | grep -q 'systemctl.py' && rm -f /bin/systemctl
     else
       cmd_systemctl disable sing-box 2>/dev/null
     fi
+    sleep 1
     [[ -s $WORK_DIR/nginx.conf && $(ps -ef | grep 'nginx' | wc -l) -le 1 ]] && reading "\n $(text 83) " REMOVE_NGINX
-    [ "${REMOVE_NGINX,,}" = 'y' ] && ${PACKAGE_UNINSTALL[int]} nginx
+    [ "${REMOVE_NGINX,,}" = 'y' ] && ${PACKAGE_UNINSTALL[int]} nginx >/dev/null 2>&1
     rm -rf $WORK_DIR $TEMP_DIR /etc/systemd/system/sing-box.service /usr/bin/sb
     info "\n $(text 16) \n"
   else
     error "\n $(text 15) \n"
   fi
 
-  # 如果 Alpine 系统，删除开机自启动
-  [ "$SYSTEM" = 'Alpine' ] && ( rm -f /etc/local.d/sing-box.start; rc-update add local >/dev/null 2>&1 )
+  # 如果 Alpine 系统，删除开机自启动和python3版systemd
+  if [ "$SYSTEM" = 'Alpine' ]; then
+    rm -f /etc/local.d/sing-box.start
+    rc-update add local >/dev/null 2>&1
+    [ ! $(ls /etc/systemd/system/*.service) ] && rm -f /bin/systemctl
+  fi
 }
 
 # Sing-box 的最新版本
@@ -2174,10 +2167,9 @@ version() {
     wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
 
     if [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ]; then
-      cmd_systemctl stop sing-box
-      rm -f /etc/local.d/$APP.start
+      cmd_systemctl disable sing-box
       chmod +x $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $WORK_DIR/sing-box
-      systemctl start sing-box && sleep 2 && [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 28) $(text 37)" || error "Sing-box $(text 28) $(text 38) "
+      systemctl enable sing-box && sleep 2 && [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 28) $(text 37)" || error "Sing-box $(text 28) $(text 38) "
     else
       local error "\n $(text 42) "
     fi
