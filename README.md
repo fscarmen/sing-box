@@ -7,26 +7,30 @@
 - [更新信息](README.md#更新信息)
 - [项目特点](README.md#项目特点)
 - [Sing-box for VPS 运行脚本](README.md#sing-box-for-vps-运行脚本)
+- [无交互极速安装](README.md#无交互极速安装)
 - [Vmess / Vless 方案设置任意端口回源以使用 cdn](README.md#Vmess--Vless-方案设置任意端口回源以使用-cdn)
 - [Nekobox 设置 shadowTLS 方法](README.md#nekobox-设置-shadowtls-方法)
 - [主体目录文件及说明](README.md#主体目录文件及说明)
 - [鸣谢下列作者的文章和项目](README.md#鸣谢下列作者的文章和项目)
 - [免责声明](README.md#免责声明)
 
+
 * * *
 ## 更新信息
+2024.03.27 v1.1.11 Add two non-interactive installation modes: 1. pass parameter; 2.kv file, for details: https://github.com/fscarmen/sing-box/blob/main/README.md; 增加两个的无交互安装模式: 1. 传参；2.kv 文件，详细参考: https://github.com/fscarmen/sing-box/blob/main/README.md
+
 2024.03.26 v1.1.10 Thanks to UUb for the official change of the compilation, dependencies jq, qrencode from apt installation to download the binary file, reduce the installation time of about 15 seconds, the implementation of the project's positioning of lightweight, as far as possible to install the least system dependencies; 感谢 UUb 兄弟的官改编译，依赖 jq, qrencode 从 apt 安装改为下载二进制文件，缩减安装时间约15秒，贯彻项目轻量化的定位，尽最大可能安装最少的系统依赖
 
 2024.03.22 v1.1.9 1. In the Sing-box client, add the brutal field in the TCP protocol to make it effective; 2. Compatible with CentOS 7,8,9; 3. Remove default Github CDN; 1. 在 Sing-box 客户端，TCP 协议协议里加上 brutal 字段以生效; 2. 适配 CentOS 7,8,9; 3. 去掉默认的 Github 加速网
-
-2024.3.18 v1.1.8 Move nginx for subscription services to the systemd daemon, following sing-box startup and shutdown; 把用于订阅服务的 nginx 移到 systemd daemon，跟随 sing-box 启停
-
-2024.3.13 v1.1.7 Subscription made optional, no nginx and qrcode installed if not needed; 在线订阅改为可选项，如不需要，不安装 nginx 和 qrcode
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
 <br>
 
+>2024.3.18 v1.1.8 Move nginx for subscription services to the systemd daemon, following sing-box startup and shutdown; 把用于订阅服务的 nginx 移到 systemd daemon，跟随 sing-box 启停
+>
+>2024.3.13 v1.1.7 Subscription made optional, no nginx and qrcode installed if not needed; 在线订阅改为可选项，如不需要，不安装 nginx 和 qrcode
+>
 >2024.3.11 v1.1.6 1. Subscription api too many problems not working properly, instead put template-2 on Github; 2. Use native IP if it supports unlocking chatGPT, otherwise use warp chained proxy unlocking; 1. 在线转订阅 api 太多问题不能正常使用，改为把模板2放Github; 2. 如自身支持解锁 chatGPT，则使用原生 IP，否则使用 warp 链式代理解锁
 >
 >2024.3.10 v1.1.5 1. To protect node data security, use fake information to fetch subscribe api; 2. Adaptive the above clients. http://\<server ip\>:\<nginx port\>/\<uuid\>/<uuid>/<auto | auto2>; 1. 为保护节点数据安全，在 api 转订阅时，使用虚假信息; 2. 自适应以上的客户端，http://\<server ip\>:\<nginx port\>/\<uuid\>/<auto | auto2>
@@ -70,6 +74,8 @@
 * 不需要域名 ( vmess / vless 方案例外)
 * 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 和 Arch Linux,请务必选择 LTS 系统
 * 支持硬件结构类型: AMD 和 ARM，支持 IPv4 和 IPv6
+* 无交互极速安排模式: 一个回车完成超 10 个协议的安装
+
 
 ## Sing-box for VPS 运行脚本:
 
@@ -89,6 +95,41 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   | -b              | Upgrade kernel, turn on BBR, change Linux system 升级内核、安装BBR、DD脚本 |
   | -r              | Add and remove protocols 添加和删除协议 |
 
+
+## 无交互极速安装:
+### 方式1. KV 配置文件，内容参照本库里的 config
+```
+bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh) -f config
+```
+
+### 方式2. KV 传参，举例
+```
+bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh) \
+  --LANGUAGE c \
+  --CHOOSE_PROTOCOLS a \
+  --START_PORT 8881 \
+  --PORT_NGINX 60000 \
+  --SERVER_IP 123.123.123.123 \
+  --CDN www.who.int \
+  --VMESS_HOST_DOMAIN vmess.test.com \
+  --VLESS_HOST_DOMAIN vless.test.com \
+  --UUID_CONFIRM 20f7fca4-86e5-4ddf-9eed-24142073d197 \
+  --NODE_NAME_CONFIRM test
+```
+
+### 参数说明
+| Key 大小写不敏感（Case Insensitive）| Value |
+| --------------- | ----------- |
+| --LANGUAGE | c=中文;  e=英文 |
+| --CHOOSE_PROTOCOLS | 可多选，如 bcdfk<br> a=全部<br> b=XTLS + reality<br> c=hysteria2<br> d=tuic<br> e=ShadowTLS<br> f=shadowsocks<br> g=trojan<br> h=vmess + ws<br> i=vless + ws + tls<br> j=H2 + reality<br> k=gRPC + reality |
+| --START_PORT | 100 - 65520 |
+| --PORT_NGINX | n=不需要订阅，或者 100 - 65520 |
+| --SERVER_IP | IPv4 或 IPv6 地址，不需要中括号 |
+| --CDN | 优选 IP 或者域名，如 --CHOOSE_PROTOCOLS 是 [a,h,i] 时需要 |
+| --VMESS_HOST_DOMAIN | vmess sni 域名，如 --CHOOSE_PROTOCOLS 是 [a,h] 时需要 |
+| --VLESS_HOST_DOMAIN | vless sni 域名，如 --CHOOSE_PROTOCOLS 是 [a,i] 时需要 |
+| --UUID_CONFIRM | 协议的 uuid 或者 password |
+| --NODE_NAME_CONFIRM | 节点名 |
 
 
 ## Vmess / Vless 方案设置任意端口回源以使用 cdn
@@ -163,7 +204,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 
 ## 鸣谢下列作者的文章和项目:
 千歌 sing-box 模板: https://github.com/chika0801/sing-box-examples  
-瞎折腾 sing-box 模板: https://t.me/ztvps/96
+瞎折腾 sing-box 模板: https://t.me/ztvps/100
 
 
 ## 免责声明:

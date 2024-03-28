@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.1.10 (2024.03.26)'
+VERSION='v1.1.11 (2024.03.27)'
 
 # 各变量默认值
 GH_PROXY=''
@@ -23,8 +23,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="Thanks to UUb for the official change of the compilation, dependencies jq, qrencode from apt installation to download the binary file, reduce the installation time of about 15 seconds, the implementation of the project's positioning of lightweight, as far as possible to install the least system dependencies."
-C[1]="感谢 UUb 兄弟的官改编译，依赖 jq, qrencode 从 apt 安装改为下载二进制文件，缩减安装时间约15秒，贯彻项目轻量化的定位，尽最大可能安装最少的系统依赖"
+E[1]="Add two non-interactive installation modes: 1. pass parameter; 2.kv file, for details: https://github.com/fscarmen/sing-box/blob/main/README.md ."
+C[1]="增加两个的无交互安装模式: 1. 传参；2.kv 文件，详细参考: https://github.com/fscarmen/sing-box/blob/main/README.md"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -165,8 +165,8 @@ E[70]="Please set inSecure in tls to true."
 C[70]="请把 tls 里的 inSecure 设置为 true"
 E[71]="Create shortcut [ sb ] successfully."
 C[71]="创建快捷 [ sb ] 指令成功!"
-E[72]="Path to each client configuration file: $WORK_DIR/subscribe/\n The full template can be found at:\n https://t.me/ztvps/96\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
-C[72]="各客户端配置文件路径: $WORK_DIR/subscribe/\n 完整模板可参照:\n https://t.me/ztvps/96\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
+E[72]="Path to each client configuration file: $WORK_DIR/subscribe/\n The full template can be found at:\n https://t.me/ztvps/100\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
+C[72]="各客户端配置文件路径: $WORK_DIR/subscribe/\n 完整模板可参照:\n https://t.me/ztvps/100\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
 E[73]="There is no protocol left, if you are sure please re-run [ sb -u ] to uninstall all."
 C[73]="没有协议剩下，如确定请重新执行 [ sb -u ] 卸载所有"
 E[74]="Keep protocols"
@@ -221,7 +221,7 @@ check_chatgpt() {
 
 # 脚本当天及累计运行次数统计
 statistics_of_run-times() {
-  local COUNT=$(wget --no-check-certificate -qO- --tries=2 --timeout=2 "https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffscarmen%2Fsing-box%2Fmain%2Fsing-box.sh" 2>&1 | grep -m1 -oE "[0-9]+[ ]+/[ ]+[0-9]+") &&
+  local COUNT=$(wget --no-check-certificate -qO- --tries=2 --timeout=2 "https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh" 2>&1 | grep -m1 -oE "[0-9]+[ ]+/[ ]+[0-9]+") &&
   TODAY=$(awk -F ' ' '{print $1}' <<< "$COUNT") &&
   TOTAL=$(awk -F ' ' '{print $3}' <<< "$COUNT")
 }
@@ -276,7 +276,7 @@ enter_export_mode() {
   # 生成 1000 - 65535 随机默认端口数
   local PORT_NGINX_DEFAULT=$(shuf -i ${MIN_PORT}-${MAX_PORT} -n 1)
   while true; do
-    [ "$PORT_ERROR_TIME" -lt 6 ] && unset IN_USED PORT_NGINX
+    [[ "$PORT_ERROR_TIME" > 1 && "$PORT_ERROR_TIME" < 6 ]] && unset IN_USED PORT_NGINX
     (( PORT_ERROR_TIME-- )) || true
     if [ "$PORT_ERROR_TIME" = 0 ]; then
       error "\n $(text 3) \n"
@@ -326,7 +326,7 @@ check_install() {
 }
 
 # 检测 sing-box 的状态
-check_sing-box_stats(){
+check_sing-box_status(){
   case "$STATUS" in
     "$(text 26)" )
       error "\n Sing-box $(text 28) $(text 38) \n"
@@ -362,7 +362,7 @@ EOF
   elif [ "$ENABLE_DISABLE" = 'disable' ]; then
     if [ "$SYSTEM" = 'Alpine' ]; then
       systemctl stop $APP
-      ss -nltp | grep $(awk '/listen/{print $2; exit}' $WORK_DIR/nginx.conf) | tr ',' '\n' | awk -F '=' '/pid/{print $2}' | sort -u | xargs kill -15 >/dev/null 2>&1
+      [ "$IS_NGINX" = 'is_nginx' ] && ss -nltp | grep $(awk '/listen/{print $2; exit}' $WORK_DIR/nginx.conf) | tr ',' '\n' | awk -F '=' '/pid/{print $2}' | sort -u | xargs kill -15 >/dev/null 2>&1
       rm -f /etc/local.d/$APP.start
     elif [ "$IS_CENTOS" = 'CentOS7' ]; then
       systemctl disable --now $APP
@@ -453,7 +453,7 @@ enter_start_port() {
 }
 
 # 定义 Sing-box 变量
-sing-box_variable() {
+sing-box_variables() {
   if grep -qi 'cloudflare' <<< "$ASNORG4$ASNORG6"; then
     local a=6
     until [ -n "$SERVER_IP" ]; do
@@ -543,15 +543,17 @@ sing-box_variable() {
   UUID_CONFIRM=${UUID_CONFIRM:-"$UUID_DEFAULT"}
 
   # 输入节点名，以系统的 hostname 作为默认
-  if [ $(type -p hostname) ]; then
-    NODE_NAME_DEFAULT="$(hostname)"
-  elif [ -s /etc/hostname ]; then
-    NODE_NAME_DEFAULT="$(cat /etc/hostname)"
-  else
-    NODE_NAME_DEFAULT="Sing-Box"
+  if [ -z "$NODE_NAME_CONFIRM" ]; then
+    if [ $(type -p hostname) ]; then
+      NODE_NAME_DEFAULT="$(hostname)"
+    elif [ -s /etc/hostname ]; then
+      NODE_NAME_DEFAULT="$(cat /etc/hostname)"
+    else
+      NODE_NAME_DEFAULT="Sing-Box"
+    fi
+    reading "\n $(text 13) " NODE_NAME_CONFIRM
+    NODE_NAME_CONFIRM="${NODE_NAME_CONFIRM:-"$NODE_NAME_DEFAULT"}"
   fi
-  reading "\n $(text 13) " NODE_NAME_CONFIRM
-  NODE_NAME_CONFIRM="${NODE_NAME_CONFIRM:-"$NODE_NAME_DEFAULT"}"
 }
 
 check_dependencies() {
@@ -569,14 +571,15 @@ check_dependencies() {
       ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
       ${PACKAGE_INSTALL[int]} >/dev/null 2>&1
       ${DEPS_ALPINE[@]} >/dev/null 2>&1
+      [[ -z "$VIRT" && "${DEPS_ALPINE[@]}" =~ 'virt-what' ]] && VIRT=$(virt-what)
     fi
 
     [ ! $(type -p systemctl) ] && wget --no-check-certificate --quiet https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement/master/files/docker/systemctl3.py -O /bin/systemctl && chmod a+x /bin/systemctl
   fi
 
   # 检测 Linux 系统的依赖，升级库并重新安装依赖
-  local DEPS_CHECK=("wget" "systemctl" "ss" "bash" "openssl")
-  local DEPS_INSTALL=("wget" "systemctl" "iproute2" "bash" "openssl")
+  local DEPS_CHECK=("wget" "tar" "systemctl" "ss" "bash" "openssl")
+  local DEPS_INSTALL=("wget" "tar" "systemctl" "iproute2" "bash" "openssl")
   for g in "${!DEPS_CHECK[@]}"; do
     [ ! $(type -p ${DEPS_CHECK[g]}) ] && DEPS+=(${DEPS_INSTALL[g]})
   done
@@ -1371,7 +1374,7 @@ fetch_nodes_value() {
 }
 
 install_sing-box() {
-  sing-box_variable
+  sing-box_variables
   [ "$EXPORT_MODE" = '2' ] && check_nginx
   [ ! -d /etc/systemd/system ] && mkdir -p /etc/systemd/system
   [ ! -d $WORK_DIR/logs ] && mkdir -p $WORK_DIR/logs
@@ -1379,7 +1382,7 @@ install_sing-box() {
   [ "$SYSTEM" = 'CentOS' ] && check_firewall_configuration
   hint "\n $(text 2) " && wait
   sing-box_json
-  echo "$L" > $WORK_DIR/language
+  echo "${L^^}" > $WORK_DIR/language
   cp $TEMP_DIR/sing-box $TEMP_DIR/jq $WORK_DIR
   [ -x $TEMP_DIR/qrencode ] && cp $TEMP_DIR/qrencode $WORK_DIR
 
@@ -1402,7 +1405,8 @@ EOF
 
   # 等待所有后台进程完成后,再次检测状态，运行 Sing-box
   check_install
-  check_sing-box_stats
+  sleep 1
+  check_sing-box_status
 }
 
 export_list() {
@@ -1493,7 +1497,7 @@ export_list() {
 
   CLASH2_YAML=$(wget --no-check-certificate -qO- --tries=3 --timeout=2 ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/clash2)
   for x in ${!CLASH2_PORT[@]}; do
-    [[ ${CLASH2_PORT[x]} =~ [0-9]+ ]] && CLASH2_YAML=$(sed "/proxy-groups:/i\  ${CLASH2_PROXY_INSERT[x]}" <<< "$CLASH2_YAML") && CLASH2_YAML=$(sed -E "/- name: (♻️ 自动选择|📲 电报消息|💬 OpenAi|📹 油管视频|🎥 奈飞视频|📺 巴哈姆特|📺 哔哩哔哩|🌍 国外媒体|🌏 国内媒体|📢 谷歌FCM|Ⓜ️ 微软Bing|Ⓜ️ 微软云盘|Ⓜ️ 微软服务|🍎 苹果服务|🎮 游戏平台|🎶 网易音乐|🎯 全球直连)|^rules:$/i\      ${CLASH2_PROXY_GROUPS_INSERT[x]}" <<< "$CLASH2_YAML")
+    [[ ${CLASH2_PORT[x]} =~ [0-9]+ ]] && CLASH2_YAML=$(sed "/proxy-groups:/i\  ${CLASH2_PROXY_INSERT[x]}" <<< "$CLASH2_YAML" >/dev/null 2>&1) && CLASH2_YAML=$(sed -E "/- name: (♻️ 自动选择|📲 电报消息|💬 OpenAi|📹 油管视频|🎥 奈飞视频|📺 巴哈姆特|📺 哔哩哔哩|🌍 国外媒体|🌏 国内媒体|📢 谷歌FCM|Ⓜ️ 微软Bing|Ⓜ️ 微软云盘|Ⓜ️ 微软服务|🍎 苹果服务|🎮 游戏平台|🎶 网易音乐|🎯 全球直连)|^rules:$/i\      ${CLASH2_PROXY_GROUPS_INSERT[x]}" <<< "$CLASH2_YAML" >/dev/null 2>&1)
   done
   echo "$CLASH2_YAML" > $WORK_DIR/subscribe/clash2
 
@@ -2123,7 +2127,7 @@ change_protocols() {
   # 再次检测状态，运行 Sing-box
   check_install
 
-  check_sing-box_stats
+  check_sing-box_status
 
   export_list
 }
@@ -2133,7 +2137,6 @@ uninstall() {
   if [ -d $WORK_DIR ]; then
     if [ "$SYSTEM" = 'Alpine' ]; then
       cmd_systemctl disable sing-box 2>/dev/null
-#      systemctl --version | grep -q 'systemctl.py' && rm -f /bin/systemctl
     else
       cmd_systemctl disable sing-box 2>/dev/null
     fi
@@ -2150,7 +2153,7 @@ uninstall() {
   if [ "$SYSTEM" = 'Alpine' ]; then
     rm -f /etc/local.d/sing-box.start
     rc-update add local >/dev/null 2>&1
-    [ ! $(ls /etc/systemd/system/*.service) ] && rm -f /bin/systemctl
+    ! ls /etc/systemd/system/*.service >/dev/null 2>&1 && rm -f /bin/systemctl
   fi
 }
 
@@ -2263,27 +2266,89 @@ check_cdn
 statistics_of_run-times
 
 # 传参
-[[ "${*,,}" =~ '-e' ]] && L=E
-[[ "${*,,}" =~ '-c' ]] && L=C
+[[ "${*^^}" =~ '-E' ]] && L=E
+[[ "${*^^}" =~ '-C'|'-B' ]] && L=C
 
-while getopts ":P:p:OoUuVvNnBbRr" OPTNAME; do
-  case "${OPTNAME,,}" in
-    p ) START_PORT=$OPTARG; select_language; check_install; [ "$STATUS" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; change_start_port; exit 0 ;;
-    o ) select_language; check_system_info; check_install; [ "$STATUS" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; [ "$STATUS" = "$(text 28)" ] && ( cmd_systemctl disable sing-box; [[ "$(systemctl is-active sing-box)" =~ 'inactive'|'unknown' ]] && info "\n Sing-box $(text 27) $(text 37)" ) || ( cmd_systemctl enable sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info "\n Sing-box $(text 28) $(text 37)" ); exit 0;;
-    u ) select_language; check_system_info; uninstall; exit 0 ;;
-    n ) select_language; [ ! -s $WORK_DIR/list ] && error " Sing-box $(text 26) "; export_list; exit 0 ;;
-    v ) select_language; check_arch; version; exit 0 ;;
-    b ) select_language; bash <(wget --no-check-certificate -qO- "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit ;;
-    r ) select_language; check_system_info; change_protocols; exit 0 ;;
+select_language
+
+# 可以是 Key Value 或者 Key=Value 的形式
+ALL_PARAMETER=($(sed -E 's/(-c|-e|-C|-E) //; ; s/=/ /g' <<< $*))
+[[ "${#ALL_PARAMETER[@]}" > 13 && "${ALL_PARAMETER[@]^^}" == *"--LANGUAGE"* && "${ALL_PARAMETER[@]^^}" == *"--CHOOSE_PROTOCOLS"* && "${ALL_PARAMETER[@]^^}" == *"--START_PORT"* && "${ALL_PARAMETER[@]^^}" == *"--PORT_NGINX"* && "${ALL_PARAMETER[@]^^}" == *"--SERVER_IP"* && "${ALL_PARAMETER[@]^^}" == *"--UUID"* && "${ALL_PARAMETER[@]^^}" == *"--NODE_NAME"* ]] && NONINTERACTIVE_INSTALL=noninteractive_install
+
+# 传参处理，无交互快速安装参数
+for z in ${!ALL_PARAMETER[@]}; do
+  case "${ALL_PARAMETER[z]^^}" in
+    -P )
+      ((z++)); START_PORT=${ALL_PARAMETER[z]}; check_install; [ "$STATUS" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; change_start_port; exit 0
+      ;;
+    -O )
+      check_system_info; check_install; [ "$STATUS" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; [ "$STATUS" = "$(text 28)" ] && ( cmd_systemctl disable sing-box; [[ "$(systemctl is-active sing-box)" =~ 'inactive'|'unknown' ]] && info "\n Sing-box $(text 27) $(text 37)" ) || ( cmd_systemctl enable sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info "\n Sing-box $(text 28) $(text 37)" ); exit 0
+      ;;
+    -U )
+      check_system_info; check_install; uninstall; exit 0
+      ;;
+    -N )
+      [ ! -s $WORK_DIR/list ] && error " Sing-box $(text 26) "; export_list; exit 0
+      ;;
+    -V )
+      check_arch; version; exit 0
+      ;;
+    -B )
+      bash <(wget --no-check-certificate -qO- "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"); exit
+      ;;
+    -R )
+      check_system_info; change_protocols; exit 0
+      ;;
+    -F )
+      ((z++)); VARIABLE_FILE=${ALL_PARAMETER[z]}; . $VARIABLE_FILE; NONINTERACTIVE_INSTALL=noninteractive_install
+      ;;
+    --LANGUAGE )
+      ((z++)); [[ "${ALL_PARAMETER[z]^^}" =~ ^C ]] && L=C || L=E
+      ;;
+    --CHOOSE_PROTOCOLS )
+      ((z++)); CHOOSE_PROTOCOLS=${ALL_PARAMETER[z]}
+      ;;
+    --START_PORT )
+      ((z++)); START_PORT=${ALL_PARAMETER[z]}
+      ;;
+    --PORT_NGINX )
+      ((z++)); PORT_NGINX=${ALL_PARAMETER[z]}
+      ;;
+    --SERVER_IP )
+      ((z++)); SERVER_IP=${ALL_PARAMETER[z]}
+      ;;
+    --VMESS_HOST_DOMAIN )
+      ((z++)); VMESS_HOST_DOMAIN=${ALL_PARAMETER[z]}
+      ;;
+    --VLESS_HOST_DOMAIN )
+      ((z++)); VLESS_HOST_DOMAIN=${ALL_PARAMETER[z]}
+      ;;
+    --CDN )
+      ((z++)); CDN=${ALL_PARAMETER[z]}
+      ;;
+    --UUID_CONFIRM )
+      ((z++)); UUID_CONFIRM=${ALL_PARAMETER[z]}
+      ;;
+    --NODE_NAME_CONFIRM )
+      ((z++))
+      for ((z=$z; z<${#ALL_PARAMETER[@]}; z++)); do
+        [[ ! "${ALL_PARAMETER[z]}" =~ ^- ]] && NODE_NAME_ARRAY+=(${ALL_PARAMETER[z]}) || break
+      done
+      NODE_NAME_CONFIRM=${NODE_NAME_ARRAY[@]}
+      ;;
   esac
 done
 
-select_language
 check_root
 check_arch
 check_system_info
 check_dependencies
 check_system_ip
 check_install
-menu_setting
-menu
+if [ "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]; then
+  install_sing-box
+  export_list install
+else
+  menu_setting
+  menu
+fi

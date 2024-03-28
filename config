@@ -1,0 +1,11 @@
+#  For details: https://github.com/fscarmen/sing-box/blob/main/README.md
+LANGUAGE=
+CHOOSE_PROTOCOLS=
+START_PORT=
+PORT_NGINX=
+SERVER_IP=
+CDN=
+VMESS_HOST_DOMAIN=
+VLESS_HOST_DOMAIN=
+UUID_CONFIRM=
+NODE_NAME_CONFIRM=
