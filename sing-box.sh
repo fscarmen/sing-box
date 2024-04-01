@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.1.11 (2024.03.27)'
+VERSION='v1.1.11 (2024.04.01)'
 
 # 各变量默认值
 GH_PROXY=''
@@ -23,8 +23,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="Add two non-interactive installation modes: 1. pass parameter; 2.kv file, for details: https://github.com/fscarmen/sing-box/blob/main/README.md ."
-C[1]="增加两个的无交互安装模式: 1. 传参；2.kv 文件，详细参考: https://github.com/fscarmen/sing-box/blob/main/README.md"
+E[1]="sing-box + argo container version is newly launched, for details: https://github.com/fscarmen/sing-box/blob/main/README.md"
+C[1]="sing-box 全家桶 + argo 容器版本全新上线，详细参考: https://github.com/fscarmen/sing-box/blob/main/README.md"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
