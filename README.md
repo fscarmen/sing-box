@@ -4,20 +4,20 @@
 
 # 目录
 
-- [更新信息](README.md#更新信息)
-- [项目特点](README.md#项目特点)
-- [Sing-box for VPS 运行脚本](README.md#sing-box-for-vps-运行脚本)
-- [无交互极速安装](README.md#无交互极速安装)
-- [Vmess / Vless 方案设置任意端口回源以使用 cdn](README.md#vmess--lless-方案设置任意端口回源以使用-cdn)
-- [Docker 和 Docker compose 安装](README.md#docker-和-docker-compose-安装)
-- [Nekobox 设置 shadowTLS 方法](README.md#nekobox-设置-shadowtls-方法)
-- [主体目录文件及说明](README.md#主体目录文件及说明)
-- [鸣谢下列作者的文章和项目](README.md#鸣谢下列作者的文章和项目)
-- [免责声明](README.md#免责声明)
+- [1.更新信息](README.md#1更新信息)
+- [2.项目特点](README.md#2项目特点)
+- [3.Sing-box for VPS 运行脚本](README.md#3sing-box-for-vps-运行脚本)
+- [4.无交互极速安装](README.md#4无交互极速安装)
+- [5.Vmess / Vless 方案设置任意端口回源以使用 cdn](README.md#5vmess--vless-方案设置任意端口回源以使用-cdn)
+- [6.Docker 和 Docker compose 安装](README.md#6docker-和-docker-compose-安装)
+- [7.Nekobox 设置 shadowTLS 方法](README.md#7nekobox-设置-shadowtls-方法)
+- [8.主体目录文件及说明](README.md#8主体目录文件及说明)
+- [9.鸣谢下列作者的文章和项目](README.md#9鸣谢下列作者的文章和项目)
+- [10.免责声明](README.md#10免责声明)
 
 
 * * *
-## 更新信息
+## 1.更新信息
 2024.04.01 sing-box + argo container version is newly launched, for details: https://github.com/fscarmen/sing-box/blob/main/README.md; sing-box 全家桶 + argo 容器版本全新上线，详细参考: https://github.com/fscarmen/sing-box/blob/main/README.md
 
 2024.03.27 v1.1.11 Add two non-interactive installation modes: 1. pass parameter; 2.kv file, for details: https://github.com/fscarmen/sing-box/blob/main/README.md; 增加两个的无交互安装模式: 1. 传参；2.kv 文件，详细参考: https://github.com/fscarmen/sing-box/blob/main/README.md
@@ -68,7 +68,7 @@
 </details>
 
 
-## 项目特点:
+## 2.项目特点:
 
 * 一键部署多协议，可以单选、多选或全选 ShadowTLS v3 / XTLS Reality / Hysteria2 / Tuic V5 / ShadowSocks / Trojan / Vmess + ws / Vless + ws + tls / H2 Reality / gRPC Reality, 总有一款适合你
 * 节点信息输出到 V2rayN / Clash Meta / 小火箭 / Nekobox / Sing-box (SFI, SFA, SFM)，订阅自动适配客户端，一个订阅 url 走天下
@@ -80,7 +80,7 @@
 * 无交互极速安排模式: 一个回车完成超 10 个协议的安装
 
 
-## Sing-box for VPS 运行脚本:
+## 3.Sing-box for VPS 运行脚本:
 
 * 首次运行
 ```
@@ -105,7 +105,7 @@ sb
   | -r              | Add and remove protocols 添加和删除协议 |
 
 
-## 无交互极速安装:
+## 4.无交互极速安装:
 ### 方式1. KV 配置文件，内容参照本库里的 config
 ```
 bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh) -f config
@@ -141,7 +141,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 | --NODE_NAME_CONFIRM | 节点名 |
 
 
-## Vmess / Vless 方案设置任意端口回源以使用 cdn
+## 5.Vmess / Vless 方案设置任意端口回源以使用 cdn
 举例子 IPv6: vmess [2a01:4f8:272:3ae6:100b:ee7a:ad2f:1]:10006
 <img width="1052" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/bc2df37a-95c4-4ba0-9c84-5d9c745c3a7b">
 
@@ -152,27 +152,12 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 <img width="1556" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/164bf255-a6be-40bc-a724-56e13da7a1e6">
 
 
-## Docker 和 Docker compose 安装
+## 6.Docker 和 Docker compose 安装
 
 ### 说明:
 * 支持三种 Argo 类型隧道: 临时 (不需要域名) / Json / Token
 * 需要20个连续可用的端口，以 `START_PORT` 开始第一个
 
-
-### 用户可以通过 Cloudflare Json 生成网轻松获取: https://fscarmen.cloudflare.now.cc
-
-<img width="784" alt="image" src="https://github.com/fscarmen/sba/assets/62703343/fb7c6e90-fb3e-4e77-bcd4-407e4660a33c">
-
-如想手动，可以参考，以 Debian 为例，需要用到的命令，[Deron Cheng - CloudFlare Argo Tunnel 试用](https://zhengweidong.com/try-cloudflare-argo-tunnel)
-
-
-### Argo Token 的获取
-
-详细教程: [群晖套件：Cloudflare Tunnel 内网穿透中文教程 支持DSM6、7](https://imnks.com/5984.html)
-
-<img width="1510" alt="image" src="https://github.com/fscarmen/sba/assets/62703343/bb2d9c43-3585-4abd-a35b-9cfd7404c87c">
-
-<img width="1616" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/ecb844be-1e93-4208-bb7c-6b00b9d1f00a">
 
 ### Docker 部署
 
@@ -206,12 +191,17 @@ docker run -dit \
 ### Docker Compose 部署
 ```
 version: '3.8'
+networks:
+    sing-box:
+        name: sing-box
 services:
     sing-box:
         image: fscarmen/sb
         pull_policy: always
         container_name: sing-box
         restart: always
+        networks:
+            - sing-box
         ports:
             - "8000-8020:8800-8820/tcp"
             - "8000-8020:8800-8820/udp"
@@ -235,10 +225,34 @@ services:
             - ARGO_AUTH=eyJhIjoiOWNjOWUzZTRkOGYyOWQyYTAyZTI5N2YxNGYyMDUxM2EiLCJ0IjoiOGNiZDA4ZjItNGM0MC00OGY1LTlmZDYtZjlmMWQ0YTcxMjUyIiwicyI6IllXWTFORGN4TW1ZdE5HTXdZUzAwT0RaakxUbGxNMkl0Wm1VMk5URTFOR0l4TkdKayJ9
 ```
 
-### 更新 Sing-box 版本
-```
-docker exec -it sing-box bash init.sh -v
-```
+
+### 常用指令
+| 功能 | 指令 |
+| ---- | ---- |
+| 查看节点信息 | `docker exec -it sing-box cat list` |
+| 查看容器日志 | `docker logs -f sing-box` |
+| 更新 Sing-box 版本 | `docker exec -it sing-box bash init.sh -v` |
+| 查看容器内存,CPU，网络等资源使用情况 | `docker stats sing-box` |
+| 暂停容器 | docker: `docker stop sing-box`</br> compose: `docker-compose stop` |
+| 停止并删除容器 | docker: `docker rm -f sing-box`</br> compose: `docker-compose down` |
+| 删除镜像 | `docker rmi -f fscarmen/sb:latest` |
+
+
+### 用户可以通过 Cloudflare Json 生成网轻松获取: https://fscarmen.cloudflare.now.cc
+
+<img width="784" alt="image" src="https://github.com/fscarmen/sba/assets/62703343/fb7c6e90-fb3e-4e77-bcd4-407e4660a33c">
+
+如想手动，可以参考，以 Debian 为例，需要用到的命令，[Deron Cheng - CloudFlare Argo Tunnel 试用](https://zhengweidong.com/try-cloudflare-argo-tunnel)
+
+
+### Argo Token 的获取
+
+详细教程: [群晖套件：Cloudflare Tunnel 内网穿透中文教程 支持DSM6、7](https://imnks.com/5984.html)
+
+<img width="1510" alt="image" src="https://github.com/fscarmen/sba/assets/62703343/bb2d9c43-3585-4abd-a35b-9cfd7404c87c">
+
+<img width="1616" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/ecb844be-1e93-4208-bb7c-6b00b9d1f00a">
+
 
 ### 参数说明
 | 参数 | 是否必须 | 说明 |
@@ -263,7 +277,8 @@ docker exec -it sing-box bash init.sh -v
 | -e ARGO_DOMAIN | 否 | Argo 固定隧道域名 , 与 ARGO_DOMAIN 一并使用才能生效 |
 | -e ARGO_AUTH | 否 | Argo 认证信息，可以是 Json 也可以是 Token，与 ARGO_DOMAIN 一并使用才能生效，不指定的话将使用临时隧道 |
 
-## Nekobox 设置 shadowTLS 方法
+
+## 7.Nekobox 设置 shadowTLS 方法
 1. 复制脚本输出的两个 Neko links 进去
 <img width="630" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/db5960f3-63b1-4145-90a5-b01066dd39be">
 
@@ -275,7 +290,7 @@ docker exec -it sing-box bash init.sh -v
 <img width="408" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/753e7159-92f9-4c88-91b5-867fdc8cca47">
 
 
-## 主体目录文件及说明
+## 8.主体目录文件及说明
 
 ```
 /etc/sing-box/                               # 项目主体目录
@@ -322,11 +337,11 @@ docker exec -it sing-box bash init.sh -v
 ```
 
 
-## 鸣谢下列作者的文章和项目:
+## 9.鸣谢下列作者的文章和项目:
 千歌 sing-box 模板: https://github.com/chika0801/sing-box-examples  
 瞎折腾 sing-box 模板: https://t.me/ztvps/100
 
 
-## 免责声明:
+## 10.免责声明:
 * 本程序仅供学习了解, 非盈利目的，请于下载后 24 小时内删除, 不得用作任何商业用途, 文字、数据及图片均有所属版权, 如转载须注明来源。
 * 使用本程序必循遵守部署免责声明。使用本程序必循遵守部署服务器所在地、所在国家和用户所在国家的法律法规, 程序作者不对使用者任何不当行为负责。
