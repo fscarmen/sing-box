@@ -164,7 +164,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 ```
 docker run -dit \
     --pull always \
-    --name sing-box 
+    --name sing-box \
     -p 8800-8820:8800-8820/tcp \
     -p 8800-8820:8800-8820/udp \
     -e START_PORT=8800 \
@@ -203,8 +203,8 @@ services:
         networks:
             - sing-box
         ports:
-            - "8000-8020:8800-8820/tcp"
-            - "8000-8020:8800-8820/udp"
+            - "8800-8820:8800-8820/tcp"
+            - "8800-8820:8800-8820/udp"
         environment:
             - START_PORT=8800
             - SERVER_IP=123.123.123.123

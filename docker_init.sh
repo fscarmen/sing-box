@@ -132,7 +132,7 @@ EOF
   }
 EOF
 
-   # 生成 route 配置
+  # 生成 route 配置
   cat > $WORK_DIR/conf/02_route.json << EOF
   {
       "route":{
@@ -295,7 +295,7 @@ EOF
   }
 EOF
 
-    # 生成 ShadowTLS V5 配置
+  # 生成 ShadowTLS V5 配置
   [ "${SHADOWTLS}" = 'true' ] && ((PORT++)) && PORT_SHADOWTLS=$PORT && cat > $WORK_DIR/conf/14_ShadowTLS_inbounds.json << EOF
   {
       "inbounds":[
@@ -442,7 +442,7 @@ EOF
   }
 EOF
 
-   # 生成 vless + ws + tls 配置
+  # 生成 vless + ws + tls 配置
   [ "${VLESS_WS}" = 'true' ] && ((PORT++)) && PORT_VLESS_WS=$PORT && cat > $WORK_DIR/conf/18_vless-ws-tls_inbounds.json << EOF
   //  "CDN": "${CDN}"
   {
@@ -643,8 +643,11 @@ stdout_logfile=/dev/null
   echo "$SUPERVISORD_CONF" > /etc/supervisor.d/daemon.ini
 
   # 如使用临时隧道，先运行 cloudflared 以获取临时隧道域名
-  $WORK_DIR/$ARGO_RUNS >/dev/null 2>&1 &
-  [ -n "$METRICS_PORT" ] && sleep 3 && ARGO_DOMAIN=$(wget -qO- http://localhost:$METRICS_PORT/quicktunnel | awk -F '"' '{print $4}')
+  if [ -n "$METRICS_PORT" ]; then
+    $WORK_DIR/$ARGO_RUNS >/dev/null 2>&1 &
+    sleep 3
+    local ARGO_DOMAIN=$(wget -qO- http://localhost:$METRICS_PORT/quicktunnel | awk -F '"' '{print $4}')
+  fi
 
   # 生成 nginx 配置文件
   local NGINX_CONF="user root;
