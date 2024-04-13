@@ -8,28 +8,31 @@
 - [2.项目特点](README.md#2项目特点)
 - [3.Sing-box for VPS 运行脚本](README.md#3sing-box-for-vps-运行脚本)
 - [4.无交互极速安装](README.md#4无交互极速安装)
-- [5.Vmess / Vless 方案设置任意端口回源以使用 cdn](README.md#5vmess--vless-方案设置任意端口回源以使用-cdn)
-- [6.Docker 和 Docker compose 安装](README.md#6docker-和-docker-compose-安装)
-- [7.Nekobox 设置 shadowTLS 方法](README.md#7nekobox-设置-shadowtls-方法)
-- [8.主体目录文件及说明](README.md#8主体目录文件及说明)
-- [9.鸣谢下列作者的文章和项目](README.md#9鸣谢下列作者的文章和项目)
-- [10.免责声明](README.md#10免责声明)
+- [5.Token Argo Tunnel 方案设置任意端口回源以使用 cdn](README.md#5token-argo-tunnel-方案设置任意端口回源以使用-cdn)
+- [6.Vmess / Vless 方案设置任意端口回源以使用 cdn](README.md#6vmess--vless-方案设置任意端口回源以使用-cdn)
+- [7.Docker 和 Docker compose 安装](README.md#7docker-和-docker-compose-安装)
+- [8.Nekobox 设置 shadowTLS 方法](README.md#8nekobox-设置-shadowtls-方法)
+- [9.主体目录文件及说明](README.md#9主体目录文件及说明)
+- [10.鸣谢下列作者的文章和项目](README.md#10鸣谢下列作者的文章和项目)
+- [11.免责声明](README.md#11免责声明)
 
 
 * * *
 ## 1.更新信息
-2024.04.01 sing-box + argo container version is newly launched, for details: https://github.com/fscarmen/sing-box/blob/main/README.md; sing-box 全家桶 + argo 容器版本全新上线，详细参考: https://github.com/fscarmen/sing-box/blob/main/README.md
+2024.04.12 V1.2.0 1. Add Cloudflare Argo Tunnel, so that 10 protocols, including the transport mode of ws, no longer need to bring our own domain; 2. Cloudflare Argo Tunnel supports try, Json and Token methods. Use of [sb -t] online switching; 3. Cloudflare Argo Tunnel switch is [sb -a], and the Sing-box switch is changed from [sb -o] to [sb -s]; 4. If Json or Token Argo is used, the subscription address is the domain name; 5. For details: https://github.com/fscarmen/sing-box; 1. 增加 Cloudflare Argo Tunnel，让包括传输方式为ws在内的10个协议均不再需要自带域名; 2. Cloudflare Argo Tunnel 支持临时、Json 和 Token 方式，支持使用 [sb -t] 在线切换; 3.  Cloudflare Argo Tunnel 开关为 [sb -a]，Sing-box 开关从 [sb -o] 更换为 [sb -s]; 4. 若使用 Json 或者 Token 固定域名 Argo，则订阅地址则使用该域名; 5. 详细参考: https://github.com/fscarmen/sing-box
 
-2024.03.27 v1.1.11 Add two non-interactive installation modes: 1. pass parameter; 2.kv file, for details: https://github.com/fscarmen/sing-box/blob/main/README.md; 增加两个的无交互安装模式: 1. 传参；2.kv 文件，详细参考: https://github.com/fscarmen/sing-box/blob/main/README.md
-
-2024.03.26 v1.1.10 Thanks to UUb for the official change of the compilation, dependencies jq, qrencode from apt installation to download the binary file, reduce the installation time of about 15 seconds, the implementation of the project's positioning of lightweight, as far as possible to install the least system dependencies; 感谢 UUb 兄弟的官改编译，依赖 jq, qrencode 从 apt 安装改为下载二进制文件，缩减安装时间约15秒，贯彻项目轻量化的定位，尽最大可能安装最少的系统依赖
-
-2024.03.22 v1.1.9 1. In the Sing-box client, add the brutal field in the TCP protocol to make it effective; 2. Compatible with CentOS 7,8,9; 3. Remove default Github CDN; 1. 在 Sing-box 客户端，TCP 协议协议里加上 brutal 字段以生效; 2. 适配 CentOS 7,8,9; 3. 去掉默认的 Github 加速网
+2024.04.01 sing-box + argo container version is newly launched, for details: https://github.com/fscarmen/sing-box; sing-box 全家桶 + argo 容器版本全新上线，详细参考: https://github.com/fscarmen/sing-box
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
 <br>
 
+>2024.03.27 v1.1.11 Add two non-interactive installation modes: 1. pass parameter; 2.kv file, for details: https://github.com/fscarmen/sing-box; 增加两个的无交互安装模式: 1. 传参；2.kv 文件，详细参考: https://github.com/fscarmen/sing-box
+>
+>2024.03.26 v1.1.10 Thanks to UUb for the official change of the compilation, dependencies jq, qrencode from apt installation to download the binary file, reduce the installation time of about 15 seconds, the implementation of the project's positioning of lightweight, as far as possible to install the least system dependencies; 感谢 UUb 兄弟的官改编译，依赖 jq, qrencode 从 apt 安装改为下载二进制文件，缩减安装时间约15秒，贯彻项目轻量化的定位，尽最大可能安装最少的系统依赖
+>
+>2024.03.22 v1.1.9 1. In the Sing-box client, add the brutal field in the TCP protocol to make it effective; 2. Compatible with CentOS 7,8,9; 3. Remove default Github CDN; 1. 在 Sing-box 客户端，TCP 协议协议里加上 brutal 字段以生效; 2. 适配 CentOS 7,8,9; 3. 去掉默认的 Github 加速网
+>
 >2024.3.18 v1.1.8 Move nginx for subscription services to the systemd daemon, following sing-box startup and shutdown; 把用于订阅服务的 nginx 移到 systemd daemon，跟随 sing-box 启停
 >
 >2024.3.13 v1.1.7 Subscription made optional, no nginx and qrcode installed if not needed; 在线订阅改为可选项，如不需要，不安装 nginx 和 qrcode
@@ -71,10 +74,10 @@
 ## 2.项目特点:
 
 * 一键部署多协议，可以单选、多选或全选 ShadowTLS v3 / XTLS Reality / Hysteria2 / Tuic V5 / ShadowSocks / Trojan / Vmess + ws / Vless + ws + tls / H2 Reality / gRPC Reality, 总有一款适合你
+* 所有协议均不需要域名，可选 Cloudflare Argo Tunnel 内网穿透以支持传统方式为 websocket 的协议
 * 节点信息输出到 V2rayN / Clash Meta / 小火箭 / Nekobox / Sing-box (SFI, SFA, SFM)，订阅自动适配客户端，一个订阅 url 走天下
 * 自定义端口，适合有限开放端口的 nat 小鸡
 * 内置 warp 链式代理解锁 chatGPT
-* 不需要域名 ( vmess / vless 方案例外)
 * 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 和 Arch Linux,请务必选择 LTS 系统
 * 支持硬件结构类型: AMD 和 ARM，支持 IPv4 和 IPv6
 * 无交互极速安排模式: 一个回车完成超 10 个协议的安装
@@ -99,7 +102,8 @@ sb
   | -u              | Uninstall 卸载 |
   | -n              | Export Nodes list 显示节点信息 |
   | -p <start port> | Change the nodes start port 更改节点的起始端口 |
-  | -o              | Stop / Start the Sing-box service 停止/开启 Sing-box 服务 |
+  | -s              | Stop / Start the Sing-box service 停止/开启 Sing-box 服务 |
+  | -a              | Stop / Start the Argo Tunnel service 停止/开启 Argo Tunnel 服务 | 
   | -v              | Sync Argo Xray to the newest 同步 Argo Xray 到最新版本 |
   | -b              | Upgrade kernel, turn on BBR, change Linux system 升级内核、安装BBR、DD脚本 |
   | -r              | Add and remove protocols 添加和删除协议 |
@@ -141,7 +145,15 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 | --NODE_NAME_CONFIRM | 节点名 |
 
 
-## 5.Vmess / Vless 方案设置任意端口回源以使用 cdn
+## 5.Token Argo Tunnel 方案设置任意端口回源以使用 cdn
+详细教程: [群晖套件：Cloudflare Tunnel 内网穿透中文教程 支持DSM6、7](https://imnks.com/5984.html)
+
+<img width="1510" alt="image" src="https://github.com/fscarmen/sba/assets/62703343/bb2d9c43-3585-4abd-a35b-9cfd7404c87c">
+
+<img width="1638" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/a4868388-d6ab-4dc7-929c-88bc775ca851">
+
+
+## 6.Vmess / Vless 方案设置任意端口回源以使用 cdn
 举例子 IPv6: vmess [2a01:4f8:272:3ae6:100b:ee7a:ad2f:1]:10006
 <img width="1052" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/bc2df37a-95c4-4ba0-9c84-5d9c745c3a7b">
 
@@ -152,7 +164,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 <img width="1556" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/164bf255-a6be-40bc-a724-56e13da7a1e6">
 
 
-## 6.Docker 和 Docker compose 安装
+## 7.Docker 和 Docker compose 安装
 
 ### 说明:
 * 支持三种 Argo 类型隧道: 临时 (不需要域名) / Json / Token
@@ -278,7 +290,7 @@ services:
 | -e ARGO_AUTH | 否 | Argo 认证信息，可以是 Json 也可以是 Token，与 ARGO_DOMAIN 一并使用才能生效，不指定的话将使用临时隧道 |
 
 
-## 7.Nekobox 设置 shadowTLS 方法
+## 8.Nekobox 设置 shadowTLS 方法
 1. 复制脚本输出的两个 Neko links 进去
 <img width="630" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/db5960f3-63b1-4145-90a5-b01066dd39be">
 
@@ -290,7 +302,7 @@ services:
 <img width="408" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/753e7159-92f9-4c88-91b5-867fdc8cca47">
 
 
-## 8.主体目录文件及说明
+## 9.主体目录文件及说明
 
 ```
 /etc/sing-box/                               # 项目主体目录
@@ -331,17 +343,20 @@ services:
 |-- language                                 # 存放脚本语言文件，E 为英文，C 为中文
 |-- list                                     # 节点信息列表
 |-- sing-box                                 # sing-box 主程序
+|-- cloudflared                              # Argo tunnel 主程序
+|-- tunnel.json                              # Argo tunnel Json 信息文件
+|-- tunnel.yml                               # Argo tunnel 配置文件
 |-- sb.sh                                    # 快捷方式脚本文件
 |-- jq                                       # 命令行 json 处理器二进制文件
 `-- qrencode                                 # QR 码编码二进制文件
 ```
 
 
-## 9.鸣谢下列作者的文章和项目:
+## 10.鸣谢下列作者的文章和项目:
 千歌 sing-box 模板: https://github.com/chika0801/sing-box-examples  
 瞎折腾 sing-box 模板: https://t.me/ztvps/100
 
 
-## 10.免责声明:
+## 11.免责声明:
 * 本程序仅供学习了解, 非盈利目的，请于下载后 24 小时内删除, 不得用作任何商业用途, 文字、数据及图片均有所属版权, 如转载须注明来源。
 * 使用本程序必循遵守部署免责声明。使用本程序必循遵守部署服务器所在地、所在国家和用户所在国家的法律法规, 程序作者不对使用者任何不当行为负责。
