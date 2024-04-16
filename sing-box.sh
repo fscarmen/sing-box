@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.0 (2024.04.12)'
+VERSION='v1.2.1 (2024.04.16)'
 
 # 各变量默认值
 GH_PROXY=''
@@ -23,8 +23,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Add Cloudflare Argo Tunnel, so that 10 protocols, including the transport mode of ws, no longer need to bring our own domain; 2. Cloudflare Argo Tunnel supports try, Json and Token methods. Use of [sb -t] online switching; 3. Cloudflare Argo Tunnel switch is [sb -a], and the Sing-box switch is changed from [sb -o] to [sb -s]; 4. If Json or Token Argo is used, the subscription address is the domain name; 5. For details: https://github.com/fscarmen/sing-box"
-C[1]="1. 增加 Cloudflare Argo Tunnel，让包括传输方式为ws在内的10个协议均不再需要自带域名; 2. Cloudflare Argo Tunnel 支持临时、Json 和 Token 方式，支持使用 [sb -t] 在线切换; 3.  Cloudflare Argo Tunnel 开关为 [sb -a]，Sing-box 开关从 [sb -o] 更换为 [sb -s]; 4. 若使用 Json 或者 Token 固定域名 Argo，则订阅地址则使用该域名; 5. 详细参考: https://github.com/fscarmen/sing-box"
+E[1]="1. Fix the bug of dynamically adding and removing protocols; 2. CentOS 7 add EPEL to install nginx"
+C[1]="1. 修复动态增加和删除协议的 bug; 2. CentOS 7 增加 EPEL 软件仓库，以便安装 Nginx"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -99,8 +99,8 @@ E[37]="successful"
 C[37]="成功"
 E[38]="failed"
 C[38]="失败"
-E[39]="Sing-box is not installed."
-C[39]="Sing-box 未安装"
+E[39]="Sing-box is not installed and cannot change the Argo tunnel."
+C[39]="Sing-box 未安装，不能更换 Argo 隧道"
 E[40]="Sing-box local verion: \$LOCAL\\\t The newest verion: \$ONLINE"
 C[40]="Sing-box 本地版本: \$LOCAL\\\t 最新版本: \$ONLINE"
 E[41]="No upgrade required."
@@ -135,16 +135,16 @@ E[55]="The script runs today: \$TODAY. Total: \$TOTAL"
 C[55]="脚本当天运行次数: \$TODAY，累计运行次数: \$TOTAL"
 E[56]="Process ID"
 C[56]="进程ID"
-E[57]=""
-C[57]=""
+E[57]="Selecting the ws return method:\n 1. Argo (default)\n 2. Origin rules"
+C[57]="选择 ws 的回源方式:\n 1. Argo (默认)\n 2. Origin rules"
 E[58]="Memory Usage"
 C[58]="内存占用"
 E[59]="Install ArgoX scripts (argo + xray) [https://github.com/fscarmen/argox]"
 C[59]="安装 ArgoX 脚本 (argo + xray) [https://github.com/fscarmen/argox]"
 E[60]="The order of the selected protocols and ports is as follows:"
 C[60]="选择的协议及端口次序如下:"
-E[61]=""
-C[61]=""
+E[61]="There are no replaceable Argo tunnels."
+C[61]="没有可更换的Argo 隧道"
 E[62]="Add / Remove protocols (sb -r)"
 C[62]="增加 / 删除协议 (sb -r)"
 E[63]="(1/3) Installed protocols."
@@ -327,15 +327,15 @@ input_argo_auth() {
     ARGO_DOMAIN=$(sed 's/[ ]*//g; s/:[ ]*//' <<< "$ARGO_DOMAIN")
   fi
 
-  if [ -z "$ARGO_DOMAIN" ]; then
+  if [[ -z "$ARGO_DOMAIN" && ( "$ARGO_DOMAIN" =~ trycloudflare\.com$ || "$IS_CHANGE_ARGO" = 'is_add_protocols' || "$IS_CHANGE_ARGO" = 'is_install' ) ]]; then
     ARGO_RUNS="$WORK_DIR/cloudflared tunnel --edge-ip-version auto --no-autoupdate --url http://localhost:$PORT_NGINX"
-  elif [[ -n "$ARGO_DOMAIN" && -z "$ARGO_AUTH" ]]; then
+  elif [[ -n "${ARGO_DOMAIN}" && -z "${ARGO_AUTH}" ]]; then
     until [[ "$ARGO_AUTH" =~ TunnelSecret || "$ARGO_AUTH" =~ ^[A-Z0-9a-z=]{120,250}$ || "$ARGO_AUTH" =~ .*cloudflared.*service[[:space:]]+install[[:space:]]+[A-Z0-9a-z=]{1,100} ]]; do
       (( DOMAIN_ERROR_TIME-- )) || true
       [ "$DOMAIN_ERROR_TIME" != 0 ] && reading "\n $(text 85) " ARGO_AUTH || error "\n $(text 3) \n"
       if [[ "$ARGO_AUTH" =~ TunnelSecret ]]; then
         ARGO_JSON=${ARGO_AUTH//[ ]/}
-        [ "$IS_CHANGE_ARGO" = 'is_change_argo' ] && export_argo_json_file $WORK_DIR || export_argo_json_file $TEMP_DIR
+        [ "$IS_CHANGE_ARGO" = 'is_install' ] && export_argo_json_file $TEMP_DIR || export_argo_json_file $WORK_DIR
         ARGO_RUNS="$WORK_DIR/cloudflared tunnel --edge-ip-version auto --config $WORK_DIR/tunnel.yml run"
       elif [[ "$ARGO_AUTH" =~ ^[A-Z0-9a-z=]{120,250}$ ]]; then
         ARGO_TOKEN=$ARGO_AUTH
@@ -353,7 +353,11 @@ input_argo_auth() {
 # 更换 Argo 隧道类型
 change_argo() {
   check_install
-  [[ ${STATUS[1]} = "$(text 26)" ]] && error " $(text 39) "
+  if [ "${STATUS[0]}" =  "$(text 26)" ]; then
+    error "\n $(text 39) "
+  elif [ "${STATUS[1]}" = "$(text 26)" ]; then
+    error "\n $(text 61) "
+  fi
 
   case $(grep "ExecStart=" /etc/systemd/system/argo.service) in
     *--config* )
@@ -655,7 +659,7 @@ sing-box_variables() {
   # 如选择有 h. vmess + ws 或 i. vless + ws 时，先检测是否有支持的 http 端口可用，如有则要求输入域名和 cdn
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ 'h' ]]; then
     if [ "$IS_ARGO" = 'is_argo' ]; then
-      [ "$ARGO_READY" != 'argo_ready' ] && input_argo_auth
+      [ "$ARGO_READY" != 'argo_ready' ] && input_argo_auth is_install
       local ARGO_READY=argo_ready
     else
       local DOMAIN_ERROR_TIME=5
@@ -668,7 +672,7 @@ sing-box_variables() {
 
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ 'i' ]]; then
     if [ "$IS_ARGO" = 'is_argo' ]; then
-      [ "$ARGO_READY" != 'argo_ready' ] && input_argo_auth
+      [ "$ARGO_READY" != 'argo_ready' ] && input_argo_auth is_install
       local ARGO_READY=argo_ready
     else
       local DOMAIN_ERROR_TIME=5
@@ -734,7 +738,11 @@ check_dependencies() {
   done
   if [ "${#DEPS[@]}" -ge 1 ]; then
     info "\n $(text 7) $(sed "s/ /,&/g" <<< ${DEPS[@]}) \n"
-    [ "$SYSTEM" != 'CentOS' ] && ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
+    if [ "$IS_CENTOS" = 'CentOS7' ]; then
+      yum repolist | grep -q epef || ${PACKAGE_INSTALL[int]} epel-release >/dev/null 2>&1
+    else
+      ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
+    fi
     ${PACKAGE_INSTALL[int]} ${DEPS[@]} >/dev/null 2>&1
   else
     info "\n $(text 8) \n"
@@ -1642,7 +1650,8 @@ install_sing-box() {
   sing-box_systemd
 
   # 生成 Argo systemd 配置文件，并复制 cloudflared 可执行二进制文件
-  [ "$IS_ARGO" = 'is_argo' ] && cp $TEMP_DIR/cloudflared $WORK_DIR && argo_systemd
+  cp $TEMP_DIR/cloudflared $WORK_DIR
+  [ -n "$ARGO_RUNS" ] && argo_systemd
 
   # 如果是 Json Argo，把配置文件复制到工作目录
   [ -n "$ARGO_JSON" ] && cp $TEMP_DIR/tunnel.* $WORK_DIR
@@ -2374,8 +2383,6 @@ change_protocols() {
     done
   done
 
-  cmd_systemctl disable sing-box
-
   # 获取各节点信息
   fetch_nodes_value
 
@@ -2388,7 +2395,7 @@ change_protocols() {
 
   # 寻找待删除协议的 inbound 文件名
   for o in "${REMOVE_PROTOCOLS[@]}"; do
-    for ((s=0; s<${#PROTOCOL_LIST[@]}; s++)); do
+    for s in ${!PROTOCOL_LIST[@]}; do
       [ "$o" = "${PROTOCOL_LIST[s]}" ] && REMOVE_FILE+=("${NODE_TAG[s]}_inbounds.json")
     done
   done
@@ -2400,7 +2407,7 @@ change_protocols() {
 
   # 寻找已存在协议中原有的端口号
   for p in "${KEEP_PROTOCOLS[@]}"; do
-    for ((u=0; u<${#PROTOCOL_LIST[@]}; u++)); do
+    for u in "${!PROTOCOL_LIST[@]}"; do
       [ "$p" = "${PROTOCOL_LIST[u]}" ] && KEEP_PORTS+=("$(awk -F '[:,]' '/listen_port/{print $2}' $WORK_DIR/conf/*${NODE_TAG[u]}_inbounds.json)")
     done
   done
@@ -2455,22 +2462,43 @@ change_protocols() {
     PORT_TROJAN=${REINSTALL_PORTS[POSITION]}
   fi
 
+  # 获取 ws 的 argo 或者 origin 状态
+  if [ -s /etc/systemd/system/argo.service ]; then
+    local ARGO_ORIGIN_RULES_STATUS=is_argo
+    ARGO_RUNS=$(sed -n "s/^ExecStart=\(.*\)/\1/gp" /etc/systemd/system/argo.service)
+  elif ls $WORK_DIR/conf/*-ws*inbounds.json >/dev/null 2>&1; then
+    local ARGO_ORIGIN_RULES_STATUS=is_origin
+  else
+    local ARGO_ORIGIN_RULES_STATUS=no_argo_no_origin
+  fi
+
   # 获取原始 vmess + ws 配置信息
   CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     local DOMAIN_ERROR_TIME=5
-    if [ "$IS_ARGO" = 'is_argo' ]; then
-      until [ -n "$ARGO_DOMAIN" ]; do
-        [ "$ARGO_READY" != 'argo_ready' ] && input_argo_auth is_change_argo
-        local ARGO_READY=argo_ready
-      done
-    else
-      until [ -n "$VMESS_HOST_DOMAIN" ]; do
-        (( DOMAIN_ERROR_TIME-- )) || true
-        [ "$DOMAIN_ERROR_TIME" != 0 ] && TYPE=VMESS && reading "\n $(text 50) " VMESS_HOST_DOMAIN || error "\n $(text 3) \n"
-      done
+    if [[ "$ARGO_READY" != 'argo_ready' || "$ORIGIN_READY" != 'origin_ready' ]]; then
+      if [ "$ARGO_ORIGIN_RULES_STATUS" = 'is_origin' ]; then
+        until [ -n "$VMESS_HOST_DOMAIN" ]; do
+          (( DOMAIN_ERROR_TIME-- )) || true
+          [ "$DOMAIN_ERROR_TIME" != 0 ] && TYPE=VMESS && reading "\n $(text 50) " VMESS_HOST_DOMAIN || error "\n $(text 3) \n"
+        done
+      elif [ "$ARGO_ORIGIN_RULES_STATUS" = 'no_argo_no_origin' ]; then
+        [ -z "$ARGO_OR_ORIGIN_RULES" ] && hint "\n $(text 57) " && reading "\n $(text 24) " ARGO_OR_ORIGIN_RULES
+        [ "$ARGO_OR_ORIGIN_RULES" = '2' ] && IS_ARGO=no_argo || IS_ARGO=is_argo
+        if [ "$IS_ARGO" = 'is_argo' ]; then
+          until [ -n "$ARGO_RUNS" ]; do
+            input_argo_auth is_add_protocols
+            [ -n "$ARGO_RUNS" ] && local ARGO_READY=argo_ready && break
+          done
+        else
+          until [ -n "$VMESS_HOST_DOMAIN" ]; do
+            (( DOMAIN_ERROR_TIME-- )) || true
+            [ "$DOMAIN_ERROR_TIME" != 0 ] && TYPE=VMESS && reading "\n $(text 50) " VMESS_HOST_DOMAIN || error "\n $(text 3) \n"
+          done
+          local ORIGIN_READY=origin_ready
+        fi
+      fi
     fi
-    [ "${#CDN[@]}" = '0' ] && RUN_ARGO_SYSTEMD=run_argo_systemd && argo_systemd && input_cdn
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_VMESS_WS=${REINSTALL_PORTS[POSITION]}
   fi
@@ -2479,21 +2507,35 @@ change_protocols() {
   CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     local DOMAIN_ERROR_TIME=5
-    if [ "$IS_ARGO" = 'is_argo' ]; then
-      until [ -n "$ARGO_DOMAIN" ]; do
-        [ "$ARGO_READY" != 'argo_ready' ] && input_argo_auth is_change_argo
-        local ARGO_READY=argo_ready
-      done
-    else
-      until [ -n "$VLESS_HOST_DOMAIN" ]; do
-        (( DOMAIN_ERROR_TIME-- )) || true
-      [ "$DOMAIN_ERROR_TIME" != 0 ] && TYPE=VLESS && reading "\n $(text 50) " VLESS_HOST_DOMAIN || error "\n $(text   3) \n"
-      done
+    if [[ "$ARGO_READY" != 'argo_ready' || "$ORIGIN_READY" != 'origin_ready' ]]; then
+      if [ "$ARGO_ORIGIN_RULES_STATUS" = 'is_origin' ]; then
+        until [ -n "$VLESS_HOST_DOMAIN" ]; do
+          (( DOMAIN_ERROR_TIME-- )) || true
+          [ "$DOMAIN_ERROR_TIME" != 0 ] && TYPE=VLESS && reading "\n $(text 50) " VLESS_HOST_DOMAIN || error "\n $(text   3) \n"
+        done
+      elif [ "$ARGO_ORIGIN_RULES_STATUS" = 'no_argo_no_origin' ]; then
+        [ -z "$ARGO_OR_ORIGIN_RULES" ] && hint "\n $(text 57) " && reading "\n $(text 24) " ARGO_OR_ORIGIN_RULES
+        [ "$ARGO_OR_ORIGIN_RULES" = '2' ] && IS_ARGO=no_argo || IS_ARGO=is_argo
+        if [ "$IS_ARGO" = 'is_argo' ]; then
+          until [ -n "$ARGO_RUNS" ]; do
+            [ "$ARGO_READY" != 'argo_ready' ] && input_argo_auth is_add_protocols
+            [ -n "$ARGO_RUNS" ] && local ARGO_READY=argo_ready && break
+          done
+        else
+          until [ -n "$VLESS_HOST_DOMAIN" ]; do
+            (( DOMAIN_ERROR_TIME-- )) || true
+            [ "$DOMAIN_ERROR_TIME" != 0 ] && TYPE=VLESS && reading "\n $(text 50) " VLESS_HOST_DOMAIN || error "\n $(text   3) \n"
+          done
+          local ORIGIN_READY=origin_ready
+        fi
+      fi
     fi
-    [ "${#CDN[@]}" = '0' ] && RUN_ARGO_SYSTEMD=run_argo_systemd && argo_systemd && input_cdn
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_VLESS_WS=${REINSTALL_PORTS[POSITION]}
   fi
+
+  # 如之前没有 ws，现新增的 ws，则输入 cdn
+  [[ "${#CDN[@]}" = '0' && ( "$ARGO_READY" = 'argo_ready' || "$ORIGIN_READY" = 'origin_ready' ) ]] && input_cdn
 
   # 获取原始 H2 + Reality 配置信息
   CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
@@ -2509,14 +2551,26 @@ change_protocols() {
     PORT_GRPC_REALITY=${REINSTALL_PORTS[POSITION]}
   fi
 
+  # 停止 sing-box 服务
+  cmd_systemctl disable sing-box
+
   # 生成 Nginx 配置文件
   [ -n "$PORT_NGINX" ] && export_nginx_conf_file
 
   # 生成各协议的 json 文件
   sing-box_json change
 
-  # 如有需要，重启 Argo 服务
-  [ "$RUN_ARGO_SYSTEMD" = 'run_argo_systemd' ] && ( cmd_systemctl disable argo >/dev/null 2>&1; cmd_systemctl enable argo >/dev/null 2>&1 )
+  # 如有需要，安装和删除 Argo 服务
+  if ls $WORK_DIR/conf/*-ws*inbounds.json >/dev/null 2>&1; then
+    if [[ "$ARGO_OR_ORIGIN_RULES" != '2' && "$ARGO_ORIGIN_RULES_STATUS" != 'is_origin' && ! -s /etc/systemd/system/argo.service ]]; then
+      argo_systemd
+      cmd_systemctl enable argo >/dev/null 2>&1
+    fi
+  elif [ -s /etc/systemd/system/argo.service ]; then
+    cmd_systemctl disable argo >/dev/null 2>&1
+    rm -f /etc/systemd/system/argo.service
+    [ -s $WORK_DIR/tunnel.json ] && rm -f $WORK_DIR/tunnel.*
+  fi
 
   # 运行 sing-box
   cmd_systemctl enable sing-box
