@@ -19,16 +19,18 @@
 
 * * *
 ## 1.更新信息
+2024.05.03 v1.2.2 Complete 8 non-interactive installation modes, direct output results. Suitable for mass installation scenarios. You can put the commands in the favorites of the ssh software. Please refer to the README.md description for details. 完善8种无交互安装模式，直接输出结果，适合大量装机的情景，可以把命令放在 ssh 软件的收藏夹，详细请参考README.md 说明
+
 2024.04.16 v1.2.1 1. Fix the bug of dynamically adding and removing protocols; 2. CentOS 7 add EPEL to install nginx; 1. 修复动态增加和删除协议的 bug; 2. CentOS 7 增加 EPEL 软件仓库，以便安装 Nginx
-
-2024.04.12 v1.2.0 1. Add Cloudflare Argo Tunnel, so that 10 protocols, including the transport mode of ws, no longer need to bring our own domain; 2. Cloudflare Argo Tunnel supports try, Json and Token methods. Use of [sb -t] online switching; 3. Cloudflare Argo Tunnel switch is [sb -a], and the Sing-box switch is changed from [sb -o] to [sb -s]; 4. If Json or Token Argo is used, the subscription address is the domain name; 5. For details: https://github.com/fscarmen/sing-box; 1. 增加 Cloudflare Argo Tunnel，让包括传输方式为ws在内的10个协议均不再需要自带域名; 2. Cloudflare Argo Tunnel 支持临时、Json 和 Token 方式，支持使用 [sb -t] 在线切换; 3.  Cloudflare Argo Tunnel 开关为 [sb -a]，Sing-box 开关从 [sb -o] 更换为 [sb -s]; 4. 若使用 Json 或者 Token 固定域名 Argo，则订阅地址则使用该域名; 5. 详细参考: https://github.com/fscarmen/sing-box
-
-2024.04.01 sing-box + argo container version is newly launched, for details: https://github.com/fscarmen/sing-box; sing-box 全家桶 + argo 容器版本全新上线，详细参考: https://github.com/fscarmen/sing-box
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
 <br>
 
+>2024.04.12 v1.2.0 1. Add Cloudflare Argo Tunnel, so that 10 protocols, including the transport mode of ws, no longer need to bring our own domain; 2. Cloudflare Argo Tunnel supports try, Json and Token methods. Use of [sb -t] online switching; 3. Cloudflare Argo Tunnel switch is [sb -a], and the Sing-box switch is changed from [sb -o] to [sb -s]; 4. If Json or Token Argo is used, the subscription address is the domain name; 5. For details: https://github.com/fscarmen/sing-box; 1. 增加 Cloudflare Argo Tunnel，让包括传输方式为ws在内的10个协议均不再需要自带域名; 2. Cloudflare Argo Tunnel 支持临时、Json 和 Token 方式，支持使用 [sb -t] 在线切换; 3.  Cloudflare Argo Tunnel 开关为 [sb -a]，Sing-box 开关从 [sb -o] 更换为 [sb -s]; 4. 若使用 Json 或者 Token 固定域名 Argo，则订阅地址则使用该域名; 5. 详细参考: https://github.com/fscarmen/sing-box
+>
+>2024.04.01 sing-box + argo container version is newly launched, for details: https://github.com/fscarmen/sing-box; sing-box 全家桶 + argo 容器版本全新上线，详细参考: https://github.com/fscarmen/sing-box
+>
 >2024.03.27 v1.1.11 Add two non-interactive installation modes: 1. pass parameter; 2.kv file, for details: https://github.com/fscarmen/sing-box; 增加两个的无交互安装模式: 1. 传参；2.kv 文件，详细参考: https://github.com/fscarmen/sing-box
 >
 >2024.03.26 v1.1.10 Thanks to UUb for the official change of the compilation, dependencies jq, qrencode from apt installation to download the binary file, reduce the installation time of about 15 seconds, the implementation of the project's positioning of lightweight, as far as possible to install the least system dependencies; 感谢 UUb 兄弟的官改编译，依赖 jq, qrencode 从 apt 安装改为下载二进制文件，缩减安装时间约15秒，贯彻项目轻量化的定位，尽最大可能安装最少的系统依赖
@@ -118,6 +120,11 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 ```
 
 ### 方式2. KV 传参，举例
+
+<details>
+    <summary> 使用 Origin Rule + 订阅</summary>
+<br>
+
 ```
 bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh) \
   --LANGUAGE c \
@@ -125,12 +132,154 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --START_PORT 8881 \
   --PORT_NGINX 60000 \
   --SERVER_IP 123.123.123.123 \
-  --CDN www.who.int \
+  --CDN dash.cloudflare.com \
   --VMESS_HOST_DOMAIN vmess.test.com \
   --VLESS_HOST_DOMAIN vless.test.com \
   --UUID_CONFIRM 20f7fca4-86e5-4ddf-9eed-24142073d197 \
-  --NODE_NAME_CONFIRM test
+  --SUBSCRIBE=true \
+  --NODE_NAME_CONFIRM bundle
 ```
+
+</details>
+
+<details>
+    <summary> 使用 Origin Rule ，不要订阅 </summary>
+<br>
+
+```
+bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh) \
+  --LANGUAGE c \
+  --CHOOSE_PROTOCOLS a \
+  --START_PORT 8881 \
+  --PORT_NGINX 60000 \
+  --SERVER_IP 123.123.123.123 \
+  --CDN dash.cloudflare.com \
+  --VMESS_HOST_DOMAIN vmess.test.com \
+  --VLESS_HOST_DOMAIN vless.test.com \
+  --UUID_CONFIRM 20f7fca4-86e5-4ddf-9eed-24142073d197 \
+  --NODE_NAME_CONFIRM bundle
+```
+</details>
+
+<details>
+    <summary> 使用 Argo 临时隧道 + 订阅 </summary>
+<br>
+
+```
+bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh) \
+  --LANGUAGE c \
+  --CHOOSE_PROTOCOLS a \
+  --START_PORT 8881 \
+  --PORT_NGINX 60000 \
+  --SERVER_IP 123.123.123.123 \
+  --CDN dash.cloudflare.com \
+  --UUID_CONFIRM 20f7fca4-86e5-4ddf-9eed-24142073d197 \
+  --SUBSCRIBE=true \
+  --ARGO=true \
+  --NODE_NAME_CONFIRM bundle
+```
+</details>
+
+<details>
+    <summary> 使用 Argo 临时隧道，不要订阅 </summary>
+<br>
+
+```
+bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh) \
+  --LANGUAGE c \
+  --CHOOSE_PROTOCOLS a \
+  --START_PORT 8881 \
+  --PORT_NGINX 60000 \
+  --SERVER_IP 123.123.123.123 \
+  --CDN dash.cloudflare.com \
+  --UUID_CONFIRM 20f7fca4-86e5-4ddf-9eed-24142073d197 \
+  --ARGO=true \
+  --NODE_NAME_CONFIRM bundle
+```
+</details>
+
+<details>
+    <summary> 使用 Argo Json 隧道 + 订阅 </summary>
+<br>
+
+```
+bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh) \
+  --LANGUAGE c \
+  --CHOOSE_PROTOCOLS a \
+  --START_PORT 8881 \
+  --PORT_NGINX 60000 \
+  --SERVER_IP 123.123.123.123 \
+  --CDN dash.cloudflare.com \
+  --UUID_CONFIRM 20f7fca4-86e5-4ddf-9eed-24142073d197 \
+  --SUBSCRIBE=true \
+  --ARGO=true \
+  --ARGO_DOMAIN=sb.argo.com \
+  --ARGO_AUTH='{"AccountTag":"9cc9e3e4d8f29d2a02e297f14f20513a","TunnelSecret":"6AYfKBOoNlPiTAuWg64ZwujsNuERpWLm6pPJ2qpN8PM=","TunnelID":"1ac55430-f4dc-47d5-a850-bdce824c4101"}' \
+  --NODE_NAME_CONFIRM bundle
+```
+</details>
+
+<details>
+    <summary> 使用 Argo Json 隧道，不要订阅 </summary>
+<br>
+
+```
+bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh) \
+  --LANGUAGE c \
+  --CHOOSE_PROTOCOLS a \
+  --START_PORT 8881 \
+  --PORT_NGINX 60000 \
+  --SERVER_IP 123.123.123.123 \
+  --CDN dash.cloudflare.com \
+  --UUID_CONFIRM 20f7fca4-86e5-4ddf-9eed-24142073d197 \
+  --ARGO=true \
+  --ARGO_DOMAIN=sb.argo.com \
+  --ARGO_AUTH='{"AccountTag":"9cc9e3e4d8f29d2a02e297f14f20513a","TunnelSecret":"6AYfKBOoNlPiTAuWg64ZwujsNuERpWLm6pPJ2qpN8PM=","TunnelID":"1ac55430-f4dc-47d5-a850-bdce824c4101"}' \
+  --NODE_NAME_CONFIRM bundle
+```
+</details>
+
+<details>
+    <summary> 使用 Argo Token 隧道 + 订阅 </summary>
+<br>
+
+```
+bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh) \
+  --LANGUAGE c \
+  --CHOOSE_PROTOCOLS a \
+  --START_PORT 8881 \
+  --PORT_NGINX 60000 \
+  --SERVER_IP 123.123.123.123 \
+  --CDN dash.cloudflare.com \
+  --UUID_CONFIRM 20f7fca4-86e5-4ddf-9eed-24142073d197 \
+  --SUBSCRIBE=true \
+  --ARGO=true \
+  --ARGO_DOMAIN=sb.argo.com \
+  --ARGO_AUTH='sudo cloudflared service install eyJhIjoiOWNjOWUzZTRkOGYyOWQyYTAyZTI5N2YxNGYyMDUxM2EiLCJ0IjoiOGNiZDA4ZjItNGM0MC00OGY1LTlmZDYtZjlmMWQ0YTcxMjUyIiwicyI6IllXWTFORGN4TW1ZdE5HTXdZUzAwT0RaakxUbGxNMkl0Wm1VMk5URTFOR0l4TkdKayJ9' \
+  --NODE_NAME_CONFIRM bundle
+```
+</details>
+
+<details>
+    <summary> 使用 Argo Token 隧道，不要订阅 </summary>
+<br>
+
+```
+bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh) \
+  --LANGUAGE c \
+  --CHOOSE_PROTOCOLS a \
+  --START_PORT 8881 \
+  --PORT_NGINX 60000 \
+  --SERVER_IP 123.123.123.123 \
+  --CDN dash.cloudflare.com \
+  --UUID_CONFIRM 20f7fca4-86e5-4ddf-9eed-24142073d197 \
+  --ARGO=true \
+  --ARGO_DOMAIN=sb.argo.com \
+  --ARGO_AUTH='sudo cloudflared service install eyJhIjoiOWNjOWUzZTRkOGYyOWQyYTAyZTI5N2YxNGYyMDUxM2EiLCJ0IjoiOGNiZDA4ZjItNGM0MC00OGY1LTlmZDYtZjlmMWQ0YTcxMjUyIiwicyI6IllXWTFORGN4TW1ZdE5HTXdZUzAwT0RaakxUbGxNMkl0Wm1VMk5URTFOR0l4TkdKayJ9' \
+  --NODE_NAME_CONFIRM bundle
+```
+</details>
+
 
 ### 参数说明
 | Key 大小写不敏感（Case Insensitive）| Value |
@@ -144,6 +293,9 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 | --VMESS_HOST_DOMAIN | vmess sni 域名，如 --CHOOSE_PROTOCOLS 是 [a,h] 时需要 |
 | --VLESS_HOST_DOMAIN | vless sni 域名，如 --CHOOSE_PROTOCOLS 是 [a,i] 时需要 |
 | --UUID_CONFIRM | 协议的 uuid 或者 password |
+| --ARGO | 是否使用 Argo Tunnel，如果是填 true，如果使用 Origin rules，则可以忽略本 Key |
+| --ARGO_DOMAIN | 固定 Argo 域名，即是 Json 或者 Token 隧道的域名 |
+| --ARGO_AUTH | Json 或者 Token 隧道的内容 |
 | --NODE_NAME_CONFIRM | 节点名 |
 
 
@@ -172,8 +324,9 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 * 支持三种 Argo 类型隧道: 临时 (不需要域名) / Json / Token
 * 需要20个连续可用的端口，以 `START_PORT` 开始第一个
 
-
-### Docker 部署
+<details>
+    <summary> Docker 部署 </summary>
+<br>
 
 ```
 docker run -dit \
@@ -193,16 +346,19 @@ docker run -dit \
     -e VLESS_WS=true \
     -e H2_REALITY=true \
     -e GRPC_REALITY=true \
-    -e UUID=68fe8d27-cbc8-4e72-90b7-70d3bb69dfd3 \
+    -e UUID=20f7fca4-86e5-4ddf-9eed-24142073d197 \
     -e CDN=www.csgo.com \
     -e NODE_NAME=sing-box \
     -e ARGO_DOMAIN=sb.argo.com \
     -e ARGO_AUTH='{"AccountTag":"9cc9e3e4d8f29d2a02e297f14f20513a","TunnelSecret":"6AYfKBOoNlPiTAuWg64ZwujsNuERpWLm6pPJ2qpN8PM=","TunnelID":"1ac55430-f4dc-47d5-a850-bdce824c4101"}' \
     fscarmen/sb
 ```
+</details>
 
+<details>
+    <summary> Docker Compose 部署 </summary>
+<br>
 
-### Docker Compose 部署
 ```
 version: '3.8'
 networks:
@@ -232,12 +388,13 @@ services:
             - VLESS_WS=true
             - H2_REALITY=true
             - GRPC_REALITY=true
-            - UUID=68fe8d27-cbc8-4e72-90b7-70d3bb69dfd3 
+            - UUID=20f7fca4-86e5-4ddf-9eed-24142073d197 
             - CDN=www.csgo.com
             - NODE_NAME=sing-box
             - ARGO_DOMAIN=sb.argo.com
             - ARGO_AUTH=eyJhIjoiOWNjOWUzZTRkOGYyOWQyYTAyZTI5N2YxNGYyMDUxM2EiLCJ0IjoiOGNiZDA4ZjItNGM0MC00OGY1LTlmZDYtZjlmMWQ0YTcxMjUyIiwicyI6IllXWTFORGN4TW1ZdE5HTXdZUzAwT0RaakxUbGxNMkl0Wm1VMk5URTFOR0l4TkdKayJ9
 ```
+</details>
 
 
 ### 常用指令
