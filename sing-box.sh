@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.2 (2024.05.03)'
+VERSION='v1.2.3 (2024.05.06)'
 
 # 各变量默认值
 GH_PROXY=''
@@ -14,7 +14,7 @@ TLS_SERVER_DEFAULT=addons.mozilla.org
 PROTOCOL_LIST=("XTLS + reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess + ws" "vless + ws + tls" "H2 + reality" "gRPC + reality")
 NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess-ws" "vless-ws-tls" "h2-reality" "grpc-reality")
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
-CDN_DOMAIN=("cn.azhz.eu.org" "visa.com" "skk.moe" "dashboard.cloudflare.com" "csgo.com")
+CDN_DOMAIN=("cn.azhz.eu.org" "dash.cloudflare.com" "skk.moe" "visa.com" "csgo.com")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
 
 trap "rm -rf $TEMP_DIR >/dev/null 2>&1 ; echo -e '\n' ;exit 1" INT QUIT TERM EXIT
@@ -23,8 +23,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="Complete 8 non-interactive installation modes, direct output results. Suitable for mass installation scenarios. You can put the commands in the favorites of the ssh software. Please refer to the README.md description for details."
-C[1]="完善8种无交互安装模式，直接输出结果，适合大量装机的情景，可以把命令放在 ssh 软件的收藏夹，详细请参考README.md 说明"
+E[1]="Automatically detects native IPv4 and IPv6 for warp-installed machines to minimize interference with warp ip."
+C[1]="对于已安装 warp 机器，自动识别原生的 IPv4 和 IPv6，以减少受 warp ip 的干扰"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -569,13 +569,19 @@ check_system_info() {
 
 # 检测 IPv4 IPv6 信息
 check_system_ip() {
-  IP4=$(wget -4 -qO- --no-check-certificate --user-agent=Mozilla --tries=2 --timeout=1 http://ip-api.com/json/) &&
+  local DEFAULT_LOCAL_INTERFACE=$(ip route show default | awk '/default/ {for (i=0; i<NF; i++) if ($i=="dev") {print $(i+1); exit}}')
+  if [ -n "$DEFAULT_LOCAL_INTERFACE" ]; then
+    local DEFAULT_LOCAL_IP4=$(ip addr show $DEFAULT_LOCAL_INTERFACE | sed -n 's#.*inet \([^/]\+\)/[0-9]\+.*global.*#\1#gp')
+    local DEFAULT_LOCAL_IP6=$(ip addr show $DEFAULT_LOCAL_INTERFACE | sed -n 's#.*inet6 \([^/]\+\)/[0-9]\+.*global.*#\1#gp')
+  fi
+
+  [ -n "$DEFAULT_LOCAL_IP4" ] && IP4=$(wget -4 --bind-address=$DEFAULT_LOCAL_IP4 -qO- $BIND_ADDRESS4 --no-check-certificate --user-agent=Mozilla --tries=2 --timeout=1 http://ip-api.com/json/) &&
   WAN4=$(expr "$IP4" : '.*query\":[ ]*\"\([^"]*\).*') &&
   COUNTRY4=$(expr "$IP4" : '.*country\":[ ]*\"\([^"]*\).*') &&
   ASNORG4=$(expr "$IP4" : '.*isp\":[ ]*\"\([^"]*\).*') &&
   [[ "$L" = C && -n "$COUNTRY4" ]] && COUNTRY4=$(translate "$COUNTRY4")
 
-  IP6=$(wget -6 -qO- --no-check-certificate --user-agent=Mozilla --tries=2 --timeout=1 https://api.ip.sb/geoip) &&
+  [ -n "$DEFAULT_LOCAL_IP6" ] && IP6=$(wget -6 --bind-address=$DEFAULT_LOCAL_IP6 -qO- $BIND_ADDRESS6 --no-check-certificate --user-agent=Mozilla --tries=2 --timeout=1 https://api.ip.sb/geoip) &&
   WAN6=$(expr "$IP6" : '.*ip\":[ ]*\"\([^"]*\).*') &&
   COUNTRY6=$(expr "$IP6" : '.*country\":[ ]*\"\([^"]*\).*') &&
   ASNORG6=$(expr "$IP6" : '.*isp\":[ ]*\"\([^"]*\).*') &&

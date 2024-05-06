@@ -19,6 +19,8 @@
 
 * * *
 ## 1.更新信息
+2024.05.06 v1.2.3 Automatically detects native IPv4 and IPv6 for warp-installed machines to minimize interference with warp ip; 对于已安装 warp 机器，自动识别原生的 IPv4 和 IPv6，以减少受 warp ip 的干扰
+
 2024.05.03 v1.2.2 Complete 8 non-interactive installation modes, direct output results. Suitable for mass installation scenarios. You can put the commands in the favorites of the ssh software. Please refer to the README.md description for details. 完善8种无交互安装模式，直接输出结果，适合大量装机的情景，可以把命令放在 ssh 软件的收藏夹，详细请参考README.md 说明
 
 2024.04.16 v1.2.1 1. Fix the bug of dynamically adding and removing protocols; 2. CentOS 7 add EPEL to install nginx; 1. 修复动态增加和删除协议的 bug; 2. CentOS 7 增加 EPEL 软件仓库，以便安装 Nginx
