@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.3 (2024.05.06)'
+VERSION='v1.2.4 (2024.05.09)'
 
 # 各变量默认值
 GH_PROXY=''
@@ -10,6 +10,8 @@ WORK_DIR='/etc/sing-box'
 START_PORT_DEFAULT='8881'
 MIN_PORT=100
 MAX_PORT=65520
+MIN_HOPPING_PORT=10000
+MAX_HOPPING_PORT=65535
 TLS_SERVER_DEFAULT=addons.mozilla.org
 PROTOCOL_LIST=("XTLS + reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess + ws" "vless + ws + tls" "H2 + reality" "gRPC + reality")
 NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess-ws" "vless-ws-tls" "h2-reality" "grpc-reality")
@@ -23,8 +25,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="Automatically detects native IPv4 and IPv6 for warp-installed machines to minimize interference with warp ip."
-C[1]="对于已安装 warp 机器，自动识别原生的 IPv4 和 IPv6，以减少受 warp ip 的干扰"
+E[1]="Add hysteria2 port hopping. Supported Clients: ShadowRocket / NekoBox / Clash"
+C[1]="添加 hysteria2 的跳跃端口，支持客户端: ShadowRocket / NekoBox / Clash"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -48,7 +50,7 @@ C[11]="\(2/6\) 请输入开始的端口号，必须是 \${MIN_PORT} - \${MAX_POR
 E[12]="\(5/6\) Please enter UUID \(Default is \${UUID_DEFAULT}\):"
 C[12]="\(5/6\) 请输入 UUID \(默认为 \${UUID_DEFAULT}\):"
 E[13]="\(6/6\) Please enter the node name. \(Default is \${NODE_NAME_DEFAULT}\):"
-C[13]="\(6/6\) 请输入节点名称 \(默认为 \${NODE_NAME_DEFAULT}\):"
+C[13]="\(6/6\) 请输入节点名称 \(默认为: \${NODE_NAME_DEFAULT}\):"
 E[14]="Node name only allow uppercase and lowercase letters and numeric characters, please re-enter \(\${a} times remaining\):"
 C[14]="节点名称只允许英文大小写及数字字符，请重新输入 \(剩余\${a}次\):"
 E[15]="Sing-box script has not been installed yet."
@@ -119,8 +121,8 @@ E[47]="No server ip, script exits. Feedback:[https://github.com/fscarmen/sing-bo
 C[47]="没有 server ip，脚本退出，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 E[48]="ShadowTLS - Copy the above two Neko links and manually set up the chained proxies in order. Tutorial: https://github.com/fscarmen/sing-box/blob/main/README.md#sekobox-%E8%AE%BE%E7%BD%AE-shadowtls-%E6%96%B9%E6%B3%95"
 C[48]="ShadowTLS - 复制上面两条 Neko links 进去，并按顺序手动设置链式代理，详细教程: https://github.com/fscarmen/sing-box/blob/main/README.md#sekobox-%E8%AE%BE%E7%BD%AE-shadowtls-%E6%96%B9%E6%B3%95"
-E[49]="(1/6) Select more protocols to install (e.g. hgbd):\n a. all (default)"
-C[49]="(1/6) 多选需要安装协议(比如 hgbd):\n a. all (默认)"
+E[49]="(1/6) Select more protocols to install (e.g. hgbd). The order of the port numbers of the protocols is related to the ordering of the multiple choices:\n a. all (default)"
+C[49]="(1/6) 多选需要安装协议(比如 hgbd)，协议的端口号次序与多选的排序有关:\n a. all (默认)"
 E[50]="Please enter the \$TYPE domain name:"
 C[50]="请输入 \$TYPE 域名:"
 E[51]="Please choose or custom a cdn, http support is required:"
@@ -211,6 +213,14 @@ E[93]="Can't get the temporary tunnel domain, script exits. Feedback:[https://gi
 C[93]="获取不到临时隧道的域名，脚本退出，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 E[94]="Please bind \[\${ARGO_DOMAIN}] tunnel TYPE to HTTP and URL to \[\localhost:\${PORT_NGINX}] in Cloudflare."
 C[94]="请在 Cloudflare 绑定 \[\${ARGO_DOMAIN}] 隧道 TYPE 为 HTTP，URL 为 \[\localhost:\${PORT_NGINX}]"
+E[95]="netfilter-persistent installation failed, but the installation progress will not stop. portHopping forwarding rules are temporary rules, reboot may be invalidated."
+C[95]="netfilter-persistent安装失败,但安装进度不会停止。PortHopping转发规则为临时规则,重启可能失效"
+E[96]="netfilter-persistent is not started, PortHopping forwarding rules cannot be persisted. Reboot the system, the rules will be invalidated, please manually execute [netfilter-persistent save], continue the script does not affect the subsequent configuration."
+C[96]="netfilter-persistent未启动，PortHopping转发规则无法持久化，重启系统，规则将会失效，请手动执行 [netfilter-persistent save],继续运行脚本不影响后续配置"
+E[97]="Port Hopping/Multiple Ports (Port Hopping) function needs to occupy multiple ports, please make sure that these ports are not listening to other services \n Tip1: The number of ports should not be too many, the recommended number is about 1000, the minimum value: $MIN_HOPPING_PORT, the maximum value: $MAX_HOPPING_PORT.\n Tip2: nat machines have a limited number of ports to listen on, usually 20-30. If setting ports out of the nat range will cause the node to not work, please use with caution!\n This function is not used by default."
+C[97]="端口跳跃/多端口(Port Hopping)功能需要占用多个端口，请保证这些端口没有监听其他服务\n Tip1: 端口选择数量不宜过多，推荐1000个左右，最小值:$MIN_HOPPING_PORT，最大值: $MAX_HOPPING_PORT\n Tip2: nat 鸡由于可用于监听的端口有限，一般为20-30个。如设置了不开放的端口会导致节点不通，请慎用！\n 默认不使用该功能"
+E[98]="Enter the port range, e.g. 50000:51000. Leave blank to disable:"
+C[98]="请输入端口范围，例如 50000:51000，如要禁用请留空:"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -304,6 +314,35 @@ input_nginx_port() {
     PORT_NGINX=${PORT_NGINX:-"$PORT_NGINX_DEFAULT"}
     if [[ "$PORT_NGINX" =~ ^[1-9][0-9]{1,4}$ && "$PORT_NGINX" -ge "$MIN_PORT" && "$PORT_NGINX" -le "$MAX_PORT" ]]; then
       ss -nltup | grep -q ":$PORT_NGINX" && warning "\n $(text 44) \n" || break
+    fi
+  done
+}
+
+# 输入 hysteria2 跳跃端口
+input_hopping_port() {
+  local HOPPING_ERROR_TIME=6
+  until [ -n "$IS_HOPPING" ]; do
+    (( HOPPING_ERROR_TIME-- )) || true
+    case "$HOPPING_ERROR_TIME" in
+      0 )
+        error "\n $(text 3) \n"
+        ;;
+      5 )
+        hint "\n $(text 97) \n" && reading " $(text 98) " PORT_HOPPING_RANGE
+        ;;
+      * )
+        reading " $(text 98) " PORT_HOPPING_RANGE
+    esac
+    if [[ "${PORT_HOPPING_RANGE//-/:}" =~ ^[1-6][0-9]{4}:[1-6][0-9]{4}$ ]]; then
+      # 为防止输入错误，把 - 改为 : ，比如  10000-11000 改为 10000:11000
+      PORT_HOPPING_RANGE=${PORT_HOPPING_RANGE//-/:}
+      PORT_HOPPING_START=${PORT_HOPPING_RANGE%:*}
+      PORT_HOPPING_END=${PORT_HOPPING_RANGE#*:}
+      [[ "$PORT_HOPPING_START" < "$PORT_HOPPING_END" && "$PORT_HOPPING_START" -ge "$MIN_HOPPING_PORT" && "$PORT_HOPPING_END" -le "$MAX_HOPPING_PORT" ]] && IS_HOPPING=is_hopping || warning "\n $(text 36) "
+    elif [[ -z "$PORT_HOPPING_RANGE" || "${PORT_HOPPING_RANGE,,}" =~ ^(n|no)$ ]]; then
+      IS_HOPPING=no_hoppinng
+    else
+      warning "\n $(text 36) "
     fi
   done
 }
@@ -433,6 +472,10 @@ check_arch() {
 # 查安装及运行状态，下标0: sing-box，下标1: argo，下标2：docker；状态码: 26 未安装， 27 已安装未运行， 28 运行中
 check_install() {
   [[ "$IS_SUB" = 'is_sub' || -s $WORK_DIR/subscribe/qr ]] && IS_SUB=is_sub || IS_SUB=no_sub
+  if ls $WORK_DIR/conf/*${NODE_TAG[1]}_inbounds.json >/dev/null 2>&1; then
+    check_port_hopping_nat
+    [ -n "$PORT_HOPPING_END" ] && IS_HOPPING=is_hopping || IS_HOPPING=no_hopping
+  fi
   STATUS[0]=$(text 26) && [ -s /etc/systemd/system/sing-box.service ] && STATUS[0]=$(text 27) && [ "$(systemctl is-active sing-box)" = 'active' ] && STATUS[0]=$(text 28)
   if [ "${STATUS[0]}" = "$(text 26)" ] && [ ! -s $WORK_DIR/sing-box ]; then
     {
@@ -469,7 +512,8 @@ check_sing-box_status() {
       error "\n Sing-box $(text 28) $(text 38) \n"
       ;;
     "$(text 27)" )
-      cmd_systemctl enable sing-box && info "\n Sing-box $(text 28) $(text 37) \n" || error "\n Sing-box $(text 28) $(text 38) \n"
+      cmd_systemctl enable sing-box
+      [ "$(systemctl is-active sing-box)" = 'active' ] && info "\n Sing-box $(text 28) $(text 37) \n" || error "\n Sing-box $(text 28) $(text 38) \n"
       ;;
     "$(text 28)" )
       info "\n Sing-box $(text 28) $(text 37) \n"
@@ -514,11 +558,11 @@ EOF
   elif [ "$ENABLE_DISABLE" = 'disable' ]; then
     if [ "$SYSTEM" = 'Alpine' ]; then
       systemctl stop $APP
-      [ "$APP" = 'sing-box' ] && [[ "${IS_SUB}" = 'is_sub' || "${IS_ARGO}" = 'is_argo' ]] && ss -nltp | grep $(awk '/listen/{print $2; exit}' $WORK_DIR/nginx.conf) | tr ',' '\n' | awk -F '=' '/pid/{print $2}' | sort -u | xargs kill -15 >/dev/null 2>&1
+      [ "$APP" = 'sing-box' ] && [[ "${IS_SUB}" = 'is_sub' || "${IS_ARGO}" = 'is_argo' ]] && [ -s $WORK_DIR/nginx.conf ] && ss -nltp | grep $(awk '/listen/{print $2; exit}' $WORK_DIR/nginx.conf) | tr ',' '\n' | awk -F '=' '/pid/{print $2}' | sort -u | xargs kill -15 >/dev/null 2>&1
       rm -f /etc/local.d/$APP.start
     elif [ "$IS_CENTOS" = 'CentOS7' ]; then
       systemctl disable --now $APP
-      [ "$APP" = 'sing-box' ] && [[ "${IS_SUB}" = 'is_sub' || "${IS_ARGO}" = 'is_argo' ]] && ss -nltp | grep $(awk '/listen/{print $2; exit}' $WORK_DIR/nginx.conf) | tr ',' '\n' | awk -F '=' '/pid/{print $2}' | sort -u | xargs kill -15 >/dev/null 2>&1
+      [ "$APP" = 'sing-box' ] && [[ "${IS_SUB}" = 'is_sub' || "${IS_ARGO}" = 'is_argo' ]] && [ -s $WORK_DIR/nginx.conf ] && ss -nltp | grep $(awk '/listen/{print $2; exit}' $WORK_DIR/nginx.conf) | tr ',' '\n' | awk -F '=' '/pid/{print $2}' | sort -u | xargs kill -15 >/dev/null 2>&1
     else
       systemctl disable --now $APP
     fi
@@ -546,8 +590,8 @@ check_system_info() {
   RELEASE=("Debian" "Ubuntu" "CentOS" "Arch" "Alpine" "Fedora")
   EXCLUDE=("")
   MAJOR=("9" "16" "7" "3" "" "37")
-  PACKAGE_UPDATE=("apt -y update" "apt -y update" "yum -y update" "pacman -Sy" "apk update -f" "dnf -y update")
-  PACKAGE_INSTALL=("apt -y install" "apt -y install" "yum -y install" "pacman -S --noconfirm" "apk add --no-cache" "dnf -y install")
+  PACKAGE_UPDATE=("apt -y update" "apt -y update" "yum -y update --skip-broken" "pacman -Sy" "apk update -f" "dnf -y update")
+  PACKAGE_INSTALL=("DEBIAN_FRONTEND=noninteractive apt -y install" "DEBIAN_FRONTEND=noninteractive apt -y install" "yum -y install" "pacman -S --noconfirm" "apk add --no-cache" "dnf -y install")
   PACKAGE_UNINSTALL=("apt -y autoremove" "apt -y autoremove" "yum -y autoremove" "pacman -Rcnsu --noconfirm" "apk del -f" "dnf -y autoremove")
 
   for int in "${!REGEX[@]}"; do
@@ -567,21 +611,104 @@ check_system_info() {
   [ "$SYSTEM" = 'CentOS' ] && IS_CENTOS="CentOS$(echo "$SYS" | sed "s/[^0-9.]//g" | cut -d. -f1)"
 }
 
+# 删除端口跳跃
+del_port_hopping_nat(){
+  check_port_hopping_nat
+  if [ "$SYSTEM" = 'Alpine' ]; then
+    iptables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    ip6tables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+  elif [ "$(systemctl is-active firewalld)" = 'active' ]; then
+    firewall-cmd --permanent --remove-forward-port=port=${PORT_HOPPING_START}-${PORT_HOPPING_END}:proto=udp:toport=${PORT_HOPPING_TARGET} >/dev/null 2>&1
+    firewall-cmd --reload >/dev/null 2>&1
+  else
+    iptables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    ip6tables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    [ "$(systemctl is-active netfilter-persistent)" = 'active' ] && netfilter-persistent save 2>/dev/null
+  fi
+}
+
+# 添加端口跳跃
+add_port_hopping_nat() {
+  local PORT_HOPPING_START=$1
+  local PORT_HOPPING_END=$2
+  local PORT_HOPPING_TARGET=$3
+
+  # 检测防火墙依赖和状态
+  if [ "$SYSTEM" = 'Alpine' ]; then
+    # 添加防火墙规则
+    iptables --table nat -A PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    ip6tables --table nat -A PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+
+    # 将 iptables, ip6tables 添加到默认运行级别
+    rc-update show default | grep -q 'iptables' || rc-update add iptables >/dev/null 2>&1
+    rc-update show default | grep -q 'ip6tables' || rc-update add ip6tables >/dev/null 2>&1
+    rc-update show default | grep -q 'iptables' && rc-update show default | grep -q 'ip6tables' || warning "\n $(text 96) \n"
+
+    # 保存当前的 iptables, ip6tables 规则集，以便在开机时恢复
+    rc-service iptables save >/dev/null 2>&1
+    rc-service ip6tables save >/dev/null 2>&1
+
+  elif [ "$(systemctl is-active firewalld)" = 'active' ]; then
+    if [ "$(firewall-cmd --query-masquerade --permanent)" != 'yes' ] ; then
+      firewall-cmd --add-masquerade --permanent >/dev/null 2>&1
+      firewall-cmd --reload >/dev/null 2>&1
+      [ "$(firewall-cmd --query-masquerade --permanent)" = 'yes' ] && info "\n firewalld masquerade $(text 28) $(text 37) \n" || warning "\n firewalld masquerade $(text 28) $(text 38) \n"
+    fi
+
+    # 添加防火墙规则
+    firewall-cmd --add-forward-port=port=$PORT_HOPPING_START-$PORT_HOPPING_END:proto=udp:toport=${PORT_HOPPING_TARGET} --permanent >/dev/null 2>&1
+    firewall-cmd --reload >/dev/null 2>&1
+
+  else
+    if ! [ -x "$(type -p netfilter-persistent)" ]; then
+      info "\n $(text 7) iptables-persistent"
+      ${PACKAGE_INSTALL[int]} iptables-persistent >/dev/null 2>&1
+    fi
+    [ -x "$(type -p netfilter-persistent)" ] || warning "\n $(text 95) \n"
+
+    # 添加防火墙规则
+    iptables --table nat -A PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    ip6tables --table nat -A PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+
+    # 保存当前的 iptables, ip6tables 规则集，以便在开机时恢复
+    [ "$(systemctl is-active netfilter-persistent)" != 'active' ] && warning "\n $(text 96) \n" || netfilter-persistent save 2>/dev/null
+  fi
+}
+
+# 查端口跳跃的 dnat 端口
+check_port_hopping_nat() {
+  PORT_HOPPING_TARGET=$(awk -F [:,] '/"listen_port"/{print $2}' $WORK_DIR/conf/*${NODE_TAG[1]}_inbounds.json)
+  if [ "$SYSTEM" = 'Alpine' ]; then
+    [[ $(iptables --list --table nat 2>/dev/null) =~ 'Sing-box Family Bucket' ]] && PORT_HOPPING_RANGE=$(iptables --table nat -S PREROUTING 2>/dev/null | awk '/Sing-box Family Bucket/ {for (i=0; i<NF; i++) if ($i=="--dport") {print $(i+1); exit}}') && PORT_HOPPING_TARGET=$(iptables --table nat -S PREROUTING 2>/dev/null | awk '/Sing-box Family Bucket/ {for (i=0; i<NF; i++) if ($i=="to") {print $(i+1); exit}}')
+    [ -n "$PORT_HOPPING_RANGE" ] && PORT_HOPPING_START=${PORT_HOPPING_RANGE%:*} && PORT_HOPPING_END=${PORT_HOPPING_RANGE#*:}
+  elif [ "$(systemctl is-active firewalld)" = 'active' ]; then
+    local FIREWALL_LIST=$(firewall-cmd --list-all --permanent | grep "toport=${PORT_HOPPING_TARGET}")
+    [ -n "$FIREWALL_LIST" ] && PORT_HOPPING_START=$(sed "s/.* port=\([^-]\+\)-.*/\1/" <<< "$FIREWALL_LIST") &&
+    PORT_HOPPING_END=$(sed "s/.* port=$PORT_HOPPING_START-\([^:]\+\):.*/\1/" <<< "$FIREWALL_LIST") &&
+    PORT_HOPPING_TARGET=$(sed "s/.*toport=\([^:]\+\):.*/\1/" <<< "$FIREWALL_LIST")
+  else
+    [[ $(iptables --list --table nat) =~ 'Sing-box Family Bucket' ]] && PORT_HOPPING_RANGE=$(iptables --table nat -S PREROUTING | awk '/Sing-box Family Bucket/ {for (i=0; i<NF; i++) if ($i=="--dport") {print $(i+1); exit}}') && PORT_HOPPING_TARGET=$(iptables --table nat -S PREROUTING | awk '/Sing-box Family Bucket/ {for (i=0; i<NF; i++) if ($i=="to") {print $(i+1); exit}}')
+    [ -n "$PORT_HOPPING_RANGE" ] && PORT_HOPPING_START=${PORT_HOPPING_RANGE%:*} && PORT_HOPPING_END=${PORT_HOPPING_RANGE#*:}
+  fi
+}
+
 # 检测 IPv4 IPv6 信息
 check_system_ip() {
   local DEFAULT_LOCAL_INTERFACE=$(ip route show default | awk '/default/ {for (i=0; i<NF; i++) if ($i=="dev") {print $(i+1); exit}}')
   if [ -n "$DEFAULT_LOCAL_INTERFACE" ]; then
     local DEFAULT_LOCAL_IP4=$(ip addr show $DEFAULT_LOCAL_INTERFACE | sed -n 's#.*inet \([^/]\+\)/[0-9]\+.*global.*#\1#gp')
     local DEFAULT_LOCAL_IP6=$(ip addr show $DEFAULT_LOCAL_INTERFACE | sed -n 's#.*inet6 \([^/]\+\)/[0-9]\+.*global.*#\1#gp')
+    [ -n "$DEFAULT_LOCAL_IP4" ] && local BIND_ADDRESS4="--bind-address=$DEFAULT_LOCAL_IP4"
+    [ -n "$DEFAULT_LOCAL_IP6" ] && local BIND_ADDRESS6="--bind-address=$DEFAULT_LOCAL_IP6"
   fi
 
-  [ -n "$DEFAULT_LOCAL_IP4" ] && IP4=$(wget -4 --bind-address=$DEFAULT_LOCAL_IP4 -qO- $BIND_ADDRESS4 --no-check-certificate --user-agent=Mozilla --tries=2 --timeout=1 http://ip-api.com/json/) &&
+  IP4=$(wget -4 $BIND_ADDRESS4 -qO- $BIND_ADDRESS4 --no-check-certificate --user-agent=Mozilla --tries=2 --timeout=1 http://ip-api.com/json/) &&
   WAN4=$(expr "$IP4" : '.*query\":[ ]*\"\([^"]*\).*') &&
   COUNTRY4=$(expr "$IP4" : '.*country\":[ ]*\"\([^"]*\).*') &&
   ASNORG4=$(expr "$IP4" : '.*isp\":[ ]*\"\([^"]*\).*') &&
   [[ "$L" = C && -n "$COUNTRY4" ]] && COUNTRY4=$(translate "$COUNTRY4")
 
-  [ -n "$DEFAULT_LOCAL_IP6" ] && IP6=$(wget -6 --bind-address=$DEFAULT_LOCAL_IP6 -qO- $BIND_ADDRESS6 --no-check-certificate --user-agent=Mozilla --tries=2 --timeout=1 https://api.ip.sb/geoip) &&
+  IP6=$(wget -6 $BIND_ADDRESS6 -qO- $BIND_ADDRESS6 --no-check-certificate --user-agent=Mozilla --tries=2 --timeout=1 https://api.ip.sb/geoip) &&
   WAN6=$(expr "$IP6" : '.*ip\":[ ]*\"\([^"]*\).*') &&
   COUNTRY6=$(expr "$IP6" : '.*country\":[ ]*\"\([^"]*\).*') &&
   ASNORG6=$(expr "$IP6" : '.*isp\":[ ]*\"\([^"]*\).*') &&
@@ -674,6 +801,9 @@ sing-box_variables() {
     DOMAIN_STRATEG=prefer_ipv4
   fi
 
+  # 如选择有 c. hysteria2 时，选择是否使用端口跳跃
+  [[ "${INSTALL_PROTOCOLS[@]}" =~ 'c' ]] && input_hopping_port
+
   # 如选择有 h. vmess + ws 或 i. vless + ws 时，先检测是否有支持的 http 端口可用，如有则要求输入域名和 cdn
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ 'h' ]]; then
     if [ "$IS_ARGO" = 'is_argo' ]; then
@@ -749,8 +879,8 @@ check_dependencies() {
   fi
 
   # 检测 Linux 系统的依赖，升级库并重新安装依赖
-  local DEPS_CHECK=("wget" "tar" "systemctl" "ss" "bash" "openssl")
-  local DEPS_INSTALL=("wget" "tar" "systemctl" "iproute2" "bash" "openssl")
+  local DEPS_CHECK=("wget" "tar" "systemctl" "ss" "bash" "openssl" "iptables" "ip6tables")
+  local DEPS_INSTALL=("wget" "tar" "systemctl" "iproute2" "bash" "openssl" "iptables" "ip6tables")
   for g in "${!DEPS_CHECK[@]}"; do
     [ ! $(type -p ${DEPS_CHECK[g]}) ] && DEPS+=(${DEPS_INSTALL[g]})
   done
@@ -811,6 +941,12 @@ check_firewall_configuration() {
 
 # Nginx 配置文件
 export_nginx_conf_file() {
+  # 在添加协议，需要用到 nginx 的时候，先检测是否已经安装
+  if ! [ -x "$(type -p nginx)" ]; then
+    info "\n $(text 7) nginx"
+    ${PACKAGE_INSTALL[int]} nginx >/dev/null 2>&1
+  fi
+
   NGINX_CONF="user  root;
 worker_processes  auto;
 
@@ -1130,6 +1266,7 @@ EOF
   CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     [ -z "$PORT_HYSTERIA2" ] && PORT_HYSTERIA2=$[START_PORT+$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")]
+    [ "$IS_HOPPING" = 'is_hopping' ] && add_port_hopping_nat $PORT_HOPPING_START $PORT_HOPPING_END $PORT_HYSTERIA2
     NODE_NAME[12]=${NODE_NAME[12]:-"$NODE_NAME_CONFIRM"} && UUID[12]=${UUID[12]:-"$UUID_CONFIRM"}
     cat > $WORK_DIR/conf/12_${NODE_TAG[1]}_inbounds.json << EOF
 {
@@ -1604,7 +1741,7 @@ fetch_nodes_value() {
   [ -s $WORK_DIR/conf/*_${NODE_TAG[0]}_inbounds.json ] && local JSON=$(cat $WORK_DIR/conf/*_${NODE_TAG[0]}_inbounds.json) && NODE_NAME[11]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[0]}.*/\1/p" <<< "$JSON") && PORT_XTLS_REALITY=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[11]=$(awk -F '"' '/"uuid"/{print $4}' <<< "$JSON") && TLS_SERVER[11]=$(awk -F '"' '/"server_name"/{print $4}' <<< "$JSON") && REALITY_PRIVATE[11]=$(awk -F '"' '/"private_key"/{print $4}' <<< "$JSON") && REALITY_PUBLIC[11]=$(awk -F '"' '/"public_key"/{print $4}' <<< "$JSON")
 
   # 获取 Hysteria2 key-value
-  [ -s $WORK_DIR/conf/*_${NODE_TAG[1]}_inbounds.json ] && local JSON=$(cat $WORK_DIR/conf/*_${NODE_TAG[1]}_inbounds.json) && NODE_NAME[12]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[1]}.*/\1/p" <<< "$JSON") && PORT_HYSTERIA2=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[12]=$(awk -F '"' '/"password"/{count++; if (count == 1) {print $4; exit}}' <<< "$JSON")
+  [ -s $WORK_DIR/conf/*_${NODE_TAG[1]}_inbounds.json ] && local JSON=$(cat $WORK_DIR/conf/*_${NODE_TAG[1]}_inbounds.json) && NODE_NAME[12]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[1]}.*/\1/p" <<< "$JSON") && PORT_HYSTERIA2=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[12]=$(awk -F '"' '/"password"/{count++; if (count == 1) {print $4; exit}}' <<< "$JSON") && check_port_hopping_nat
 
   # 获取 Tuic V5 key-value
   [ -s $WORK_DIR/conf/*_${NODE_TAG[2]}_inbounds.json ] && local JSON=$(cat $WORK_DIR/conf/*_${NODE_TAG[2]}_inbounds.json) && NODE_NAME[13]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[2]}.*/\1/p" <<< "$JSON") && PORT_TUIC=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[13]=$(awk -F '"' '/"uuid"/{print $4}' <<< "$JSON") && TUIC_PASSWORD=$(awk -F '"' '/"password"/{print $4}' <<< "$JSON") && TUIC_CONGESTION_CONTROL=$(awk -F '"' '/"congestion_control"/{print $4}' <<< "$JSON")
@@ -1736,10 +1873,14 @@ export_list() {
   local CLASH_SUBSCRIBE+="
   $CLASH_XTLS_REALITY
 "
-  [ -n "$PORT_HYSTERIA2" ] && local CLASH_HYSTERIA2="- {name: \"${NODE_NAME[12]} ${NODE_TAG[1]}\", type: hysteria2, server: ${SERVER_IP}, port: ${PORT_HYSTERIA2}, up: \"200 Mbps\", down: \"1000 Mbps\", password: ${UUID[12]}, skip-cert-verify: true}" &&
-  local CLASH_SUBSCRIBE+="
-  - {name: \"${NODE_NAME[12]} ${NODE_TAG[1]}\", type: hysteria2, server: ${SERVER_IP}, port: ${PORT_HYSTERIA2}, up: \"200 Mbps\", down: \"1000 Mbps\", password: ${UUID[12]}, skip-cert-verify: true}
+  if [ -n "$PORT_HYSTERIA2" ]; then
+    [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && local CLASH_HOPPING=" ports: ${PORT_HOPPING_START}-${PORT_HOPPING_END}, HopInterval: 60,"
+    local CLASH_HYSTERIA2="- {name: \"${NODE_NAME[12]} ${NODE_TAG[1]}\", type: hysteria2, server: ${SERVER_IP}, port: ${PORT_HYSTERIA2},${CLASH_HOPPING} up: \"200 Mbps\", down: \"1000 Mbps\", password: ${UUID[12]}, skip-cert-verify: true}" &&
+    local CLASH_SUBSCRIBE+="
+  $CLASH_HYSTERIA2
 "
+  fi
+
   [ -n "$PORT_TUIC" ] && local CLASH_TUIC="- {name: \"${NODE_NAME[13]} ${NODE_TAG[2]}\", type: tuic, server: ${SERVER_IP}, port: ${PORT_TUIC}, uuid: ${UUID[13]}, password: ${TUIC_PASSWORD}, alpn: [h3], disable-sni: true, reduce-rtt: true, request-timeout: 8000, udp-relay-mode: native, congestion-controller: $TUIC_CONGESTION_CONTROL, skip-cert-verify: true}" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_TUIC
@@ -1758,7 +1899,7 @@ export_list() {
   $CLASH_TROJAN
 "
   if [ -n "$PORT_VMESS_WS" ]; then
-     if [[ "${STATUS[1]}" =~ $(text 27)|$(text 28) ]] || [[ "$IS_ARGO" = 'is_argo' && "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]]; then
+    if [[ "${STATUS[1]}" =~ $(text 27)|$(text 28) ]] || [[ "$IS_ARGO" = 'is_argo' && "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]]; then
       local CLASH_VMESS_WS="- {name: \"${NODE_NAME[17]} ${NODE_TAG[6]}\", type: vmess, server: ${CDN[17]}, port: 80, uuid: ${UUID[17]}, udp: true, tls: false, alterId: 0, cipher: none, skip-cert-verify: true, network: ws, ws-opts: { path: \"/$VMESS_WS_PATH\", headers: {Host: $ARGO_DOMAIN} }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }" &&
       local CLASH_SUBSCRIBE+="
   $CLASH_VMESS_WS
@@ -1826,9 +1967,13 @@ export_list() {
   [ -n "$PORT_XTLS_REALITY" ] && local SHADOWROCKET_SUBSCRIBE+="
 vless://$(echo -n "auto:${UUID[11]}@${SERVER_IP_2}:${PORT_XTLS_REALITY}" | base64 -w0)?remarks=${NODE_NAME[11]} ${NODE_TAG[0]}&obfs=none&tls=1&peer=${TLS_SERVER[11]}&mux=1&pbk=${REALITY_PUBLIC[11]}
 "
-  [ -n "$PORT_HYSTERIA2" ] && local SHADOWROCKET_SUBSCRIBE+="
-hysteria2://${UUID[12]}@${SERVER_IP_2}:${PORT_HYSTERIA2}?insecure=1&obfs=none#${NODE_NAME[12]}%20${NODE_TAG[1]}
+  if [ -n "$PORT_HYSTERIA2" ]; then
+    [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && local SHADOWROCKET_HOPPING="&mport=${PORT_HYSTERIA2},${PORT_HOPPING_START}-${PORT_HOPPING_END}"
+    local SHADOWROCKET_SUBSCRIBE+="
+hysteria2://${UUID[12]}@${SERVER_IP_2}:${PORT_HYSTERIA2}?insecure=1&obfs=none${SHADOWROCKET_HOPPING}#${NODE_NAME[12]}%20${NODE_TAG[1]}
 "
+  fi
+
   [ -n "$PORT_TUIC" ] && local SHADOWROCKET_SUBSCRIBE+="
 tuic://${TUIC_PASSWORD}:${UUID[13]}@${SERVER_IP_2}:${PORT_TUIC}?congestion_control=$TUIC_CONGESTION_CONTROL&udp_relay_mode=native&alpn=h3&allow_insecure=1#${NODE_NAME[13]}%20${NODE_TAG[2]}
 "
@@ -2018,9 +2163,12 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?encryption=none&security
 ----------------------------
 vless://${UUID[11]}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?security=reality&sni=${TLS_SERVER[11]}&fp=chrome&pbk=${REALITY_PUBLIC[11]}&type=tcp&encryption=none#${NODE_NAME[11]}%20${NODE_TAG[0]}"
 
-  [ -n "$PORT_HYSTERIA2" ] && local NEKOBOX_SUBSCRIBE+="
+  if [ -n "$PORT_HYSTERIA2" ]; then
+    [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && NEKOBOX_HOPPING="mport=${PORT_HOPPING_START}-${PORT_HOPPING_END}&"
+    local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-hy2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}?insecure=1#${NODE_NAME[12]} ${NODE_TAG[1]}"
+hy2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}?${NEKOBOX_HOPPING}insecure=1#${NODE_NAME[12]} ${NODE_TAG[1]}"
+  fi
 
   [ -n "$PORT_TUIC" ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
@@ -2441,45 +2589,56 @@ change_protocols() {
   REINSTALL_PORTS=(${KEEP_PORTS[@]} ${ADD_PORTS[@]})
 
   CHECK_PROTOCOLS=b
-  # 获取原始 Reality 配置信息
+  # 获取 Reality 端口
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_XTLS_REALITY=${REINSTALL_PORTS[POSITION]}
+  else
+    unset PORT_XTLS_REALITY
   fi
 
-  # 获取原始 Hysteria2 配置信息
+  # 获取 Hysteria2 端口
   CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_HYSTERIA2=${REINSTALL_PORTS[POSITION]}
+    [ -z "${PORT_HOPPING_START}${PORT_HOPPING_END}" ] && input_hopping_port
+  else
+    unset PORT_HYSTERIA2
   fi
 
-  # 获取原始 Tuic V5 配置信息
+  # 获取 Tuic V5 端口
   CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_TUIC=${REINSTALL_PORTS[POSITION]}
+  else
+    unset PORT_TUIC
   fi
 
-  # 获取原始 ShadowTLS 配置信息
+  # 获取 ShadowTLS 端口
   CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_SHADOWTLS=${REINSTALL_PORTS[POSITION]}
   fi
 
-  # 获取原始 Shadowsocks 配置信息
+  # 获取 Shadowsocks 端口
   CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_SHADOWSOCKS=${REINSTALL_PORTS[POSITION]}
+  else
+    unset PORT_SHADOWSOCKS
   fi
 
-  # 获取原始 Trojan 配置信息
+  # 获取 Trojan 端口
   CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_TROJAN=${REINSTALL_PORTS[POSITION]}
+  else
+    unset PORT_TROJAN
   fi
 
   # 获取 ws 的 argo 或者 origin 状态
@@ -2492,7 +2651,7 @@ change_protocols() {
     local ARGO_ORIGIN_RULES_STATUS=no_argo_no_origin
   fi
 
-  # 获取原始 vmess + ws 配置信息
+  # 获取 vmess + ws 配置信息
   CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     local DOMAIN_ERROR_TIME=5
@@ -2504,8 +2663,10 @@ change_protocols() {
         done
       elif [ "$ARGO_ORIGIN_RULES_STATUS" = 'no_argo_no_origin' ]; then
         [ -z "$ARGO_OR_ORIGIN_RULES" ] && hint "\n $(text 57) " && reading "\n $(text 24) " ARGO_OR_ORIGIN_RULES
-        [ "$ARGO_OR_ORIGIN_RULES" = '2' ] && IS_ARGO=no_argo || IS_ARGO=is_argo
+        [ "$ARGO_OR_ORIGIN_RULES" != '2' ] && ARGO_OR_ORIGIN_RULES=1 && IS_ARGO=is_argo || IS_ARGO=no_argo
         if [ "$IS_ARGO" = 'is_argo' ]; then
+          # 如果原来没有 nginx 配置，需要获取 nginx 端口信息
+          [ -z "$PORT_NGINX"  ] && input_nginx_port
           until [ -n "$ARGO_RUNS" ]; do
             input_argo_auth is_add_protocols
             [ -n "$ARGO_RUNS" ] && local ARGO_READY=argo_ready && break
@@ -2521,9 +2682,11 @@ change_protocols() {
     fi
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_VMESS_WS=${REINSTALL_PORTS[POSITION]}
+  else
+    unset PORT_VMESS_WS
   fi
 
-  # 获取原始 vless + ws + tls 配置信息
+  # 获取 vless + ws + tls 配置信息
   CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     local DOMAIN_ERROR_TIME=5
@@ -2535,8 +2698,10 @@ change_protocols() {
         done
       elif [ "$ARGO_ORIGIN_RULES_STATUS" = 'no_argo_no_origin' ]; then
         [ -z "$ARGO_OR_ORIGIN_RULES" ] && hint "\n $(text 57) " && reading "\n $(text 24) " ARGO_OR_ORIGIN_RULES
-        [ "$ARGO_OR_ORIGIN_RULES" = '2' ] && IS_ARGO=no_argo || IS_ARGO=is_argo
+        [ "$ARGO_OR_ORIGIN_RULES" != '2' ] && ARGO_OR_ORIGIN_RULES=1 && IS_ARGO=is_argo || IS_ARGO=no_argo
         if [ "$IS_ARGO" = 'is_argo' ]; then
+           # 如果原来没有 nginx 配置，需要获取 nginx 端口信息
+          [ -z "$PORT_NGINX"  ] && input_nginx_port
           until [ -n "$ARGO_RUNS" ]; do
             [ "$ARGO_READY" != 'argo_ready' ] && input_argo_auth is_add_protocols
             [ -n "$ARGO_RUNS" ] && local ARGO_READY=argo_ready && break
@@ -2552,23 +2717,29 @@ change_protocols() {
     fi
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_VLESS_WS=${REINSTALL_PORTS[POSITION]}
+  else
+    unset PORT_VLESS_WS
   fi
 
   # 如之前没有 ws，现新增的 ws，则输入 cdn
   [[ "${#CDN[@]}" = '0' && ( "$ARGO_READY" = 'argo_ready' || "$ORIGIN_READY" = 'origin_ready' ) ]] && input_cdn
 
-  # 获取原始 H2 + Reality 配置信息
+  # 获取 H2 + Reality 端口
   CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_H2_REALITY=${REINSTALL_PORTS[POSITION]}
+  else
+    unset PORT_H2_REALITY
   fi
 
-  # 获取原始 gRPC + Reality 配置信息
+  # 获取 gRPC + Reality 端口
   CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_GRPC_REALITY=${REINSTALL_PORTS[POSITION]}
+  else
+    PORT_GRPC_REALITY
   fi
 
   # 停止 sing-box 服务
@@ -2592,10 +2763,16 @@ change_protocols() {
     [ -s $WORK_DIR/tunnel.json ] && rm -f $WORK_DIR/tunnel.*
   fi
 
+  # 如有需要，删除 hysteria2 跳跃端口
+  ! ls $WORK_DIR/conf/*${NODE_TAG[1]}_inbounds.json >/dev/null 2>&1 && del_port_hopping_nat
+
+  # 如有需要，删除 nginx 配置文件
+  ! ls /etc/systemd/system/argo.service >/dev/null 2>&1 && [[ -s $WORK_DIR/nginx.conf && "$IS_SUB" = 'no_sub' ]] && IS_ARGO=no_argo && rm -f $WORK_DIR/nginx.conf
+
   # 运行 sing-box
   cmd_systemctl enable sing-box
 
-  # 再次检测状态，运行 Sing-box
+  # 再次检测状态，运行 sing-box
   check_install
 
   check_sing-box_status
@@ -2603,7 +2780,7 @@ change_protocols() {
   export_list
 }
 
-# 卸载 Sing-box 全家桶
+# 卸载 sing-box 全家桶
 uninstall() {
   if [ -d $WORK_DIR ]; then
     [ -s /etc/systemd/system/argo.service ] && ( cmd_systemctl disable argo 2>/dev/null; rm -f /etc/systemd/system/argo.service )
@@ -2615,6 +2792,7 @@ uninstall() {
     sleep 1
     [[ -s $WORK_DIR/nginx.conf && $(ps -ef | grep 'nginx' | wc -l) -le 1 ]] && reading "\n $(text 83) " REMOVE_NGINX
     [ "${REMOVE_NGINX,,}" = 'y' ] && ${PACKAGE_UNINSTALL[int]} nginx >/dev/null 2>&1
+    [ "$IS_HOPPING" = 'is_hopping' ] && del_port_hopping_nat
     rm -rf $WORK_DIR $TEMP_DIR /etc/systemd/system/sing-box.service /usr/bin/sb
     info "\n $(text 16) \n"
   else
@@ -2764,9 +2942,6 @@ ALL_PARAMETER=($(sed -E 's/(-c|-e|-C|-E) //; s/=([^"])/ \1/g; s/sudo cloudflared
 [[ "${#ALL_PARAMETER[@]}" > 13 && "${ALL_PARAMETER[@]^^}" == *"--LANGUAGE"* && "${ALL_PARAMETER[@]^^}" == *"--CHOOSE_PROTOCOLS"* && "${ALL_PARAMETER[@]^^}" == *"--START_PORT"* && "${ALL_PARAMETER[@]^^}" == *"--PORT_NGINX"* && "${ALL_PARAMETER[@]^^}" == *"--SERVER_IP"* && "${ALL_PARAMETER[@]^^}" == *"--UUID"* && "${ALL_PARAMETER[@]^^}" == *"--NODE_NAME"* ]] && NONINTERACTIVE_INSTALL=noninteractive_install
 
 # 传参处理，无交互快速安装参数
-# 预设默认值
-IS_SUB=no_sub
-IS_ARGO=no_argo
 for z in ${!ALL_PARAMETER[@]}; do
   case "${ALL_PARAMETER[z]^^}" in
     -P )
@@ -2845,6 +3020,10 @@ for z in ${!ALL_PARAMETER[@]}; do
     --ARGO_AUTH )
       ((z++)); ARGO_AUTH=${ALL_PARAMETER[z]}
       ;;
+    --PORT_HOPPING_RANGE )
+      ((z++)); [[ "${ALL_PARAMETER[z]//:/-}" =~ ^[1-6][0-9]{4}-[1-6][0-9]{4}$ ]] && PORT_HOPPING_RANGE=${ALL_PARAMETER[z]//-/:} && PORT_HOPPING_START=${ALL_PARAMETER[z]%:*} && PORT_HOPPING_END=${ALL_PARAMETER[z]#*:}
+      [[ "$PORT_HOPPING_START" < "$PORT_HOPPING_END" && "$PORT_HOPPING_START" -ge "$MIN_HOPPING_PORT" && "$PORT_HOPPING_END" -le "$MAX_HOPPING_PORT" ]] && IS_HOPPING=is_hopping
+      ;;
   esac
 done
 
@@ -2855,6 +3034,11 @@ check_dependencies
 check_system_ip
 check_install
 if [ "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]; then
+  # 预设默认值
+  IS_SUB=${IS_SUB:-'no_sub'}
+  IS_ARGO=${IS_ARGO:-'no_argo'}
+  IS_HOPPING=${IS_HOPPING:-'no_hoppinng'}
+
   install_sing-box
   export_list install
   create_shortcut

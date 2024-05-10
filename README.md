@@ -19,6 +19,8 @@
 
 * * *
 ## 1.更新信息
+2024.05.09 v1.2.4 Add hysteria2 port hopping. Supported Clients: ShadowRocket / NekoBox / Clash; 添加 hysteria2 的跳跃端口，支持客户端: ShadowRocket / NekoBox / Clash
+
 2024.05.06 v1.2.3 Automatically detects native IPv4 and IPv6 for warp-installed machines to minimize interference with warp ip; 对于已安装 warp 机器，自动识别原生的 IPv4 和 IPv6，以减少受 warp ip 的干扰
 
 2024.05.03 v1.2.2 Complete 8 non-interactive installation modes, direct output results. Suitable for mass installation scenarios. You can put the commands in the favorites of the ssh software. Please refer to the README.md description for details. 完善8种无交互安装模式，直接输出结果，适合大量装机的情景，可以把命令放在 ssh 软件的收藏夹，详细请参考README.md 说明
@@ -139,7 +141,8 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --VLESS_HOST_DOMAIN vless.test.com \
   --UUID_CONFIRM 20f7fca4-86e5-4ddf-9eed-24142073d197 \
   --SUBSCRIBE=true \
-  --NODE_NAME_CONFIRM bundle
+  --PORT_HOPPING_RANGE 50000:51000 \
+  --NODE_NAME_CONFIRM bucket
 ```
 
 </details>
@@ -159,7 +162,8 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --VMESS_HOST_DOMAIN vmess.test.com \
   --VLESS_HOST_DOMAIN vless.test.com \
   --UUID_CONFIRM 20f7fca4-86e5-4ddf-9eed-24142073d197 \
-  --NODE_NAME_CONFIRM bundle
+  --PORT_HOPPING_RANGE 50000:51000 \
+  --NODE_NAME_CONFIRM bucket
 ```
 </details>
 
@@ -178,7 +182,8 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --UUID_CONFIRM 20f7fca4-86e5-4ddf-9eed-24142073d197 \
   --SUBSCRIBE=true \
   --ARGO=true \
-  --NODE_NAME_CONFIRM bundle
+  --PORT_HOPPING_RANGE 50000:51000 \
+  --NODE_NAME_CONFIRM bucket
 ```
 </details>
 
@@ -196,7 +201,8 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --CDN dash.cloudflare.com \
   --UUID_CONFIRM 20f7fca4-86e5-4ddf-9eed-24142073d197 \
   --ARGO=true \
-  --NODE_NAME_CONFIRM bundle
+  --PORT_HOPPING_RANGE 50000:51000 \
+  --NODE_NAME_CONFIRM bucket
 ```
 </details>
 
@@ -217,7 +223,8 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --ARGO=true \
   --ARGO_DOMAIN=sb.argo.com \
   --ARGO_AUTH='{"AccountTag":"9cc9e3e4d8f29d2a02e297f14f20513a","TunnelSecret":"6AYfKBOoNlPiTAuWg64ZwujsNuERpWLm6pPJ2qpN8PM=","TunnelID":"1ac55430-f4dc-47d5-a850-bdce824c4101"}' \
-  --NODE_NAME_CONFIRM bundle
+  --PORT_HOPPING_RANGE 50000:51000 \
+  --NODE_NAME_CONFIRM bucket
 ```
 </details>
 
@@ -237,7 +244,8 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --ARGO=true \
   --ARGO_DOMAIN=sb.argo.com \
   --ARGO_AUTH='{"AccountTag":"9cc9e3e4d8f29d2a02e297f14f20513a","TunnelSecret":"6AYfKBOoNlPiTAuWg64ZwujsNuERpWLm6pPJ2qpN8PM=","TunnelID":"1ac55430-f4dc-47d5-a850-bdce824c4101"}' \
-  --NODE_NAME_CONFIRM bundle
+  --PORT_HOPPING_RANGE 50000:51000 \
+  --NODE_NAME_CONFIRM bucket
 ```
 </details>
 
@@ -258,7 +266,8 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --ARGO=true \
   --ARGO_DOMAIN=sb.argo.com \
   --ARGO_AUTH='sudo cloudflared service install eyJhIjoiOWNjOWUzZTRkOGYyOWQyYTAyZTI5N2YxNGYyMDUxM2EiLCJ0IjoiOGNiZDA4ZjItNGM0MC00OGY1LTlmZDYtZjlmMWQ0YTcxMjUyIiwicyI6IllXWTFORGN4TW1ZdE5HTXdZUzAwT0RaakxUbGxNMkl0Wm1VMk5URTFOR0l4TkdKayJ9' \
-  --NODE_NAME_CONFIRM bundle
+  --PORT_HOPPING_RANGE 50000:51000 \
+  --NODE_NAME_CONFIRM bucket
 ```
 </details>
 
@@ -278,7 +287,8 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --ARGO=true \
   --ARGO_DOMAIN=sb.argo.com \
   --ARGO_AUTH='sudo cloudflared service install eyJhIjoiOWNjOWUzZTRkOGYyOWQyYTAyZTI5N2YxNGYyMDUxM2EiLCJ0IjoiOGNiZDA4ZjItNGM0MC00OGY1LTlmZDYtZjlmMWQ0YTcxMjUyIiwicyI6IllXWTFORGN4TW1ZdE5HTXdZUzAwT0RaakxUbGxNMkl0Wm1VMk5URTFOR0l4TkdKayJ9' \
-  --NODE_NAME_CONFIRM bundle
+  --PORT_HOPPING_RANGE 50000:51000 \
+  --NODE_NAME_CONFIRM bucket
 ```
 </details>
 
@@ -298,6 +308,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 | --ARGO | 是否使用 Argo Tunnel，如果是填 true，如果使用 Origin rules，则可以忽略本 Key |
 | --ARGO_DOMAIN | 固定 Argo 域名，即是 Json 或者 Token 隧道的域名 |
 | --ARGO_AUTH | Json 或者 Token 隧道的内容 |
+| --PORT_HOPPING_RANGE | hysteria2 跳跃端口范围，如 50000:51000 |
 | --NODE_NAME_CONFIRM | 节点名 |
 
 
