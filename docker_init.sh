@@ -67,7 +67,7 @@ install() {
   local CDN=${CDN:-"skk.moe"}
 
   # 检测是否解锁 chatGPT
-  local SUPPORT_COUNTRY='AL DZ AD AO AG AR AM AU AT AZ BS BD BB BE BZ BJ BT BO BA BW BR BN BG BF CV CA CL CO KM CG CR CI HR CY CZ DK DJ DM DO EC SV EE FJ FI FR GA GM GE DE GH GR GD GT GN GW GY HT VA HN HU IS IN ID IQ IE IL IT JM JP JO KZ KE KI KW KG LV LB LS LR LI LT LU MG MW MY MV ML MT MH MR MU MX FM MD MC MN ME MA MZ MM NA NR NP NL NZ NI NE NG MK NO OM PK PW PS PA PG PY PE PH PL PT QA RO RW KN LC VC WS SM ST SN RS SC SL SG SK SI SB ZA KR ES LK SR SE CH TW TZ TH TL TG TO TT TN TR TV UG UA AE GB US UY VU ZM'
+  local SUPPORT_COUNTRY='AD AE AF AG AL AM AO AR AT AU AZ BA BB BD BE BF BG BH BI BJ BN BO BR BS BT BW BZ CA CD CF CG CH CI CL CM CO CR CV CY CZ DE DJ DK DM DO DZ EC EE EG ER ES ET FI FJ FM FR GA GB GD GE GH GM GN GQ GR GT GW GY HN HR HT HU ID IE IL IN IQ IS IT JM JO JP KE KG KH KI KM KN KR KW KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MG MH MK ML MM MN MR MT MU MV MW MX MY MZ NA NE NG NI NL NO NP NR NZ OM PA PE PG PH PK PL PS PT PW PY QA RO RS RW SA SB SC SD SE SG SI SK SL SM SN SO SR SS ST SV SZ TD TG TH TJ TL TM TN TO TR TT TV TW TZ UA UG US UY UZ VA VC VN VU WS YE ZA ZM ZW'
   [[ "${SUPPORT_COUNTRY}" =~ $(wget -qO- --tries=3 --timeout=2 https://chat.openai.com/cdn-cgi/trace | awk -F '=' '/loc/{print $2}') ]] && { CHAT_GPT_OUT_V4=direct && CHAT_GPT_OUT_V6=direct; } || { CHAT_GPT_OUT_V4=warp-IPv4-out && CHAT_GPT_OUT_V6=warp-IPv6-out ; }
 
   # 生成 dns 配置
@@ -612,6 +612,7 @@ EOF
   # 生成 supervisord 配置文件
   mkdir -p /etc/supervisor.d
   SUPERVISORD_CONF="[supervisord]
+user=root
 nodaemon=true
 logfile=/dev/null
 pidfile=/run/supervisord.pid
@@ -751,6 +752,15 @@ stdout_logfile=/dev/null
 
   echo "$NGINX_CONF" > /etc/nginx/nginx.conf
 
+  # IPv6 时的 IP 处理
+  if [[ "$SERVER_IP" =~ : ]]; then
+    SERVER_IP_1="[$SERVER_IP]"
+    SERVER_IP_2="[[$SERVER_IP]]"
+  else
+    SERVER_IP_1="$SERVER_IP"
+    SERVER_IP_2="$SERVER_IP"
+  fi
+
   # 生成各订阅文件
   # 生成 Clash proxy providers 订阅文件
   local CLASH_SUBSCRIBE='proxies:'
@@ -805,7 +815,7 @@ stdout_logfile=/dev/null
 vless://$(echo -n "auto:${UUID}@${SERVER_IP_2}:${PORT_XTLS_REALITY}" | base64 -w0)?remarks=${NODE_NAME} xtls-reality&obfs=none&tls=1&peer=addons.mozilla.org&mux=1&pbk=${REALITY_PUBLIC}
 "
   [ "${HYSTERIA2}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
-hysteria2://${UUID}@${SERVER_IP_2}:${PORT_HYSTERIA2}?insecure=1&obfs=none#${NODE_NAME}%20hysteria2
+hysteria2://${UUID}@${SERVER_IP_1}:${PORT_HYSTERIA2}?insecure=1&obfs=none#${NODE_NAME}%20hysteria2
 "
   [ "${TUIC}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
 tuic://${UUID}:${UUID}@${SERVER_IP_2}:${PORT_TUIC}?congestion_control=bbr&udp_relay_mode=native&alpn=h3&allow_insecure=1#${NODE_NAME}%20tuic
@@ -825,7 +835,7 @@ vmess://$(echo -n "none:${UUID}@${CDN}:80" | base64 -w0)?remarks=${NODE_NAME}%20
 "
   [ "${VLESS_WS}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
 ----------------------------
-vless://$(echo -n "auto:${UUID}@${CDN}:443" | base64 -w0)?remarks=${NODE_NAME}%20vless-ws-tls&obfsParam=$ v&path=/${UUID}-vless?ed=2048&obfs=websocket&tls=1&peer=${ARGO_DOMAIN}&allowInsecure=1
+vless://$(echo -n "auto:${UUID}@${CDN}:443" | base64 -w0)?remarks=${NODE_NAME} vless-ws-tls&obfsParam=${ARGO_DOMAIN}&path=/${UUID}-vless?ed=2048&obfs=websocket&tls=1&peer=${ARGO_DOMAIN}&allowInsecure=1
 "
   [ "${H2_REALITY}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
 ----------------------------
@@ -1016,7 +1026,7 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=addons.
 
   [ "${H2_REALITY}" = 'true' ] &&
   local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME} h2-reality\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_H2_REALITY}, \"uuid\":\"${UUID}\", \"tls\": { \"enabled\":true, \"server_name\":\"addons.mozilla.org\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC}\", \"short_id\":\"\" } }, \"packet_encoding\": \"xudp\", \"transport\": { \"type\": \"http\" } }," &&
-  local NODE_REPLACE+="\"${REALITY_H2_NODE} h2-reality\","
+  local NODE_REPLACE+="\"${NODE_NAME} h2-reality\","
 
   [ "${GRPC_REALITY}" = 'true' ] &&
   local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME} grpc-reality\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_GRPC_REALITY}, \"uuid\":\"${UUID}\", \"tls\": { \"enabled\":true, \"server_name\":\"addons.mozilla.org\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC}\", \"short_id\":\"\" } }, \"packet_encoding\": \"xudp\", \"transport\": { \"type\": \"grpc\", \"service_name\": \"grpc\" } }," &&

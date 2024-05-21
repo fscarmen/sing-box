@@ -126,7 +126,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 ### 方式2. KV 传参，举例
 
 <details>
-    <summary> 使用 Origin Rule + 订阅</summary>
+    <summary> 使用 Origin Rule + 订阅（点击即可展开或收起）</summary>
 <br>
 
 ```
@@ -148,7 +148,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 </details>
 
 <details>
-    <summary> 使用 Origin Rule ，不要订阅 </summary>
+    <summary> 使用 Origin Rule ，不要订阅（点击即可展开或收起）</summary>
 <br>
 
 ```
@@ -168,7 +168,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 </details>
 
 <details>
-    <summary> 使用 Argo 临时隧道 + 订阅 </summary>
+    <summary> 使用 Argo 临时隧道 + 订阅（点击即可展开或收起）</summary>
 <br>
 
 ```
@@ -188,7 +188,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 </details>
 
 <details>
-    <summary> 使用 Argo 临时隧道，不要订阅 </summary>
+    <summary> 使用 Argo 临时隧道，不要订阅（点击即可展开或收起）</summary>
 <br>
 
 ```
@@ -207,7 +207,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 </details>
 
 <details>
-    <summary> 使用 Argo Json 隧道 + 订阅 </summary>
+    <summary> 使用 Argo Json 隧道 + 订阅（点击即可展开或收起）</summary>
 <br>
 
 ```
@@ -229,7 +229,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 </details>
 
 <details>
-    <summary> 使用 Argo Json 隧道，不要订阅 </summary>
+    <summary> 使用 Argo Json 隧道，不要订阅（点击即可展开或收起）</summary>
 <br>
 
 ```
@@ -250,7 +250,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 </details>
 
 <details>
-    <summary> 使用 Argo Token 隧道 + 订阅 </summary>
+    <summary> 使用 Argo Token 隧道 + 订阅（点击即可展开或收起）</summary>
 <br>
 
 ```
@@ -272,7 +272,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 </details>
 
 <details>
-    <summary> 使用 Argo Token 隧道，不要订阅 </summary>
+    <summary> 使用 Argo Token 隧道，不要订阅（点击即可展开或收起）</summary>
 <br>
 
 ```
@@ -338,7 +338,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 * 需要20个连续可用的端口，以 `START_PORT` 开始第一个
 
 <details>
-    <summary> Docker 部署 </summary>
+    <summary> Docker 部署（点击即可展开或收起）</summary>
 <br>
 
 ```
@@ -369,7 +369,7 @@ docker run -dit \
 </details>
 
 <details>
-    <summary> Docker Compose 部署 </summary>
+    <summary> Docker Compose 部署（点击即可展开或收起）</summary>
 <br>
 
 ```
