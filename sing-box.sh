@@ -4,7 +4,7 @@
 VERSION='v1.2.4 (2024.05.09)'
 
 # 各变量默认值
-GH_PROXY='https://ghproxy.agrayman.gay/'
+GH_PROXY='https://ghproxy.lvedong.eu.org/'
 TEMP_DIR='/tmp/sing-box'
 WORK_DIR='/etc/sing-box'
 START_PORT_DEFAULT='8881'
@@ -16,12 +16,12 @@ TLS_SERVER_DEFAULT=addons.mozilla.org
 PROTOCOL_LIST=("XTLS + reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess + ws" "vless + ws + tls" "H2 + reality" "gRPC + reality")
 NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess-ws" "vless-ws-tls" "h2-reality" "grpc-reality")
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
-CDN_DOMAIN=("cn.azhz.eu.org" "acjp.cloudflarest.link" "xn--b6gac.eu.org" "dash.cloudflare.com" "skk.moe" "visa.com")
+CDN_DOMAIN=("cn.azhz.eu.org" "acjp2.cloudflarest.link" "xn--b6gac.eu.org" "dash.cloudflare.com" "skk.moe" "visa.com")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
 
 export DEBIAN_FRONTEND=noninteractive
 
-trap "rm -rf $TEMP_DIR >/dev/null 2>&1 ; echo -e '\n' ;exit 1" INT QUIT TERM EXIT
+trap "rm -rf $TEMP_DIR >/dev/null 2>&1 ; echo -e '\n' ;exit" INT QUIT TERM EXIT
 
 mkdir -p $TEMP_DIR
 
@@ -484,7 +484,7 @@ check_install() {
 
   # 检测是否安装其他 sing-box systemd 状态，和是否其他一键脚本
   if [ -s /etc/systemd/system/sing-box.service ]; then
-   SYSTEMD_EXECSTART=$(grep '^ExecStart=' /etc/systemd/system/sing-box.service)
+    SYSTEMD_EXECSTART=$(grep '^ExecStart=' /etc/systemd/system/sing-box.service)
     case "$SYSTEMD_EXECSTART" in
       'ExecStart=/etc/sing-box/sing-box run -C /etc/sing-box/conf/' )
         [ "$(systemctl is-active sing-box)" = 'active' ] && STATUS[0]=$(text 28) || STATUS[0]=$(text 27)
@@ -504,15 +504,24 @@ check_install() {
       * )
         SING_BOX_SCRIPT='Unknown or customized sing-box' && error "\n $(text 99) \n"
     esac
+  elif [ -s /lib/systemd/system/sing-box.service ]; then
+    SYSTEMD_EXECSTART=$(grep '^ExecStart=' /lib/systemd/system/sing-box.service)
+    case "$SYSTEMD_EXECSTART" in
+      'ExecStart=/etc/sing-box/bin/sing-box run -c /etc/sing-box/config.json -C /etc/sing-box/conf' )
+        SING_BOX_SCRIPT='233boy/sing-box' && error "\n $(text 99) \n"
+        ;;
+      * )
+        SING_BOX_SCRIPT='Unknown or customized sing-box' && error "\n $(text 99) \n"
+    esac
   else
     STATUS[0]=$(text 26)
   fi
 
   if [ "${STATUS[0]}" = "$(text 26)" ] && [ ! -s $WORK_DIR/sing-box ]; then
     {
-    local VERSION_LATEST=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v-]' '/tag_name/{print $5}' | sort -r | sed -n '1p')
+    local VERSION_LATEST=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v-]' '/tag_name/{print $5}' | sort -Vr | sed -n '1p')
     local ONLINE=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
-    ONLINE=${ONLINE:-'1.9.0-rc.18'}
+    ONLINE=${ONLINE:-'1.10.0-alpha.13'}
     wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box >/dev/null 2>&1
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
     wget --no-check-certificate --continue -qO $TEMP_DIR/jq ${GH_PROXY}https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$JQ_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/jq >/dev/null 2>&1
@@ -920,10 +929,10 @@ check_dependencies() {
     [ ! -x "$(type -p ${DEPS_CHECK[g]})" ] && DEPS+=(${DEPS_INSTALL[g]})
   done
 
-  if [ "$IS_CENTOS" = 'CentOS7' ]; then
-    yum repolist | grep -q epef || DEPS+=(epel-release)
-    [ ! -x "$(type -p firewalld)" ] && DEPS+=(firewalld)
-  elif [ "$IS_CENTOS" = 'CentOS8' ]; then
+  if [ "$SYSTEM" = 'CentOS' ]; then
+    if [ "$IS_CENTOS" = 'CentOS7' ]; then
+      yum repolist | grep -q epef || DEPS+=(epel-release)
+    fi
     [ ! -x "$(type -p firewalld)" ] && DEPS+=(firewalld)
   else
     [ ! -x "$(type -p iptables)" ] && DEPS+=(iptables)
@@ -934,6 +943,12 @@ check_dependencies() {
   if [[ "${#DEPS[@]}" > 0 ]]; then
     [[ ! "$SYSTEM" =~ Alpine|CentOS ]] && ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
     ${PACKAGE_INSTALL[int]} ${DEPS[@]} >/dev/null 2>&1
+    # 如新安装 firewalld，设置允许所有端口的 TCP 和 UDP 入站连接
+    if [[ "${DEPS[@]}" =~ 'firewalld' ]]; then
+      firewall-cmd --add-port=0-65535/tcp --permanent >/dev/null 2>&1
+      firewall-cmd --add-port=0-65535/udp --permanent >/dev/null 2>&1
+      firewall-cmd --reload >/dev/null 2>&1
+    fi
   else
     info "\n $(text 8) \n"
   fi
@@ -2849,7 +2864,7 @@ uninstall() {
 
 # Sing-box 的最新版本
 version() {
-  local VERSION_LATEST=$(wget --no-check-certificate -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v-]' '/tag_name/{print $5}' | sort -r | sed -n '1p')
+  local VERSION_LATEST=$(wget --no-check-certificate -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v-]' '/tag_name/{print $5}' | sort -Vr | sed -n '1p')
   local ONLINE=$(wget --no-check-certificate -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
   local LOCAL=$($WORK_DIR/sing-box version | awk '/version/{print $NF}')
   info "\n $(text 40) "
