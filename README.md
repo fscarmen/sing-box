@@ -19,18 +19,20 @@
 
 * * *
 ## 1.更新信息
+2024.08.06 v1.2.5 Add detection of TCP brutal. Sing-box will not use this module if not installed. 增加 TCP brutal 的检测，如果没有安装，Sing-box 将不使用该模块
+
 2024.05.09 v1.2.4 Add hysteria2 port hopping. Supported Clients: ShadowRocket / NekoBox / Clash; 添加 hysteria2 的跳跃端口，支持客户端: ShadowRocket / NekoBox / Clash
 
 2024.05.06 v1.2.3 Automatically detects native IPv4 and IPv6 for warp-installed machines to minimize interference with warp ip; 对于已安装 warp 机器，自动识别原生的 IPv4 和 IPv6，以减少受 warp ip 的干扰
-
-2024.05.03 v1.2.2 Complete 8 non-interactive installation modes, direct output results. Suitable for mass installation scenarios. You can put the commands in the favorites of the ssh software. Please refer to the README.md description for details. 完善8种无交互安装模式，直接输出结果，适合大量装机的情景，可以把命令放在 ssh 软件的收藏夹，详细请参考README.md 说明
-
-2024.04.16 v1.2.1 1. Fix the bug of dynamically adding and removing protocols; 2. CentOS 7 add EPEL to install nginx; 1. 修复动态增加和删除协议的 bug; 2. CentOS 7 增加 EPEL 软件仓库，以便安装 Nginx
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
 <br>
 
+>2024.05.03 v1.2.2 Complete 8 non-interactive installation modes, direct output results. Suitable for mass installation scenarios. You can put the commands in the favorites of the ssh software. Please refer to the README.md description for details. 完善8种无交互安装模式，直接输出结果，适合大量装机的情景，可以把命令放在 ssh 软件的收藏夹，详细请参考README.md 说明
+>
+>2024.04.16 v1.2.1 1. Fix the bug of dynamically adding and removing protocols; 2. CentOS 7 add EPEL to install nginx; 1. 修复动态增加和删除协议的 bug; 2. CentOS 7 增加 EPEL 软件仓库，以便安装 Nginx
+>
 >2024.04.12 v1.2.0 1. Add Cloudflare Argo Tunnel, so that 10 protocols, including the transport mode of ws, no longer need to bring our own domain; 2. Cloudflare Argo Tunnel supports try, Json and Token methods. Use of [sb -t] online switching; 3. Cloudflare Argo Tunnel switch is [sb -a], and the Sing-box switch is changed from [sb -o] to [sb -s]; 4. If Json or Token Argo is used, the subscription address is the domain name; 5. For details: https://github.com/fscarmen/sing-box; 1. 增加 Cloudflare Argo Tunnel，让包括传输方式为ws在内的10个协议均不再需要自带域名; 2. Cloudflare Argo Tunnel 支持临时、Json 和 Token 方式，支持使用 [sb -t] 在线切换; 3.  Cloudflare Argo Tunnel 开关为 [sb -a]，Sing-box 开关从 [sb -o] 更换为 [sb -s]; 4. 若使用 Json 或者 Token 固定域名 Argo，则订阅地址则使用该域名; 5. 详细参考: https://github.com/fscarmen/sing-box
 >
 >2024.04.01 sing-box + argo container version is newly launched, for details: https://github.com/fscarmen/sing-box; sing-box 全家桶 + argo 容器版本全新上线，详细参考: https://github.com/fscarmen/sing-box

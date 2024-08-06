@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.4 (2024.05.09)'
+VERSION='v1.2.5 (2024.08.06)'
 
 # 各变量默认值
 GH_PROXY='https://ghproxy.lvedong.eu.org/'
@@ -16,7 +16,7 @@ TLS_SERVER_DEFAULT=addons.mozilla.org
 PROTOCOL_LIST=("XTLS + reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess + ws" "vless + ws + tls" "H2 + reality" "gRPC + reality")
 NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess-ws" "vless-ws-tls" "h2-reality" "grpc-reality")
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
-CDN_DOMAIN=("cn.azhz.eu.org" "acjp2.cloudflarest.link" "xn--b6gac.eu.org" "dash.cloudflare.com" "skk.moe" "visa.com")
+CDN_DOMAIN=("acjp2.cloudflarest.link" "vps-jdkz.tk" "xn--b6gac.eu.org" "dash.cloudflare.com" "skk.moe" "visa.com")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
 
 export DEBIAN_FRONTEND=noninteractive
@@ -27,8 +27,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="Add hysteria2 port hopping. Supported Clients: ShadowRocket / NekoBox / Clash"
-C[1]="添加 hysteria2 的跳跃端口，支持客户端: ShadowRocket / NekoBox / Clash"
+E[1]="Add detection of TCP brutal. Sing-box will not use this module if not installed."
+C[1]="增加 TCP brutal 的检测，如果没有安装，Sing-box 将不使用该模块"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -153,12 +153,12 @@ E[62]="Add / Remove protocols (sb -r)"
 C[62]="增加 / 删除协议 (sb -r)"
 E[63]="(1/3) Installed protocols."
 C[63]="(1/3) 已安装的协议"
-E[64]="Please select the protocols to be removed (multiple selections possible):"
-C[64]="请选择需要删除的协议（可以多选）:"
+E[64]="Please select the protocols to be removed (multiple selections possible. Press Enter to skip):"
+C[64]="请选择需要删除的协议（可以多选，回车跳过）:"
 E[65]="(2/3) Uninstalled protocols."
 C[65]="(2/3) 未安装的协议"
-E[66]="Please select the protocols to be added (multiple choices possible):"
-C[66]="请选择需要增加的协议（可以多选）:"
+E[66]="Please select the protocols to be added (multiple choices possible. Press Enter to skip):"
+C[66]="请选择需要增加的协议（可以多选，回车跳过）:"
 E[67]="(3/3) Confirm all protocols for reloading."
 C[67]="(3/3) 确认重装的所有协议"
 E[68]="Press [n] if there is an error, other keys to continue:"
@@ -219,8 +219,8 @@ E[95]="netfilter-persistent installation failed, but the installation progress w
 C[95]="netfilter-persistent安装失败,但安装进度不会停止。PortHopping转发规则为临时规则,重启可能失效"
 E[96]="netfilter-persistent is not started, PortHopping forwarding rules cannot be persisted. Reboot the system, the rules will be invalidated, please manually execute [netfilter-persistent save], continue the script does not affect the subsequent configuration."
 C[96]="netfilter-persistent未启动，PortHopping转发规则无法持久化，重启系统，规则将会失效，请手动执行 [netfilter-persistent save],继续运行脚本不影响后续配置"
-E[97]="Port Hopping/Multiple Ports (Port Hopping) function needs to occupy multiple ports, please make sure that these ports are not listening to other services \n Tip1: The number of ports should not be too many, the recommended number is about 1000, the minimum value: $MIN_HOPPING_PORT, the maximum value: $MAX_HOPPING_PORT.\n Tip2: nat machines have a limited number of ports to listen on, usually 20-30. If setting ports out of the nat range will cause the node to not work, please use with caution!\n This function is not used by default."
-C[97]="端口跳跃/多端口(Port Hopping)功能需要占用多个端口，请保证这些端口没有监听其他服务\n Tip1: 端口选择数量不宜过多，推荐1000个左右，最小值:$MIN_HOPPING_PORT，最大值: $MAX_HOPPING_PORT\n Tip2: nat 鸡由于可用于监听的端口有限，一般为20-30个。如设置了不开放的端口会导致节点不通，请慎用！\n 默认不使用该功能"
+E[97]="Port Hopping/Multiple: Users sometimes report that their ISPs block or throttle persistent UDP connections. However, these restrictions often only apply to the specific port being used. Port hopping can be used as a workaround for this situation. This function needs to occupy multiple ports, please make sure that these ports are not listening to other services. \n Tip1: The number of ports should not be too many, the recommended number is about 1000, the minimum value: $MIN_HOPPING_PORT, the maximum value: $MAX_HOPPING_PORT.\n Tip2: nat machines have a limited number of ports to listen on, usually 20-30. If setting ports out of the nat range will cause the node to not work, please use with caution!\n This function is not used by default."
+C[97]="端口跳跃/多端口(Port Hopping)介绍: 用户有时报告运营商会阻断或限速 UDP 连接。不过，这些限制往往仅限单个端口。端口跳跃可用作此情况的解决方法。该功能需要占用多个端口，请保证这些端口没有监听其他服务\n Tip1: 端口选择数量不宜过多，推荐1000个左右，最小值:$MIN_HOPPING_PORT，最大值: $MAX_HOPPING_PORT\n Tip2: nat 鸡由于可用于监听的端口有限，一般为20-30个。如设置了不开放的端口会导致节点不通，请慎用！\n 默认不使用该功能"
 E[98]="Enter the port range, e.g. 50000:51000. Leave blank to disable:"
 C[98]="请输入端口范围，例如 50000:51000，如要禁用请留空:"
 E[99]="The \${SING_BOX_SCRIPT} is detected to be installed. Script exits."
@@ -233,14 +233,6 @@ info() { echo -e "\033[32m\033[01m$*\033[0m"; }   # 绿色
 hint() { echo -e "\033[33m\033[01m$*\033[0m"; }   # 黄色
 reading() { read -rp "$(info "$1")" "$2"; }
 text() { grep -q '\$' <<< "${E[$*]}" && eval echo "\$(eval echo "\${${L}[$*]}")" || eval echo "\${${L}[$*]}"; }
-
-# 自定义谷歌翻译函数，使用两个翻译 api，如均不能翻译，则返回原英文
-translate() {
-  [ -n "$@" ] && local EN="$@"
-  [ -z "$ZH" ] && local ZH=$(curl -km8 -sSL "https://translate.google.com/translate_a/t?client=any_client_id_works&sl=en&tl=zh&q=${EN//[[:space:]]/%20}" 2>/dev/null | awk -F '"' '{print $2}')
-  [ -z "$ZH" ] && local ZH=$(curl -km8 -sSL "https://findmyip.net/api/translate.php?text=${EN//[[:space:]]/%20}" 2>/dev/null | awk -F '"' '{print $16}')
-  [ -z "$ZH" ] && echo "$EN" || echo "$ZH"
-}
 
 # 检测是否需要启用 Github CDN，如能直接连通，则不使用
 check_cdn() {
@@ -256,7 +248,7 @@ check_chatgpt() {
 
 # 脚本当天及累计运行次数统计
 statistics_of_run-times() {
-  local COUNT=$(wget --no-check-certificate -qO- --tries=2 --timeout=2 "https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh" 2>&1 | grep -m1 -oE "[0-9]+[ ]+/[ ]+[0-9]+") &&
+  local COUNT=$(wget --no-check-certificate -qO- --tries=2 --timeout=2 "https://hit.forvps.gq/https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh" 2>&1 | grep -m1 -oE "[0-9]+[ ]+/[ ]+[0-9]+") &&
   TODAY=$(awk -F ' ' '{print $1}' <<< "$COUNT") &&
   TOTAL=$(awk -F ' ' '{print $3}' <<< "$COUNT")
 }
@@ -474,6 +466,12 @@ check_arch() {
   esac
 }
 
+# 检查系统是否已经安装 tcp-brutal
+check_brutal() {
+  IS_BRUTAL=false && [ -x "$(type -p lsmod)" ] && lsmod | grep -q brutal && IS_BRUTAL=true
+  [ "$IS_BRUTAL" = 'false' ] && [ -x "$(type -p modprobe)" ] && modprobe brutal 2>/dev/null && IS_BRUTAL=true
+}
+
 # 查安装及运行状态，下标0: sing-box，下标1: argo，下标2：docker；状态码: 26 未安装， 27 已安装未运行， 28 运行中
 check_install() {
   [[ "$IS_SUB" = 'is_sub' || -s $WORK_DIR/subscribe/qr ]] && IS_SUB=is_sub || IS_SUB=no_sub
@@ -533,7 +531,7 @@ check_install() {
     STATUS[1]=$(text 26) && IS_ARGO=no_argo && [ -s /etc/systemd/system/argo.service ] && IS_ARGO=is_argo && STATUS[1]=$(text 27) && [ "$(systemctl is-active argo)" = 'active' ] && STATUS[1]=$(text 28)
   fi
   if [ -s /etc/systemd/system/argo.service ]; then
-    local ARGO_CONTENT=$(cat /etc/systemd/system/argo.service)
+    local ARGO_CONTENT=$(grep '^ExecStart' /etc/systemd/system/argo.service)
     if grep -q '\--token' <<< "$ARGO_CONTENT"; then
       ARGO_TYPE=is_token_argo
     elif grep -q '\--config' <<< "$ARGO_CONTENT"; then
@@ -737,26 +735,25 @@ check_port_hopping_nat() {
 
 # 检测 IPv4 IPv6 信息
 check_system_ip() {
+  [ "$L" = 'C' ] && local IS_CHINESE='?lang=zh-CN'
   local DEFAULT_LOCAL_INTERFACE4=$(ip -4 route show default | awk '/default/ {for (i=0; i<NF; i++) if ($i=="dev") {print $(i+1); exit}}')
   local DEFAULT_LOCAL_INTERFACE6=$(ip -6 route show default | awk '/default/ {for (i=0; i<NF; i++) if ($i=="dev") {print $(i+1); exit}}')
-  if [ -n "$DEFAULT_LOCAL_INTERFACE" ]; then
-    local DEFAULT_LOCAL_IP4=$(ip -4 addr show $DEFAULT_LOCAL_INTERFACE | sed -n 's#.*inet \([^/]\+\)/[0-9]\+.*global.*#\1#gp')
-    local DEFAULT_LOCAL_IP6=$(ip -6 addr show $DEFAULT_LOCAL_INTERFACE | sed -n 's#.*inet6 \([^/]\+\)/[0-9]\+.*global.*#\1#gp')
+  if [ -n ""${DEFAULT_LOCAL_INTERFACE4}${DEFAULT_LOCAL_INTERFACE6}"" ]; then
+    local DEFAULT_LOCAL_IP4=$(ip -4 addr show $DEFAULT_LOCAL_INTERFACE4 | sed -n 's#.*inet \([^/]\+\)/[0-9]\+.*global.*#\1#gp')
+    local DEFAULT_LOCAL_IP6=$(ip -6 addr show $DEFAULT_LOCAL_INTERFACE6 | sed -n 's#.*inet6 \([^/]\+\)/[0-9]\+.*global.*#\1#gp')
     [ -n "$DEFAULT_LOCAL_IP4" ] && local BIND_ADDRESS4="--bind-address=$DEFAULT_LOCAL_IP4"
     [ -n "$DEFAULT_LOCAL_IP6" ] && local BIND_ADDRESS6="--bind-address=$DEFAULT_LOCAL_IP6"
   fi
 
-  IP4=$(wget -4 $BIND_ADDRESS4 -qO- --no-check-certificate --user-agent=Mozilla --tries=2 --timeout=1 http://ip-api.com/json/) &&
-  WAN4=$(expr "$IP4" : '.*query\":[ ]*\"\([^"]*\).*') &&
-  COUNTRY4=$(expr "$IP4" : '.*country\":[ ]*\"\([^"]*\).*') &&
-  ASNORG4=$(expr "$IP4" : '.*isp\":[ ]*\"\([^"]*\).*') &&
-  [[ "$L" = C && -n "$COUNTRY4" ]] && COUNTRY4=$(translate "$COUNTRY4")
+  WAN4=$(wget $BIND_ADDRESS4 -qO- --no-check-certificate --tries=2 --timeout=2 http://api-ipv4.ip.sb)
+  [ -n "$WAN4" ] && local IP4_JSON=$(wget -qO- --no-check-certificate --tries=2 --timeout=2 https://ip.forvps.gq/${WAN4}${IS_CHINESE}) &&
+  COUNTRY4=$(sed -En 's/.*"country":[ ]*"([^"]+)".*/\1/p' <<< "$IP4_JSON") &&
+  ASNORG4=$(sed -En 's/.*"(isp|asn_org)":[ ]*"([^"]+)".*/\2/p' <<< "$IP4_JSON")
 
-  IP6=$(wget -6 $BIND_ADDRESS6 -qO- --no-check-certificate --user-agent=Mozilla --tries=2 --timeout=1 https://api.ip.sb/geoip) &&
-  WAN6=$(expr "$IP6" : '.*ip\":[ ]*\"\([^"]*\).*') &&
-  COUNTRY6=$(expr "$IP6" : '.*country\":[ ]*\"\([^"]*\).*') &&
-  ASNORG6=$(expr "$IP6" : '.*isp\":[ ]*\"\([^"]*\).*') &&
-  [[ "$L" = C && -n "$COUNTRY6" ]] && COUNTRY6=$(translate "$COUNTRY6")
+  WAN6=$(wget $BIND_ADDRESS6 -qO- --no-check-certificate --tries=2 --timeout=2 http://api-ipv6.ip.sb)
+  [ -n "$WAN6" ] && local IP6_JSON=$(wget -qO- --no-check-certificate --tries=2 --timeout=2 https://ip.forvps.gq/${WAN6}${IS_CHINESE}) &&
+  COUNTRY6=$(sed -En 's/.*"country":[ ]*"([^"]+)".*/\1/p' <<< "$IP6_JSON") &&
+  ASNORG6=$(sed -En 's/.*"(isp|asn_org)":[ ]*"([^"]+)".*/\2/p' <<< "$IP6_JSON")
 }
 
 # 输入起始 port 函数
@@ -1308,7 +1305,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -1435,7 +1432,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -1467,7 +1464,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -1507,7 +1504,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -1554,7 +1551,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -1608,7 +1605,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -1662,7 +1659,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -1717,7 +1714,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -2291,7 +2288,7 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
 
   # 生成 Sing-box 订阅文件
   [ -n "$PORT_XTLS_REALITY" ] &&
-  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[11]} ${NODE_TAG[0]}\", \"server\":\"${SERVER_IP}\", \"server_port\":${PORT_XTLS_REALITY}, \"uuid\":\"${UUID[11]}\", \"flow\":\"\", \"packet_encoding\":\"xudp\", \"tls\":{ \"enabled\":true, \"server_name\":\"${TLS_SERVER[11]}\", \"utls\":{ \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[11]}\", \"short_id\":\"\" } }, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[11]} ${NODE_TAG[0]}\", \"server\":\"${SERVER_IP}\", \"server_port\":${PORT_XTLS_REALITY}, \"uuid\":\"${UUID[11]}\", \"flow\":\"\", \"packet_encoding\":\"xudp\", \"tls\":{ \"enabled\":true, \"server_name\":\"${TLS_SERVER[11]}\", \"utls\":{ \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[11]}\", \"short_id\":\"\" } }, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
   local NODE_REPLACE+="\"${NODE_NAME[11]} ${NODE_TAG[0]}\","
 
   [ -n "$PORT_HYSTERIA2" ] &&
@@ -2304,21 +2301,21 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
   local NODE_REPLACE+="\"${NODE_NAME[13]} ${NODE_TAG[2]}\","
 
   [ -n "$PORT_SHADOWTLS" ] &&
-  local SHADOWTLS_INBOUND=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[14]} ${NODE_TAG[3]}\", \"method\": \"$SHADOWTLS_METHOD\", \"password\": \"$SHADOWTLS_PASSWORD\", \"detour\": \"shadowtls-out\", \"udp_over_tcp\": false, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } }, { \"type\": \"shadowtls\", \"tag\": \"shadowtls-out\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_SHADOWTLS}, \"version\": 3, \"password\": \"${UUID[14]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER[14]}\", \"utls\": { \"enabled\": true, \"fingerprint\": \"chrome\" } } }," &&
+  local SHADOWTLS_INBOUND=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[14]} ${NODE_TAG[3]}\", \"method\": \"$SHADOWTLS_METHOD\", \"password\": \"$SHADOWTLS_PASSWORD\", \"detour\": \"shadowtls-out\", \"udp_over_tcp\": false, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }, { \"type\": \"shadowtls\", \"tag\": \"shadowtls-out\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_SHADOWTLS}, \"version\": 3, \"password\": \"${UUID[14]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER[14]}\", \"utls\": { \"enabled\": true, \"fingerprint\": \"chrome\" } } }," &&
   local INBOUND_REPLACE+="${SHADOWTLS_INBOUND}" &&
   local NODE_REPLACE+="\"${NODE_NAME[14]} ${NODE_TAG[3]}\","
 
   [ -n "$PORT_SHADOWSOCKS" ] &&
-  local INBOUND_REPLACE+=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[15]} ${NODE_TAG[4]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_SHADOWSOCKS, \"method\": \"${SHADOWSOCKS_METHOD}\", \"password\": \"${UUID[15]}\", \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[15]} ${NODE_TAG[4]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_SHADOWSOCKS, \"method\": \"${SHADOWSOCKS_METHOD}\", \"password\": \"${UUID[15]}\", \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
   local NODE_REPLACE+="\"${NODE_NAME[15]} ${NODE_TAG[4]}\","
 
   [ -n "$PORT_TROJAN" ] &&
-  local INBOUND_REPLACE+=" { \"type\": \"trojan\", \"tag\": \"${NODE_NAME[16]} ${NODE_TAG[5]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_TROJAN, \"password\": \"$TROJAN_PASSWORD\", \"tls\": { \"enabled\":true, \"insecure\": true, \"server_name\":\"\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"trojan\", \"tag\": \"${NODE_NAME[16]} ${NODE_TAG[5]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_TROJAN, \"password\": \"$TROJAN_PASSWORD\", \"tls\": { \"enabled\":true, \"insecure\": true, \"server_name\":\"\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
   local NODE_REPLACE+="\"${NODE_NAME[16]} ${NODE_TAG[5]}\","
 
   if [ -n "$PORT_VMESS_WS" ]; then
      if [[ "${STATUS[1]}" =~ $(text 27)|$(text 28) ]] || [[ "$IS_ARGO" = 'is_argo' && "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]]; then
-      local INBOUND_REPLACE+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${CDN[17]}\", \"server_port\":80, \"uuid\":\"${UUID[17]}\", \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$ARGO_DOMAIN\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } }," && local NODE_REPLACE+="\"${NODE_NAME[17]} ${NODE_TAG[6]}\","
+      local INBOUND_REPLACE+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${CDN[17]}\", \"server_port\":80, \"uuid\":\"${UUID[17]}\", \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$ARGO_DOMAIN\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," && local NODE_REPLACE+="\"${NODE_NAME[17]} ${NODE_TAG[6]}\","
       [ "$ARGO_TYPE" = 'is_token_argo' ] && [ -z "$PROMPT" ] && local PROMPT="
   # $(text 94)"
     else
@@ -2327,14 +2324,14 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
       local TYPE_PORT_WS=$PORT_VMESS_WS &&
       local PROMPT+="
       # $(text 52)" &&
-      local INBOUND_REPLACE+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${CDN[17]}\", \"server_port\":80, \"uuid\":\"${UUID[17]}\", \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$VMESS_HOST_DOMAIN\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
+      local INBOUND_REPLACE+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${CDN[17]}\", \"server_port\":80, \"uuid\":\"${UUID[17]}\", \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$VMESS_HOST_DOMAIN\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
     fi
     local NODE_REPLACE+="\"${NODE_NAME[17]} ${NODE_TAG[6]}\","
   fi
 
   if [ -n "$PORT_VLESS_WS" ]; then
     if [[ "${STATUS[1]}" =~ $(text 27)|$(text 28) ]] || [[ "$IS_ARGO" = 'is_argo' && "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]]; then
-      local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[18]} ${NODE_TAG[7]}\", \"server\":\"${CDN[18]}\", \"server_port\":443, \"uuid\":\"${UUID[18]}\", \"tls\": { \"enabled\":true, \"server_name\":\"$ARGO_DOMAIN\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VLESS_WS_PATH\", \"headers\": { \"Host\": \"$ARGO_DOMAIN\" }, \"max_early_data\":2048, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
+      local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[18]} ${NODE_TAG[7]}\", \"server\":\"${CDN[18]}\", \"server_port\":443, \"uuid\":\"${UUID[18]}\", \"tls\": { \"enabled\":true, \"server_name\":\"$ARGO_DOMAIN\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VLESS_WS_PATH\", \"headers\": { \"Host\": \"$ARGO_DOMAIN\" }, \"max_early_data\":2048, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
       [ "$ARGO_TYPE" = 'is_token_argo' ] && [ -z "$PROMPT" ] && local PROMPT="
   # $(text 94)"
     else
@@ -2343,7 +2340,7 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
       local TYPE_PORT_WS=$PORT_VLESS_WS &&
       local PROMPT+="
       # $(text 52)" &&
-      local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[18]} ${NODE_TAG[7]}\", \"server\":\"${CDN[18]}\", \"server_port\":443, \"uuid\":\"${UUID[18]}\", \"tls\": { \"enabled\":true, \"server_name\":\"$VLESS_HOST_DOMAIN\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VLESS_WS_PATH\", \"headers\": { \"Host\": \"$VLESS_HOST_DOMAIN\" }, \"max_early_data\":2048, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
+      local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[18]} ${NODE_TAG[7]}\", \"server\":\"${CDN[18]}\", \"server_port\":443, \"uuid\":\"${UUID[18]}\", \"tls\": { \"enabled\":true, \"server_name\":\"$VLESS_HOST_DOMAIN\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VLESS_WS_PATH\", \"headers\": { \"Host\": \"$VLESS_HOST_DOMAIN\" }, \"max_early_data\":2048, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
     fi
     local NODE_REPLACE+="\"${NODE_NAME[18]} ${NODE_TAG[7]}\","
   fi
@@ -3003,7 +3000,17 @@ for z in ${!ALL_PARAMETER[@]}; do
       ((z++)); START_PORT=${ALL_PARAMETER[z]}; check_install; [ "${STATUS[0]}" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; change_start_port; exit 0
       ;;
     -S )
-      check_install; [ "${STATUS[0]}" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; [ "${STATUS[0]}" = "$(text 28)" ] && ( cmd_systemctl disable sing-box; [[ "$(systemctl is-active sing-box)" =~ 'inactive'|'unknown' ]] && info "\n Sing-box $(text 27) $(text 37)" ) || ( cmd_systemctl enable sing-box && [ "$(systemctl is-active sing-box)" = 'active' ] && info "\n Sing-box $(text 28) $(text 37)" ); exit 0
+      check_install;
+      if [ "${STATUS[0]}" = "$(text 26)" ];then
+        error "\n Sing-box $(text 26) "
+      elif [ "${STATUS[0]}" = "$(text 28)" ]; then
+        cmd_systemctl disable sing-box
+        [[ "$(systemctl is-active sing-box)" =~ 'inactive'|'unknown' ]] && info "\n Sing-box $(text 27) $(text 37)"
+      elif [ "${STATUS[0]}" = "$(text 27)" ]; then
+        cmd_systemctl enable sing-box
+        [ "$(systemctl is-active sing-box)" = 'active' ] && info "\n Sing-box $(text 28) $(text 37)"
+      fi
+      exit 0
       ;;
     -A )
       check_install; [ "${STATUS[1]}" = "$(text 26)" ] && error "\n Argo $(text 26) "; [ "${STATUS[1]}" = "$(text 28)" ] && ( cmd_systemctl disable argo; [[ "$(systemctl is-active argo)" =~ 'inactive'|'unknown' ]] && info "\n Argo $(text 27) $(text 37)" ) || ( cmd_systemctl enable argo && sleep 2 && [ "$(systemctl is-active argo)" = 'active' ] && info "\n Argo $(text 28) $(text 37)" && ( grep -q '\--url' /etc/systemd/system/argo.service && fetch_quicktunnel_domain && export_list ) ); exit 0
@@ -3087,6 +3094,7 @@ check_arch
 check_system_info
 check_dependencies
 check_system_ip
+check_brutal
 check_install
 if [ "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]; then
   # 预设默认值
