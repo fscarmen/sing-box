@@ -2315,7 +2315,7 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
 
   if [ -n "$PORT_VMESS_WS" ]; then
      if [[ "${STATUS[1]}" =~ $(text 27)|$(text 28) ]] || [[ "$IS_ARGO" = 'is_argo' && "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]]; then
-      local INBOUND_REPLACE+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${CDN[17]}\", \"server_port\":80, \"uuid\":\"${UUID[17]}\", \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$ARGO_DOMAIN\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," && local NODE_REPLACE+="\"${NODE_NAME[17]} ${NODE_TAG[6]}\","
+      local INBOUND_REPLACE+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${CDN[17]}\", \"server_port\":80, \"uuid\":\"${UUID[17]}\", \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$ARGO_DOMAIN\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
       [ "$ARGO_TYPE" = 'is_token_argo' ] && [ -z "$PROMPT" ] && local PROMPT="
   # $(text 94)"
     else
@@ -2986,6 +2986,7 @@ statistics_of_run-times
 
 select_language
 check_system_info
+check_brutal
 
 # 可以是 Key Value 或者 Key=Value 的形式。传参时，
 # 传参处理1: 把所有的 = 变为空格，但保留 =" ，因为 Json TunnelSecret 是 =" 结尾的，如 {"AccountTag":"9cc9e3e4d8f29d2a02e297f14f20513a","TunnelSecret":"6AYfKBOoNlPiTAuWg64ZwujsNuERpWLm6pPJ2qpN8PM=","TunnelID":"1ac55430-f4dc-47d5-a850-bdce824c4101"}
@@ -3000,7 +3001,7 @@ for z in ${!ALL_PARAMETER[@]}; do
       ((z++)); START_PORT=${ALL_PARAMETER[z]}; check_install; [ "${STATUS[0]}" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; change_start_port; exit 0
       ;;
     -S )
-      check_install;
+      check_install
       if [ "${STATUS[0]}" = "$(text 26)" ];then
         error "\n Sing-box $(text 26) "
       elif [ "${STATUS[0]}" = "$(text 28)" ]; then
@@ -3013,7 +3014,21 @@ for z in ${!ALL_PARAMETER[@]}; do
       exit 0
       ;;
     -A )
-      check_install; [ "${STATUS[1]}" = "$(text 26)" ] && error "\n Argo $(text 26) "; [ "${STATUS[1]}" = "$(text 28)" ] && ( cmd_systemctl disable argo; [[ "$(systemctl is-active argo)" =~ 'inactive'|'unknown' ]] && info "\n Argo $(text 27) $(text 37)" ) || ( cmd_systemctl enable argo && sleep 2 && [ "$(systemctl is-active argo)" = 'active' ] && info "\n Argo $(text 28) $(text 37)" && ( grep -q '\--url' /etc/systemd/system/argo.service && fetch_quicktunnel_domain && export_list ) ); exit 0
+      check_install
+      if [ "${STATUS[1]}" = "$(text 26)" ]; then
+        error "\n Argo $(text 26) "
+      elif [ "${STATUS[1]}" = "$(text 28)" ]; then
+        cmd_systemctl disable argo
+        [[ "$(systemctl is-active argo)" =~ 'inactive'|'unknown' ]] && info "\n Argo $(text 27) $(text 37)"
+      elif [ "${STATUS[1]}" = "$(text 27)" ]; then
+        cmd_systemctl enable argo
+        sleep 2
+        if [ "$(systemctl is-active argo)" = 'active' ]; then
+          info "\n Argo $(text 28) $(text 37)"
+          grep -q '\--url' /etc/systemd/system/argo.service && fetch_quicktunnel_domain && export_list
+        fi
+      fi
+      exit 0
       ;;
     -T )
       change_argo; exit 0
@@ -3094,7 +3109,6 @@ check_arch
 check_system_info
 check_dependencies
 check_system_ip
-check_brutal
 check_install
 if [ "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]; then
   # 预设默认值
