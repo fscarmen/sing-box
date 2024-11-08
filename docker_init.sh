@@ -36,7 +36,8 @@ check_latest_sing-box() {
 install() {
   # 下载 sing-box
   echo "正在下载 sing-box ..."
-  local ONLINE=$(check_latest_sing-box)
+  #####local ONLINE=$(check_latest_sing-box)
+  local ONLINE='1.11.0-alpha.6'
   wget https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -O- | tar xz -C $WORK_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box && mv $WORK_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $WORK_DIR/sing-box && rm -rf $WORK_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH
 
   # 下载 jq
@@ -692,7 +693,8 @@ stdout_logfile=/dev/null
       #include /etc/nginx/conf.d/*.conf;
 
     server {
-      listen 127.0.0.1:$START_PORT ssl http2; # sing-box backend
+      listen 127.0.0.1:$START_PORT ssl ; # sing-box backend
+      http2 on;
       server_name addons.mozilla.org;
 
       ssl_certificate            $WORK_DIR/cert/cert.pem;
@@ -702,7 +704,7 @@ stdout_logfile=/dev/null
       ssl_stapling               off;
       ssl_stapling_verify        off;"
 
-  [ "${VMESS_WS}" = 'true' ] && NGINX_CONF+="
+  [ "${VLESS_WS}" = 'true' ] && NGINX_CONF+="
       # 反代 sing-box vless websocket
       location /${UUID}-vless {
         if (\$http_upgrade != "websocket") {
@@ -718,7 +720,7 @@ stdout_logfile=/dev/null
         proxy_redirect                      off;
       }"
 
-  [ "${VLESS_WS}" = 'true' ] && NGINX_CONF+="
+  [ "${VMESS_WS}" = 'true' ] && NGINX_CONF+="
       # 反代 sing-box websocket
       location /${UUID}-vmess {
         if (\$http_upgrade != "websocket") {
@@ -1154,7 +1156,8 @@ $($WORK_DIR/qrencode https://${ARGO_DOMAIN}/${UUID}/auto)
 
 # Sing-box 的最新版本
 update_sing-box() {
-  local ONLINE=$(check_latest_sing-box)
+  #####local ONLINE=$(check_latest_sing-box)
+  local ONLINE='1.11.0-alpha.6'
   local LOCAL=$($WORK_DIR/sing-box version | awk '/version/{print $NF}')
   if [ -n "$ONLINE" ]; then
     if [[ "$ONLINE" != "$LOCAL" ]]; then
