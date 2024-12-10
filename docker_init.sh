@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 脚本更新日期 2024.10.28
+# 脚本更新日期 2024.12.10
 WORK_DIR=/sing-box
 PORT=$START_PORT
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
@@ -36,21 +36,21 @@ check_latest_sing-box() {
 install() {
   # 下载 sing-box
   echo "正在下载 sing-box ..."
-  #####local ONLINE=$(check_latest_sing-box)
-  local ONLINE='1.11.0-alpha.6'
-  wget https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -O- | tar xz -C $WORK_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box && mv $WORK_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $WORK_DIR/sing-box && rm -rf $WORK_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH
+  local ONLINE=$(check_latest_sing-box)
+  local ONLINE=${ONLINE:-'1.11.0-beta.8'}
+  wget https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -O- | tar xz -C ${WORK_DIR} sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box && mv ${WORK_DIR}/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ${WORK_DIR}/sing-box && rm -rf ${WORK_DIR}/sing-box-$ONLINE-linux-$SING_BOX_ARCH
 
   # 下载 jq
   echo "正在下载 jq ..."
-  wget -O $WORK_DIR/jq https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$JQ_ARCH && chmod +x $WORK_DIR/jq
+  wget -O ${WORK_DIR}/jq https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$JQ_ARCH && chmod +x ${WORK_DIR}/jq
 
   # 下载 qrencode
   echo "正在下载 qrencode ..."
-  wget -O $WORK_DIR/qrencode https://github.com/fscarmen/client_template/raw/main/qrencode-go/qrencode-go-linux-$QRENCODE_ARCH && chmod +x $WORK_DIR/qrencode
+  wget -O ${WORK_DIR}/qrencode https://github.com/fscarmen/client_template/raw/main/qrencode-go/qrencode-go-linux-$QRENCODE_ARCH && chmod +x ${WORK_DIR}/qrencode
 
   # 下载 cloudflared
   echo "正在下载 cloudflared ..."
-  wget -O $WORK_DIR/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$ARGO_ARCH && chmod +x $WORK_DIR/cloudflared
+  wget -O ${WORK_DIR}/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$ARGO_ARCH && chmod +x ${WORK_DIR}/cloudflared
 
   # 生成 sing-box 配置文件
   if [[ "$SERVER_IP" =~ : ]]; then
@@ -61,9 +61,9 @@ install() {
     local DOMAIN_STRATEG=prefer_ipv4
   fi
 
-  local REALITY_KEYPAIR=$($WORK_DIR/sing-box generate reality-keypair) && REALITY_PRIVATE=$(awk '/PrivateKey/{print $NF}' <<< "$REALITY_KEYPAIR") && REALITY_PUBLIC=$(awk '/PublicKey/{print $NF}' <<< "$REALITY_KEYPAIR")
-  local SHADOWTLS_PASSWORD=$($WORK_DIR/sing-box generate rand --base64 16)
-  local UUID=${UUID:-"$($WORK_DIR/sing-box generate uuid)"}
+  local REALITY_KEYPAIR=$(${WORK_DIR}/sing-box generate reality-keypair) && REALITY_PRIVATE=$(awk '/PrivateKey/{print $NF}' <<< "$REALITY_KEYPAIR") && REALITY_PUBLIC=$(awk '/PublicKey/{print $NF}' <<< "$REALITY_KEYPAIR")
+  local SHADOWTLS_PASSWORD=$(${WORK_DIR}/sing-box generate rand --base64 16)
+  local UUID=${UUID:-"$(${WORK_DIR}/sing-box generate uuid)"}
   local NODE_NAME=${NODE_NAME:-"sing-box"}
   local CDN=${CDN:-"skk.moe"}
 
@@ -71,526 +71,509 @@ install() {
   local SUPPORT_COUNTRY='AD AE AF AG AL AM AO AR AT AU AZ BA BB BD BE BF BG BH BI BJ BN BO BR BS BT BW BZ CA CD CF CG CH CI CL CM CO CR CV CY CZ DE DJ DK DM DO DZ EC EE EG ER ES ET FI FJ FM FR GA GB GD GE GH GM GN GQ GR GT GW GY HN HR HT HU ID IE IL IN IQ IS IT JM JO JP KE KG KH KI KM KN KR KW KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MG MH MK ML MM MN MR MT MU MV MW MX MY MZ NA NE NG NI NL NO NP NR NZ OM PA PE PG PH PK PL PS PT PW PY QA RO RS RW SA SB SC SD SE SG SI SK SL SM SN SO SR SS ST SV SZ TD TG TH TJ TL TM TN TO TR TT TV TW TZ UA UG US UY UZ VA VC VN VU WS YE ZA ZM ZW'
   [[ "${SUPPORT_COUNTRY}" =~ $(wget -qO- --tries=3 --timeout=2 https://chat.openai.com/cdn-cgi/trace | awk -F '=' '/loc/{print $2}') ]] && { CHAT_GPT_OUT_V4=direct && CHAT_GPT_OUT_V6=direct; } || { CHAT_GPT_OUT_V4=warp-IPv4-out && CHAT_GPT_OUT_V6=warp-IPv6-out ; }
 
-  # 生成 dns 配置
-  cat > $WORK_DIR/conf/00_log.json << EOF
+  # 生成 log 配置
+  cat > ${WORK_DIR}/conf/00_log.json << EOF
 
-  {
-      "log":{
-          "disabled":false,
-
-          "level":"error",
-          "output":"$WORK_DIR/logs/box.log",
-          "timestamp":true
-      }
-  }
+{
+    "log":{
+        "disabled":false,
+        "level":"error",
+        "output":"${WORK_DIR}/logs/box.log",
+        "timestamp":true
+    }
+}
 EOF
 
   # 生成 outbound 配置
-  cat > $WORK_DIR/conf/01_outbounds.json << EOF
-  {
-      "outbounds":[
-          {
+  cat > ${WORK_DIR}/conf/01_outbounds.json << EOF
+{
+    "outbounds":[
+        {
+            "type":"direct",
+            "tag":"direct",
+            "domain_strategy":"$DOMAIN_STRATEG"
+        }
+    ]
+}
+EOF
 
-              "type":"direct",
-              "tag":"direct",
-              "domain_strategy":"${DOMAIN_STRATEG}"
-          },
-          {
-              "type":"direct",
-              "tag":"warp-IPv4-out",
-              "detour":"wireguard-out",
-              "domain_strategy":"ipv4_only"
-          },
-          {
-              "type":"direct",
-              "tag":"warp-IPv6-out",
-              "detour":"wireguard-out",
-              "domain_strategy":"ipv6_only"
-          },
-          {
-              "type":"wireguard",
-              "tag":"wireguard-out",
-              "server":"${WARP_ENDPOINT}",
-              "server_port":2408,
-              "local_address":[
-                  "172.16.0.2/32",
-                  "2606:4700:110:8a36:df92:102a:9602:fa18/128"
-              ],
-              "private_key":"YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY=",
-              "peer_public_key":"bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
-              "reserved":[
-                  78,
-                  135,
-                  76
-              ],
-              "mtu":1280
-          },
-          {
-              "type":"block",
-              "tag":"block"
-          }
-      ]
-  }
+  # 生成 endpoint 配置
+  cat > ${WORK_DIR}/conf/02_endpoints.json << EOF
+{
+    "endpoints":[
+        {
+            "type":"wireguard",
+            "tag":"wireguard-ep",
+            "mtu":1280,
+            "address":[
+                "172.16.0.2/32",
+                "2606:4700:110:8a36:df92:102a:9602:fa18/128"
+            ],
+            "private_key":"YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY=",
+            "peers": [
+              {
+                "address": "${WARP_ENDPOINT}",
+                "port":2408,
+                "public_key":"bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+                "allowed_ips": [
+                  "0.0.0.0/0",
+                  "::/0"
+                ],
+                "reserved":[
+                    78,
+                    135,
+                    76
+                ]
+              }
+            ]
+        }
+    ]
+}
 EOF
 
   # 生成 route 配置
-  cat > $WORK_DIR/conf/02_route.json << EOF
-  {
-      "route":{
-          "rule_set":[
-              {
-                  "tag":"geosite-openai",
-                  "type":"remote",
-                  "format":"binary",
-                  "url":"https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs"
-              }
-          ],
-          "rules":[
-              {
-                  "domain":"api.openai.com",
-                  "outbound":"${CHAT_GPT_OUT_V4}"
-              },
-              {
-                  "rule_set":"geosite-openai",
-                  "outbound":"${CHAT_GPT_OUT_V6}"
-              }
-          ]
-      }
-  }
+  cat > ${WORK_DIR}/conf/03_route.json << EOF
+{
+    "route":{
+        "rule_set":[
+            {
+                "tag":"geosite-openai",
+                "type":"remote",
+                "format":"binary",
+                "url":"https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs"
+            }
+        ],
+        "rules":[
+            {
+                "action": "sniff"
+            },
+            {
+                "domain":"api.openai.com",
+                "outbound":"${CHAT_GPT_OUT_V4}"
+            },
+            {
+                "rule_set":"geosite-openai",
+                "outbound":"${CHAT_GPT_OUT_V6}"
+            }
+        ]
+    }
+}
 EOF
 
   # 生成缓存文件
-  cat > $WORK_DIR/conf/03_experimental.json << EOF
-  {
-      "experimental": {
-          "cache_file": {
-              "enabled": true,
-              "path": "$WORK_DIR/cache.db"
-          }
-      }
-  }
+  cat > ${WORK_DIR}/conf/04_experimental.json << EOF
+{
+    "experimental": {
+        "cache_file": {
+            "enabled": true,
+            "path": "${WORK_DIR}/cache.db"
+        }
+    }
+}
 EOF
 
   # 生成 dns 配置文件
-  cat > $WORK_DIR/conf/04_dns.json << EOF
-  {
-      "dns":{
-          "servers":[
-              {
-                  "address":"local"
-              }
-          ]
-      }
-  }
+  cat > ${WORK_DIR}/conf/05_dns.json << EOF
+{
+    "dns":{
+        "servers":[
+            {
+                "address":"local"
+            }
+        ]
+    }
+}
 EOF
 
   # 生成 XTLS + Reality 配置
-  [ "${XTLS_REALITY}" = 'true' ] && ((PORT++)) && PORT_XTLS_REALITY=$PORT && cat > $WORK_DIR/conf/11_xtls-reality_inbounds.json << EOF
-  //  "public_key":"${REALITY_PUBLIC}"
-  {
-      "inbounds":[
-          {
-              "type":"vless",
-              "sniff":true,
-              "sniff_override_destination":true,
-              "tag":"${NODE_NAME} xtls-reality",
-              "listen":"::",
-              "listen_port":${PORT_XTLS_REALITY},
-              "users":[
-                  {
-                      "uuid":"${UUID}",
-                      "flow":""
-                  }
-              ],
-              "tls":{
-                  "enabled":true,
-                  "server_name":"addons.mozilla.org",
-                  "reality":{
-                      "enabled":true,
-                      "handshake":{
-                          "server":"addons.mozilla.org",
-                          "server_port":443
-                      },
-                      "private_key":"${REALITY_PRIVATE}",
-                      "short_id":[
-                          ""
-                      ]
-                  }
-              },
-              "multiplex":{
-                  "enabled":true,
-                  "padding":true,
-                  "brutal":{
-                      "enabled":true,
-                      "up_mbps":1000,
-                      "down_mbps":1000
-                  }
-              }
-          }
-      ]
-  }
+  [ "${XTLS_REALITY}" = 'true' ] && ((PORT++)) && PORT_XTLS_REALITY=$PORT && cat > ${WORK_DIR}/conf/11_xtls-reality_inbounds.json << EOF
+//  "public_key":"${REALITY_PUBLIC}"
+{
+    "inbounds":[
+        {
+            "type":"vless",
+            "tag":"${NODE_NAME} xtls-reality",
+            "listen":"::",
+            "listen_port":${PORT_XTLS_REALITY},
+            "users":[
+                {
+                    "uuid":"${UUID}",
+                    "flow":""
+                }
+            ],
+            "tls":{
+                "enabled":true,
+                "server_name":"addons.mozilla.org",
+                "reality":{
+                    "enabled":true,
+                    "handshake":{
+                        "server":"addons.mozilla.org",
+                        "server_port":443
+                    },
+                    "private_key":"${REALITY_PRIVATE}",
+                    "short_id":[
+                        ""
+                    ]
+                }
+            },
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
+            }
+        }
+    ]
+}
 EOF
 
   # 生成 Hysteria2 配置
-  [ "${HYSTERIA2}" = 'true' ] && ((PORT++)) && PORT_HYSTERIA2=$PORT && cat > $WORK_DIR/conf/12_hysteria2_inbounds.json << EOF
-  {
-      "inbounds":[
-          {
-              "type":"hysteria2",
-              "sniff":true,
-              "sniff_override_destination":true,
-              "tag":"${NODE_NAME} hysteria2",
-              "listen":"::",
-              "listen_port":${PORT_HYSTERIA2},
-              "users":[
-                  {
-                      "password":"${UUID}"
-                  }
-              ],
-              "ignore_client_bandwidth":false,
-              "tls":{
-                  "enabled":true,
-                  "server_name":"",
-                  "alpn":[
-                      "h3"
-                  ],
-                  "min_version":"1.3",
-                  "max_version":"1.3",
-                  "certificate_path":"$WORK_DIR/cert/cert.pem",
-                  "key_path":"$WORK_DIR/cert/private.key"
-              }
-          }
-      ]
-  }
+  [ "${HYSTERIA2}" = 'true' ] && ((PORT++)) && PORT_HYSTERIA2=$PORT && cat > ${WORK_DIR}/conf/12_hysteria2_inbounds.json << EOF
+{
+    "inbounds":[
+        {
+            "type":"hysteria2",
+            "tag":"${NODE_NAME} hysteria2",
+            "listen":"::",
+            "listen_port":${PORT_HYSTERIA2},
+            "users":[
+                {
+                    "password":"${UUID}"
+                }
+            ],
+            "ignore_client_bandwidth":false,
+            "tls":{
+                "enabled":true,
+                "server_name":"",
+                "alpn":[
+                    "h3"
+                ],
+                "min_version":"1.3",
+                "max_version":"1.3",
+                "certificate_path":"${WORK_DIR}/cert/cert.pem",
+                "key_path":"${WORK_DIR}/cert/private.key"
+            }
+        }
+    ]
+}
 EOF
 
   # 生成 Tuic V5 配置
-  [ "${TUIC}" = 'true' ] && ((PORT++)) && PORT_TUIC=$PORT && cat > $WORK_DIR/conf/13_tuic_inbounds.json << EOF
-  {
-      "inbounds":[
-          {
-              "type":"tuic",
-              "sniff":true,
-              "sniff_override_destination":true,
-              "tag":"${NODE_NAME} tuic",
-              "listen":"::",
-              "listen_port":${PORT_TUIC},
-              "users":[
-                  {
-                      "uuid":"${UUID}",
-                      "password":"${UUID}"
-                  }
-              ],
-              "congestion_control": "bbr",
-              "zero_rtt_handshake": false,
-              "tls":{
-                  "enabled":true,
-                  "alpn":[
-                      "h3"
-                  ],
-                  "certificate_path":"$WORK_DIR/cert/cert.pem",
-                  "key_path":"$WORK_DIR/cert/private.key"
-              }
-          }
-      ]
-  }
+  [ "${TUIC}" = 'true' ] && ((PORT++)) && PORT_TUIC=$PORT && cat > ${WORK_DIR}/conf/13_tuic_inbounds.json << EOF
+{
+    "inbounds":[
+        {
+            "type":"tuic",
+            "tag":"${NODE_NAME} tuic",
+            "listen":"::",
+            "listen_port":${PORT_TUIC},
+            "users":[
+                {
+                    "uuid":"${UUID}",
+                    "password":"${UUID}"
+                }
+            ],
+            "congestion_control": "bbr",
+            "zero_rtt_handshake": false,
+            "tls":{
+                "enabled":true,
+                "alpn":[
+                    "h3"
+                ],
+                "certificate_path":"${WORK_DIR}/cert/cert.pem",
+                "key_path":"${WORK_DIR}/cert/private.key"
+            }
+        }
+    ]
+}
 EOF
 
   # 生成 ShadowTLS V5 配置
-  [ "${SHADOWTLS}" = 'true' ] && ((PORT++)) && PORT_SHADOWTLS=$PORT && cat > $WORK_DIR/conf/14_ShadowTLS_inbounds.json << EOF
-  {
-      "inbounds":[
-          {
-              "type":"shadowtls",
-              "sniff":true,
-              "sniff_override_destination":true,
-              "tag":"${NODE_NAME} ShadowTLS",
-              "listen":"::",
-              "listen_port":${PORT_SHADOWTLS},
-              "detour":"shadowtls-in",
-              "version":3,
-              "users":[
-                  {
-                      "password":"${UUID}"
-                  }
-              ],
-              "handshake":{
-                  "server":"addons.mozilla.org",
-                  "server_port":443
-              },
-              "strict_mode":true
-          },
-          {
-              "type":"shadowsocks",
-              "tag":"shadowtls-in",
-              "listen":"127.0.0.1",
-              "network":"tcp",
-              "method":"2022-blake3-aes-128-gcm",
-              "password":"${SHADOWTLS_PASSWORD}",
-              "multiplex":{
-                  "enabled":true,
-                  "padding":true,
-                  "brutal":{
-                      "enabled":true,
-                      "up_mbps":1000,
-                      "down_mbps":1000
-                  }
-              }
-          }
-      ]
-  }
+  [ "${SHADOWTLS}" = 'true' ] && ((PORT++)) && PORT_SHADOWTLS=$PORT && cat > ${WORK_DIR}/conf/14_ShadowTLS_inbounds.json << EOF
+{
+    "inbounds":[
+        {
+            "type":"shadowtls",
+            "tag":"${NODE_NAME} ShadowTLS",
+            "listen":"::",
+            "listen_port":${PORT_SHADOWTLS},
+            "detour":"shadowtls-in",
+            "version":3,
+            "users":[
+                {
+                    "password":"${UUID}"
+                }
+            ],
+            "handshake":{
+                "server":"addons.mozilla.org",
+                "server_port":443
+            },
+            "strict_mode":true
+        },
+        {
+            "type":"shadowsocks",
+            "tag":"shadowtls-in",
+            "listen":"127.0.0.1",
+            "network":"tcp",
+            "method":"2022-blake3-aes-128-gcm",
+            "password":"${SHADOWTLS_PASSWORD}",
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
+            }
+        }
+    ]
+}
 EOF
 
   # 生成 Shadowsocks 配置
-  [ "${SHADOWSOCKS}" = 'true' ] && ((PORT++)) && PORT_SHADOWSOCKS=$PORT && cat > $WORK_DIR/conf/15_shadowsocks_inbounds.json << EOF
-  {
-      "inbounds":[
-          {
-              "type":"shadowsocks",
-              "sniff":true,
-              "sniff_override_destination":true,
-              "tag":"${NODE_NAME} shadowsocks",
-              "listen":"::",
-              "listen_port":${PORT_SHADOWSOCKS},
-              "method":"aes-128-gcm",
-              "password":"${UUID}",
-              "multiplex":{
-                  "enabled":true,
-                  "padding":true,
-                  "brutal":{
-                      "enabled":true,
-                      "up_mbps":1000,
-                      "down_mbps":1000
-                  }
-              }
-          }
-      ]
-  }
+  [ "${SHADOWSOCKS}" = 'true' ] && ((PORT++)) && PORT_SHADOWSOCKS=$PORT && cat > ${WORK_DIR}/conf/15_shadowsocks_inbounds.json << EOF
+{
+    "inbounds":[
+        {
+            "type":"shadowsocks",
+            "tag":"${NODE_NAME} shadowsocks",
+            "listen":"::",
+            "listen_port":${PORT_SHADOWSOCKS},
+            "method":"aes-128-gcm",
+            "password":"${UUID}",
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
+            }
+        }
+    ]
+}
 EOF
 
   # 生成 Trojan 配置
-  [ "${TROJAN}" = 'true' ] && ((PORT++)) && PORT_TROJAN=$PORT && cat > $WORK_DIR/conf/16_trojan_inbounds.json << EOF
-  {
-      "inbounds":[
-          {
-              "type":"trojan",
-              "sniff":true,
-              "sniff_override_destination":true,
-              "tag":"${NODE_NAME} trojan",
-              "listen":"::",
-              "listen_port":${PORT_TROJAN},
-              "users":[
-                  {
-                      "password":"${UUID}"
-                  }
-              ],
-              "tls":{
-                  "enabled":true,
-                  "certificate_path":"$WORK_DIR/cert/cert.pem",
-                  "key_path":"$WORK_DIR/cert/private.key"
-              },
-              "multiplex":{
-                  "enabled":true,
-                  "padding":true,
-                  "brutal":{
-                      "enabled":true,
-                      "up_mbps":1000,
-                      "down_mbps":1000
-                  }
-              }
-          }
-      ]
-  }
+  [ "${TROJAN}" = 'true' ] && ((PORT++)) && PORT_TROJAN=$PORT && cat > ${WORK_DIR}/conf/16_trojan_inbounds.json << EOF
+{
+    "inbounds":[
+        {
+            "type":"trojan",
+            "tag":"${NODE_NAME} trojan",
+            "listen":"::",
+            "listen_port":${PORT_TROJAN},
+            "users":[
+                {
+                    "password":"${UUID}"
+                }
+            ],
+            "tls":{
+                "enabled":true,
+                "certificate_path":"${WORK_DIR}/cert/cert.pem",
+                "key_path":"${WORK_DIR}/cert/private.key"
+            },
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
+            }
+        }
+    ]
+}
 EOF
 
   # 生成 vmess + ws 配置
-  [ "${VMESS_WS}" = 'true' ] && ((PORT++)) && PORT_VMESS_WS=$PORT && cat > $WORK_DIR/conf/17_vmess-ws_inbounds.json << EOF
-  //  "CDN": "${CDN}"
-  {
-      "inbounds":[
-          {
-              "type":"vmess",
-              "sniff":true,
-              "sniff_override_destination":true,
-              "tag":"${NODE_NAME} vmess-ws",
-              "listen":"127.0.0.1",
-              "listen_port":${PORT_VMESS_WS},
-              "tcp_fast_open":false,
-              "proxy_protocol":false,
-              "users":[
-                  {
-                      "uuid":"${UUID}",
-                      "alterId":0
-                  }
-              ],
-              "transport":{
-                  "type":"ws",
-                  "path":"/${UUID}-vmess",
-                  "max_early_data":2048,
-                  "early_data_header_name":"Sec-WebSocket-Protocol"
-              },
-              "multiplex":{
-                  "enabled":true,
-                  "padding":true,
-                  "brutal":{
-                      "enabled":true,
-                      "up_mbps":1000,
-                      "down_mbps":1000
-                  }
-              }
-          }
-      ]
-  }
+  [ "${VMESS_WS}" = 'true' ] && ((PORT++)) && PORT_VMESS_WS=$PORT && cat > ${WORK_DIR}/conf/17_vmess-ws_inbounds.json << EOF
+//  "CDN": "${CDN}"
+{
+    "inbounds":[
+        {
+            "type":"vmess",
+            "tag":"${NODE_NAME} vmess-ws",
+            "listen":"127.0.0.1",
+            "listen_port":${PORT_VMESS_WS},
+            "tcp_fast_open":false,
+            "proxy_protocol":false,
+            "users":[
+                {
+                    "uuid":"${UUID}",
+                    "alterId":0
+                }
+            ],
+            "transport":{
+                "type":"ws",
+                "path":"/${UUID}-vmess",
+                "max_early_data":2048,
+                "early_data_header_name":"Sec-WebSocket-Protocol"
+            },
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
+            }
+        }
+    ]
+}
 EOF
 
   # 生成 vless + ws + tls 配置
-  [ "${VLESS_WS}" = 'true' ] && ((PORT++)) && PORT_VLESS_WS=$PORT && cat > $WORK_DIR/conf/18_vless-ws-tls_inbounds.json << EOF
-  //  "CDN": "${CDN}"
-  {
-      "inbounds":[
-          {
-              "type":"vless",
-              "sniff_override_destination":true,
-              "sniff":true,
-              "tag":"${NODE_NAME} vless-ws-tls",
-              "listen":"::",
-              "listen_port":${PORT_VLESS_WS},
-              "tcp_fast_open":false,
-              "proxy_protocol":false,
-              "users":[
-                  {
-                      "name":"sing-box",
-                      "uuid":"${UUID}"
-                  }
-              ],
-              "transport":{
-                  "type":"ws",
-                  "path":"/${UUID}-vless",
-                  "max_early_data":2048,
-                  "early_data_header_name":"Sec-WebSocket-Protocol"
-              },
-              "multiplex":{
-                  "enabled":true,
-                  "padding":true,
-                  "brutal":{
-                      "enabled":true,
-                      "up_mbps":1000,
-                      "down_mbps":1000
-                  }
-              }
-          }
-      ]
-  }
+  [ "${VLESS_WS}" = 'true' ] && ((PORT++)) && PORT_VLESS_WS=$PORT && cat > ${WORK_DIR}/conf/18_vless-ws-tls_inbounds.json << EOF
+//  "CDN": "${CDN}"
+{
+    "inbounds":[
+        {
+            "type":"vless",
+            "tag":"${NODE_NAME} vless-ws-tls",
+            "listen":"::",
+            "listen_port":${PORT_VLESS_WS},
+            "tcp_fast_open":false,
+            "proxy_protocol":false,
+            "users":[
+                {
+                    "name":"sing-box",
+                    "uuid":"${UUID}"
+                }
+            ],
+            "transport":{
+                "type":"ws",
+                "path":"/${UUID}-vless",
+                "max_early_data":2048,
+                "early_data_header_name":"Sec-WebSocket-Protocol"
+            },
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
+            }
+        }
+    ]
+}
 EOF
 
   # 生成 H2 + Reality 配置
-  [ "${H2_REALITY}" = 'true' ] && ((PORT++)) && PORT_H2_REALITY=$PORT && cat > $WORK_DIR/conf/19_h2-reality_inbounds.json << EOF
-  //  "public_key":"${REALITY_PUBLIC}"
-  {
-      "inbounds":[
-          {
-              "type":"vless",
-              "sniff":true,
-              "sniff_override_destination":true,
-              "tag":"${NODE_NAME} h2-reality",
-              "listen":"::",
-              "listen_port":${PORT_H2_REALITY},
-              "users":[
-                  {
-                      "uuid":"${UUID}"
-                  }
-              ],
-              "tls":{
-                  "enabled":true,
-                  "server_name":"addons.mozilla.org",
-                  "reality":{
-                      "enabled":true,
-                      "handshake":{
-                          "server":"addons.mozilla.org",
-                          "server_port":443
-                      },
-                      "private_key":"${REALITY_PRIVATE}",
-                      "short_id":[
-                          ""
-                      ]
-                  }
-              },
-              "transport": {
-                  "type": "http"
-              },
-              "multiplex":{
-                  "enabled":true,
-                  "padding":true,
-                  "brutal":{
-                      "enabled":true,
-                      "up_mbps":1000,
-                      "down_mbps":1000
-                  }
-              }
-          }
-      ]
-  }
+  [ "${H2_REALITY}" = 'true' ] && ((PORT++)) && PORT_H2_REALITY=$PORT && cat > ${WORK_DIR}/conf/19_h2-reality_inbounds.json << EOF
+//  "public_key":"${REALITY_PUBLIC}"
+{
+    "inbounds":[
+        {
+            "type":"vless",
+            "tag":"${NODE_NAME} h2-reality",
+            "listen":"::",
+            "listen_port":${PORT_H2_REALITY},
+            "users":[
+                {
+                    "uuid":"${UUID}"
+                }
+            ],
+            "tls":{
+                "enabled":true,
+                "server_name":"addons.mozilla.org",
+                "reality":{
+                    "enabled":true,
+                    "handshake":{
+                        "server":"addons.mozilla.org",
+                        "server_port":443
+                    },
+                    "private_key":"${REALITY_PRIVATE}",
+                    "short_id":[
+                        ""
+                    ]
+                }
+            },
+            "transport": {
+                "type": "http"
+            },
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
+            }
+        }
+    ]
+}
 EOF
 
   # 生成 gRPC + Reality 配置
-  [ "${GRPC_REALITY}" = 'true' ] && ((PORT++)) && PORT_GRPC_REALITY=$PORT && cat > $WORK_DIR/conf/20_grpc-reality_inbounds.json << EOF
-  //  "public_key":"${REALITY_PUBLIC}"
-  {
-      "inbounds":[
-          {
-              "type":"vless",
-              "sniff":true,
-              "sniff_override_destination":true,
-              "tag":"${NODE_NAME} grpc-reality",
-              "listen":"::",
-              "listen_port":${PORT_GRPC_REALITY},
-              "users":[
-                  {
-                      "uuid":"${UUID}"
-                  }
-              ],
-              "tls":{
-                  "enabled":true,
-                  "server_name":"addons.mozilla.org",
-                  "reality":{
-                      "enabled":true,
-                      "handshake":{
-                          "server":"addons.mozilla.org",
-                          "server_port":443
-                      },
-                      "private_key":"${REALITY_PRIVATE}",
-                      "short_id":[
-                          ""
-                      ]
-                  }
-              },
-              "transport": {
-                  "type": "grpc",
-                  "service_name": "grpc"
-              },
-              "multiplex":{
-                  "enabled":true,
-                  "padding":true,
-                  "brutal":{
-                      "enabled":true,
-                      "up_mbps":1000,
-                      "down_mbps":1000
-                  }
-              }
-          }
-      ]
-  }
+  [ "${GRPC_REALITY}" = 'true' ] && ((PORT++)) && PORT_GRPC_REALITY=$PORT && cat > ${WORK_DIR}/conf/20_grpc-reality_inbounds.json << EOF
+//  "public_key":"${REALITY_PUBLIC}"
+{
+    "inbounds":[
+        {
+            "type":"vless",
+            "sniff":true,
+            "sniff_override_destination":true,
+            "tag":"${NODE_NAME} grpc-reality",
+            "listen":"::",
+            "listen_port":${PORT_GRPC_REALITY},
+            "users":[
+                {
+                    "uuid":"${UUID}"
+                }
+            ],
+            "tls":{
+                "enabled":true,
+                "server_name":"addons.mozilla.org",
+                "reality":{
+                    "enabled":true,
+                    "handshake":{
+                        "server":"addons.mozilla.org",
+                        "server_port":443
+                    },
+                    "private_key":"${REALITY_PRIVATE}",
+                    "short_id":[
+                        ""
+                    ]
+                }
+            },
+            "transport": {
+                "type": "grpc",
+                "service_name": "grpc"
+            },
+            "multiplex":{
+                "enabled":true,
+                "padding":true,
+                "brutal":{
+                    "enabled":true,
+                    "up_mbps":1000,
+                    "down_mbps":1000
+                }
+            }
+        }
+    ]
+}
 EOF
 
   # 判断 argo 隧道类型
   if [[ -n "$ARGO_DOMAIN" && -n "$ARGO_AUTH" ]]; then
     if [[ "$ARGO_AUTH" =~ TunnelSecret ]]; then
       ARGO_JSON=${ARGO_AUTH//[ ]/}
-      ARGO_RUNS="cloudflared tunnel --edge-ip-version auto --config $WORK_DIR/tunnel.yml run"
-      echo $ARGO_JSON > $WORK_DIR/tunnel.json
-      cat > $WORK_DIR/tunnel.yml << EOF
+      ARGO_RUNS="cloudflared tunnel --edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run"
+      echo $ARGO_JSON > ${WORK_DIR}/tunnel.json
+      cat > ${WORK_DIR}/tunnel.yml << EOF
 tunnel: $(cut -d\" -f12 <<< $ARGO_JSON)
-credentials-file: $WORK_DIR/tunnel.json
+credentials-file: ${WORK_DIR}/tunnel.json
 
 ingress:
   - hostname: ${ARGO_DOMAIN}
@@ -626,7 +609,7 @@ stderr_logfile=/dev/null
 stdout_logfile=/dev/null
 
 [program:sing-box]
-command=$WORK_DIR/sing-box run -C $WORK_DIR/conf/
+command=${WORK_DIR}/sing-box run -C ${WORK_DIR}/conf/
 autostart=true
 autorestart=true
 stderr_logfile=/dev/null
@@ -635,7 +618,7 @@ stdout_logfile=/dev/null"
 [ -z "$METRICS_PORT" ] && SUPERVISORD_CONF+="
 
 [program:argo]
-command=$WORK_DIR/$ARGO_RUNS
+command=${WORK_DIR}/$ARGO_RUNS
 autostart=true
 autorestart=true
 stderr_logfile=/dev/null
@@ -646,8 +629,8 @@ stdout_logfile=/dev/null
 
   # 如使用临时隧道，先运行 cloudflared 以获取临时隧道域名
   if [ -n "$METRICS_PORT" ]; then
-    $WORK_DIR/$ARGO_RUNS >/dev/null 2>&1 &
-    sleep 3
+    ${WORK_DIR}/$ARGO_RUNS >/dev/null 2>&1 &
+    sleep 15
     local ARGO_DOMAIN=$(wget -qO- http://localhost:$METRICS_PORT/quicktunnel | awk -F '"' '{print $4}')
   fi
 
@@ -697,8 +680,8 @@ stdout_logfile=/dev/null
       http2 on;
       server_name addons.mozilla.org;
 
-      ssl_certificate            $WORK_DIR/cert/cert.pem;
-      ssl_certificate_key        $WORK_DIR/cert/private.key;
+      ssl_certificate            ${WORK_DIR}/cert/cert.pem;
+      ssl_certificate_key        ${WORK_DIR}/cert/private.key;
       ssl_protocols              TLSv1.3;
       ssl_session_tickets        on;
       ssl_stapling               off;
@@ -740,14 +723,14 @@ stdout_logfile=/dev/null
       # 来自 /auto 的分流
       location ~ ^/${UUID}/auto {
         default_type 'text/plain; charset=utf-8';
-        alias $WORK_DIR/subscribe/\$path;
+        alias ${WORK_DIR}/subscribe/\$path;
       }
 
       location ~ ^/${UUID}/(.*) {
         autoindex on;
         proxy_set_header X-Real-IP \$proxy_protocol_addr;
         default_type 'text/plain; charset=utf-8';
-        alias $WORK_DIR/subscribe/\$1;
+        alias ${WORK_DIR}/subscribe/\$1;
       }
     }
   }"
@@ -806,11 +789,11 @@ stdout_logfile=/dev/null
   local CLASH_SUBSCRIBE+="
   $CLASH_GRPC_REALITY
 "
-  echo -n "${CLASH_SUBSCRIBE}" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' > $WORK_DIR/subscribe/proxies
+  echo -n "${CLASH_SUBSCRIBE}" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' > ${WORK_DIR}/subscribe/proxies
 
   # 生成 clash 订阅配置文件
   # 模板: 使用 proxy providers
-  wget -qO- --tries=3 --timeout=2 ${SUBSCRIBE_TEMPLATE}/clash | sed "s#NODE_NAME#${NODE_NAME}#g; s#PROXY_PROVIDERS_URL#https://${ARGO_DOMAIN}/${UUID}/proxies#" > $WORK_DIR/subscribe/clash
+  wget -qO- --tries=3 --timeout=2 ${SUBSCRIBE_TEMPLATE}/clash | sed "s#NODE_NAME#${NODE_NAME}#g; s#PROXY_PROVIDERS_URL#https://${ARGO_DOMAIN}/${UUID}/proxies#" > ${WORK_DIR}/subscribe/clash
 
   # 生成 ShadowRocket 订阅配置文件
   [ "${XTLS_REALITY}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
@@ -846,7 +829,7 @@ vless://$(echo -n auto:${UUID}@${SERVER_IP_2}:${PORT_H2_REALITY} | base64 -w0)?r
   [ "${GRPC_REALITY}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
 vless://$(echo -n "auto:${UUID}@${SERVER_IP_2}:${PORT_GRPC_REALITY}" | base64 -w0)?remarks=${NODE_NAME}%20grpc-reality&path=grpc&obfs=grpc&tls=1&peer=addons.mozilla.org&pbk=${REALITY_PUBLIC}
 "
-  echo -n "$SHADOWROCKET_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > $WORK_DIR/subscribe/shadowrocket
+  echo -n "$SHADOWROCKET_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/shadowrocket
 
   # 生成 V2rayN 订阅文件
   [ "${XTLS_REALITY}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
@@ -945,7 +928,7 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_H2_REALITY}?encryption=none&security=reali
 ----------------------------
 vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?encryption=none&security=reality&sni=addons.mozilla.org&fp=chrome&pbk=${REALITY_PUBLIC}&type=grpc&serviceName=grpc&mode=gun#${NODE_NAME// /%20}%20grpc-reality"
 
-  echo -n "$V2RAYN_SUBSCRIBE" | sed -E '/^[ ]*#|^[ ]+|^--|^\{|^\}/d' | sed '/^$/d' | base64 -w0 > $WORK_DIR/subscribe/v2rayn
+  echo -n "$V2RAYN_SUBSCRIBE" | sed -E '/^[ ]*#|^[ ]+|^--|^\{|^\}/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/v2rayn
 
   # 生成 NekoBox 订阅文件
   [ "${XTLS_REALITY}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
@@ -992,7 +975,7 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_H2_REALITY}?security=reality&sni=addons.mo
 ----------------------------
 vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=addons.mozilla.org&fp=chrome&pbk=${REALITY_PUBLIC}&type=grpc&serviceName=grpc&encryption=none#${NODE_NAME}%20grpc-reality"
 
-  echo -n "$NEKOBOX_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > $WORK_DIR/subscribe/neko
+  echo -n "$NEKOBOX_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/neko
 
   # 生成 Sing-box 订阅文件
   [ "${XTLS_REALITY}" = 'true' ] &&
@@ -1037,12 +1020,12 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=addons.
   # 模板
   local SING_BOX_JSON1=$(wget -qO- --tries=3 --timeout=2 ${SUBSCRIBE_TEMPLATE}/sing-box1)
 
-  echo $SING_BOX_JSON1 | sed 's#, {[^}]\+"tun-in"[^}]\+}##' | sed "s#\"<INBOUND_REPLACE>\",#$INBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | $WORK_DIR/jq > $WORK_DIR/subscribe/sing-box-pc
+  echo $SING_BOX_JSON1 | sed 's#, {[^}]\+"tun-in"[^}]\+}##' | sed "s#\"<INBOUND_REPLACE>\",#$INBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | ${WORK_DIR}/jq > ${WORK_DIR}/subscribe/sing-box-pc
 
-  echo $SING_BOX_JSON1 | sed 's# {[^}]\+"mixed"[^}]\+},##; s#, "auto_detect_interface": true##' | sed "s#\"<INBOUND_REPLACE>\",#$INBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | $WORK_DIR/jq > $WORK_DIR/subscribe/sing-box-phone
+  echo $SING_BOX_JSON1 | sed 's# {[^}]\+"mixed"[^}]\+},##; s#, "auto_detect_interface": true##' | sed "s#\"<INBOUND_REPLACE>\",#$INBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | ${WORK_DIR}/jq > ${WORK_DIR}/subscribe/sing-box-phone
 
   # 生成二维码 url 文件
-  cat > $WORK_DIR/subscribe/qr << EOF
+  cat > ${WORK_DIR}/subscribe/qr << EOF
 自适应 Clash / V2rayN / NekoBox / ShadowRocket / SFI / SFA / SFM 客户端:
 模版:
 https://${ARGO_DOMAIN}/${UUID}/auto
@@ -1052,7 +1035,7 @@ https://${ARGO_DOMAIN}/${UUID}/auto
 https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://${ARGO_DOMAIN}/${UUID}/auto
 
 模版:
-$($WORK_DIR/qrencode "https://${ARGO_DOMAIN}/${UUID}/auto")
+$(${WORK_DIR}/qrencode "https://${ARGO_DOMAIN}/${UUID}/auto")
 EOF
 
   # 生成配置文件
@@ -1099,9 +1082,9 @@ $(hint "${NEKOBOX_SUBSCRIBE}")
 └────────────────┘
 ----------------------------
 
-$(info "$(echo "{ \"outbounds\":[ ${INBOUND_REPLACE%,} ] }" | $WORK_DIR/jq)
+$(info "$(echo "{ \"outbounds\":[ ${INBOUND_REPLACE%,} ] }" | ${WORK_DIR}/jq)
 
-各客户端配置文件路径: $WORK_DIR/subscribe/\n 完整模板可参照:\n https://t.me/ztvps/100\n https://github.com/chika0801/sing-box-examples/tree/main/Tun")
+各客户端配置文件路径: ${WORK_DIR}/subscribe/\n 完整模板可参照:\n https://t.me/ztvps/100\n https://github.com/chika0801/sing-box-examples/tree/main/Tun")
 "
 
 EXPORT_LIST_FILE+="
@@ -1143,12 +1126,12 @@ https://${ARGO_DOMAIN}/${UUID}/auto
 https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://${ARGO_DOMAIN}/${UUID}/auto")
 
 $(hint "模版:")
-$($WORK_DIR/qrencode https://${ARGO_DOMAIN}/${UUID}/auto)
+$(${WORK_DIR}/qrencode https://${ARGO_DOMAIN}/${UUID}/auto)
 "
 
   # 生成并显示节点信息
-  echo "$EXPORT_LIST_FILE" > $WORK_DIR/list
-  cat $WORK_DIR/list
+  echo "$EXPORT_LIST_FILE" > ${WORK_DIR}/list
+  cat ${WORK_DIR}/list
 
   # 显示脚本使用情况数据
   hint "\n*******************************************\n"
@@ -1158,12 +1141,12 @@ $($WORK_DIR/qrencode https://${ARGO_DOMAIN}/${UUID}/auto)
 update_sing-box() {
   #####local ONLINE=$(check_latest_sing-box)
   local ONLINE='1.11.0-alpha.6'
-  local LOCAL=$($WORK_DIR/sing-box version | awk '/version/{print $NF}')
+  local LOCAL=$(${WORK_DIR}/sing-box version | awk '/version/{print $NF}')
   if [ -n "$ONLINE" ]; then
     if [[ "$ONLINE" != "$LOCAL" ]]; then
-      wget https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -O- | tar xz -C $WORK_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box &&
-      mv $WORK_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $WORK_DIR/sing-box &&
-      rm -rf $WORK_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH &&
+      wget https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -O- | tar xz -C ${WORK_DIR} sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box &&
+      mv ${WORK_DIR}/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ${WORK_DIR}/sing-box &&
+      rm -rf ${WORK_DIR}/sing-box-$ONLINE-linux-$SING_BOX_ARCH &&
       supervisorctl restart sing-box
       info " Sing-box v${ONLINE} 更新成功！"
     else
