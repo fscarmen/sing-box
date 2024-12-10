@@ -518,7 +518,7 @@ check_install() {
   if [ "${STATUS[0]}" = "$(text 26)" ] && [ ! -s $WORK_DIR/sing-box ]; then
     {
     local VERSION_LATEST=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v-]' '/tag_name/{print $5}' | sort -Vr | sed -n '1p')
-    #####local ONLINE=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
+    local ONLINE=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
     ONLINE=${ONLINE:-'1.11.0-alpha.6'}
     wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box >/dev/null 2>&1
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
@@ -1143,7 +1143,7 @@ sing-box_json() {
   else
     DIR=$TEMP_DIR
 
-    # 生成 dns 配置
+    # 生成 log 配置
     cat > $WORK_DIR/conf/00_log.json << EOF
 {
     "log":{
@@ -1163,47 +1163,47 @@ EOF
             "type":"direct",
             "tag":"direct",
             "domain_strategy":"$DOMAIN_STRATEG"
-        },
-        {
-            "type":"direct",
-            "tag":"warp-IPv4-out",
-            "detour":"wireguard-out",
-            "domain_strategy":"ipv4_only"
-        },
-        {
-            "type":"direct",
-            "tag":"warp-IPv6-out",
-            "detour":"wireguard-out",
-            "domain_strategy":"ipv6_only"
-        },
-        {
-            "type":"wireguard",
-            "tag":"wireguard-out",
-            "server":"${WARP_ENDPOINT}",
-            "server_port":2408,
-            "local_address":[
-                "172.16.0.2/32",
-                "2606:4700:110:8a36:df92:102a:9602:fa18/128"
-            ],
-            "private_key":"YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY=",
-            "peer_public_key":"bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
-            "reserved":[
-                78,
-                135,
-                76
-            ],
-            "mtu":1280
-        },
-        {
-            "type":"block",
-            "tag":"block"
         }
     ]
 }
 EOF
 
+    # 生成 endpoint 配置
+    cat > $WORK_DIR/conf/02_endpoints.json << EOF
+{
+    "endpoints":[
+        {
+            "type":"wireguard",
+            "tag":"wireguard-ep",
+            "mtu":1280,
+            "address":[
+                "172.16.0.2/32",
+                "2606:4700:110:8a36:df92:102a:9602:fa18/128"
+            ],
+            "private_key":"YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY=", 
+            "peers": [
+              {
+                "address": "${WARP_ENDPOINT}",
+                "port":2408,
+                "public_key":"bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+                "allowed_ips": [
+                  "0.0.0.0/0",
+                  "::/0"
+                ],
+                "reserved":[
+                    78,
+                    135,
+                    76
+                ]
+              }
+            ]
+        }
+    ]
+}
+EOF
+    
     # 生成 route 配置
-    cat > $WORK_DIR/conf/02_route.json << EOF
+    cat > $WORK_DIR/conf/03_route.json << EOF
 {
     "route":{
         "rule_set":[
@@ -1215,6 +1215,9 @@ EOF
             }
         ],
         "rules":[
+            {
+                "action": "sniff"
+            },
             {
                 "domain":"api.openai.com",
                 "outbound":"$CHAT_GPT_OUT_V4"
@@ -1229,7 +1232,7 @@ EOF
 EOF
 
     # 生成缓存文件
-    cat > $WORK_DIR/conf/03_experimental.json << EOF
+    cat > $WORK_DIR/conf/04_experimental.json << EOF
 {
     "experimental": {
         "cache_file": {
@@ -1241,7 +1244,7 @@ EOF
 EOF
 
     # 生成 dns 配置文件
-    cat > $WORK_DIR/conf/04_dns.json << EOF
+    cat > $WORK_DIR/conf/05_dns.json << EOF
 {
     "dns":{
         "servers":[
@@ -1275,8 +1278,6 @@ EOF
     "inbounds":[
         {
             "type":"vless",
-            "sniff":true,
-            "sniff_override_destination":true,
             "tag":"${NODE_NAME[11]} ${NODE_TAG[0]}",
             "listen":"::",
             "listen_port":$PORT_XTLS_REALITY,
@@ -1327,8 +1328,6 @@ EOF
     "inbounds":[
         {
             "type":"hysteria2",
-            "sniff":true,
-            "sniff_override_destination":true,
             "tag":"${NODE_NAME[12]} ${NODE_TAG[1]}",
             "listen":"::",
             "listen_port":$PORT_HYSTERIA2,
@@ -1365,8 +1364,6 @@ EOF
     "inbounds":[
         {
             "type":"tuic",
-            "sniff":true,
-            "sniff_override_destination":true,
             "tag":"${NODE_NAME[13]} ${NODE_TAG[2]}",
             "listen":"::",
             "listen_port":$PORT_TUIC,
@@ -1403,8 +1400,6 @@ EOF
     "inbounds":[
         {
             "type":"shadowtls",
-            "sniff":true,
-            "sniff_override_destination":true,
             "tag":"${NODE_NAME[14]} ${NODE_TAG[3]}",
             "listen":"::",
             "listen_port":$PORT_SHADOWTLS,
@@ -1453,8 +1448,6 @@ EOF
     "inbounds":[
         {
             "type":"shadowsocks",
-            "sniff":true,
-            "sniff_override_destination":true,
             "tag":"${NODE_NAME[15]} ${NODE_TAG[4]}",
             "listen":"::",
             "listen_port":$PORT_SHADOWSOCKS,
@@ -1485,8 +1478,6 @@ EOF
     "inbounds":[
         {
             "type":"trojan",
-            "sniff":true,
-            "sniff_override_destination":true,
             "tag":"${NODE_NAME[16]} ${NODE_TAG[5]}",
             "listen":"::",
             "listen_port":$PORT_TROJAN,
@@ -1528,8 +1519,6 @@ EOF
     "inbounds":[
         {
             "type":"vmess",
-            "sniff":true,
-            "sniff_override_destination":true,
             "tag":"${NODE_NAME[17]} ${NODE_TAG[6]}",
             "listen":"::",
             "listen_port":$PORT_VMESS_WS,
@@ -1574,8 +1563,6 @@ EOF
     "inbounds":[
         {
             "type":"vless",
-            "sniff_override_destination":true,
-            "sniff":true,
             "tag":"${NODE_NAME[18]} ${NODE_TAG[7]}",
             "listen":"::",
             "listen_port":$PORT_VLESS_WS,
@@ -1627,8 +1614,6 @@ EOF
     "inbounds":[
         {
             "type":"vless",
-            "sniff":true,
-            "sniff_override_destination":true,
             "tag":"${NODE_NAME[19]} ${NODE_TAG[8]}",
             "listen":"::",
             "listen_port":$PORT_H2_REALITY,
@@ -1681,8 +1666,6 @@ EOF
     "inbounds":[
         {
             "type":"vless",
-            "sniff":true,
-            "sniff_override_destination":true,
             "tag":"${NODE_NAME[20]} ${NODE_TAG[9]}",
             "listen":"::",
             "listen_port":$PORT_GRPC_REALITY,
@@ -2863,8 +2846,8 @@ uninstall() {
 # Sing-box 的最新版本
 version() {
   local VERSION_LATEST=$(wget --no-check-certificate -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v-]' '/tag_name/{print $5}' | sort -Vr | sed -n '1p')
-  #####local ONLINE=$(wget --no-check-certificate -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
-  local ONLINE='1.11.0-alpha.6'
+  local ONLINE=$(wget --no-check-certificate -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
+  #####local ONLINE='1.11.0-alpha.6'
   local LOCAL=$($WORK_DIR/sing-box version | awk '/version/{print $NF}')
   info "\n $(text 40) "
   [[ -n "$ONLINE" && "$ONLINE" != "$LOCAL" ]] && reading "\n $(text 9) " UPDATE || info " $(text 41) "
