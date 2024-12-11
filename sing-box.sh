@@ -800,8 +800,8 @@ sing-box_variables() {
   fi
 
   # 检测是否解锁 chatGPT
-  CHAT_GPT_OUT_V4=warp-IPv4-out; CHAT_GPT_OUT_V6=warp-IPv6-out;
-  [ "$(check_chatgpt ${DOMAIN_STRATEG: -1})" = 'unlock' ] && CHAT_GPT_OUT_V4=direct && CHAT_GPT_OUT_V6=direct
+  CHAT_GPT_OUT=wireguard-ep;
+  [ "$(check_chatgpt ${DOMAIN_STRATEG: -1})" = 'unlock' ] && CHAT_GPT_OUT=direct
 
   # 选择安装的协议，由于选项 a 为全部协议，所以选项数不是从 a 开始，而是从 b 开始，处理输入：把大写全部变为小写，把不符合的选项去掉，把重复的选项合并
   MAX_CHOOSE_PROTOCOLS=$(asc $[CONSECUTIVE_PORTS+96+1])
@@ -1180,6 +1180,7 @@ EOF
                 "172.16.0.2/32",
                 "2606:4700:110:8a36:df92:102a:9602:fa18/128"
             ],
+            "domain_strategy":"${DOMAIN_STRATEG}",
             "private_key":"YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY=",
             "peers": [
               {
@@ -1220,11 +1221,11 @@ EOF
             },
             {
                 "domain":"api.openai.com",
-                "outbound":"${CHAT_GPT_OUT_V4}"
+                "outbound":"${CHAT_GPT_OUT}"
             },
             {
                 "rule_set":"geosite-openai",
-                "outbound":"${CHAT_GPT_OUT_V6}"
+                "outbound":"${CHAT_GPT_OUT}"
             }
         ]
     }
