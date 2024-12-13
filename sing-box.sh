@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.7 (2024.12.10)'
+VERSION='v1.2.8 (2024.12.13)'
 
 # 各变量默认值
 GH_PROXY='https://ghproxy.lvedong.eu.org/'
@@ -27,8 +27,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="Compatible with Sing-box 1.11.0-beta.8+. Thanks to the PR from brother Maxrxf. I've already given up myself. Due to significant differences in the configuration files, it is not possible to upgrade from the old version. You can only reinstall the script."
-C[1]="适配 Sing-box 1.11.0-beta.8+，感谢 Maxrxf 兄弟的 PR，我自己已经投降的了。由于配置文件有很大差异，不能从旧版本升级，只能重装脚本"
+E[1]="Thank you to the veteran player Fan Glider Fangliding for the technical guidance on Warp's routing!"
+C[1]="感谢资深玩家 风扇滑翔翼 Fangliding 关于 Warp 的分流的技术指导"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -519,7 +519,7 @@ check_install() {
     {
     local VERSION_LATEST=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v-]' '/tag_name/{print $5}' | sort -Vr | sed -n '1p')
     local ONLINE=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
-    ONLINE=${ONLINE:-'1.11.0-beta.8'}
+    ONLINE=${ONLINE:-'1.11.0-beta.9'}
     wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box >/dev/null 2>&1
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
     wget --no-check-certificate --continue -qO $TEMP_DIR/jq ${GH_PROXY}https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$JQ_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/jq >/dev/null 2>&1
@@ -800,8 +800,8 @@ sing-box_variables() {
   fi
 
   # 检测是否解锁 chatGPT
-  CHAT_GPT_OUT=wireguard-ep;
-  [ "$(check_chatgpt ${DOMAIN_STRATEG: -1})" = 'unlock' ] && CHAT_GPT_OUT=direct
+  CHATGPT_OUT=warp-ep;
+  [ "$(check_chatgpt ${DOMAIN_STRATEG: -1})" = 'unlock' ] && CHATGPT_OUT=direct
 
   # 选择安装的协议，由于选项 a 为全部协议，所以选项数不是从 a 开始，而是从 b 开始，处理输入：把大写全部变为小写，把不符合的选项去掉，把重复的选项合并
   MAX_CHOOSE_PROTOCOLS=$(asc $[CONSECUTIVE_PORTS+96+1])
@@ -1174,13 +1174,12 @@ EOF
     "endpoints":[
         {
             "type":"wireguard",
-            "tag":"wireguard-ep",
+            "tag":"warp-ep",
             "mtu":1280,
             "address":[
                 "172.16.0.2/32",
                 "2606:4700:110:8a36:df92:102a:9602:fa18/128"
             ],
-            "domain_strategy":"${DOMAIN_STRATEG}",
             "private_key":"YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY=",
             "peers": [
               {
@@ -1220,12 +1219,27 @@ EOF
                 "action": "sniff"
             },
             {
-                "domain":"api.openai.com",
-                "outbound":"${CHAT_GPT_OUT}"
+                "action": "resolve",
+                "domain":[
+                    "api.openai.com"
+                ],
+                "strategy": "prefer_ipv4"
             },
             {
-                "rule_set":"geosite-openai",
-                "outbound":"${CHAT_GPT_OUT}"
+                "action": "resolve",
+                "rule_set":[
+                    "geosite-openai"
+                ],
+                "strategy": "prefer_ipv6"
+            },
+            {
+                "domain":[
+                    "api.openai.com"
+                ],
+                "rule_set":[
+                    "geosite-openai"
+                ],
+                "outbound":"${CHATGPT_OUT}"
             }
         ]
     }
@@ -2848,7 +2862,7 @@ uninstall() {
 version() {
   local VERSION_LATEST=$(wget --no-check-certificate -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v-]' '/tag_name/{print $5}' | sort -Vr | sed -n '1p')
   local ONLINE=$(wget --no-check-certificate -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
-  local ONLINE='1.11.0-beta.8'
+  local ONLINE='1.11.0-beta.9'
   local LOCAL=$(${WORK_DIR}/sing-box version | awk '/version/{print $NF}')
   info "\n $(text 40) "
   [[ -n "$ONLINE" && "$ONLINE" != "$LOCAL" ]] && reading "\n $(text 9) " UPDATE || info " $(text 41) "

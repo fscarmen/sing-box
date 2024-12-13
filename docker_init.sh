@@ -37,7 +37,7 @@ install() {
   # 下载 sing-box
   echo "正在下载 sing-box ..."
   local ONLINE=$(check_latest_sing-box)
-  local ONLINE=${ONLINE:-'1.11.0-beta.8'}
+  local ONLINE=${ONLINE:-'1.11.0-beta.9'}
   wget https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -O- | tar xz -C ${WORK_DIR} sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box && mv ${WORK_DIR}/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ${WORK_DIR}/sing-box && rm -rf ${WORK_DIR}/sing-box-$ONLINE-linux-$SING_BOX_ARCH
 
   # 下载 jq
@@ -69,7 +69,7 @@ install() {
 
   # 检测是否解锁 chatGPT
   local SUPPORT_COUNTRY='AD AE AF AG AL AM AO AR AT AU AZ BA BB BD BE BF BG BH BI BJ BN BO BR BS BT BW BZ CA CD CF CG CH CI CL CM CO CR CV CY CZ DE DJ DK DM DO DZ EC EE EG ER ES ET FI FJ FM FR GA GB GD GE GH GM GN GQ GR GT GW GY HN HR HT HU ID IE IL IN IQ IS IT JM JO JP KE KG KH KI KM KN KR KW KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MG MH MK ML MM MN MR MT MU MV MW MX MY MZ NA NE NG NI NL NO NP NR NZ OM PA PE PG PH PK PL PS PT PW PY QA RO RS RW SA SB SC SD SE SG SI SK SL SM SN SO SR SS ST SV SZ TD TG TH TJ TL TM TN TO TR TT TV TW TZ UA UG US UY UZ VA VC VN VU WS YE ZA ZM ZW'
-  [[ "${SUPPORT_COUNTRY}" =~ $(wget -qO- --tries=3 --timeout=2 https://chat.openai.com/cdn-cgi/trace | awk -F '=' '/loc/{print $2}') ]] && { CHAT_GPT_OUT_V4=direct && CHAT_GPT_OUT_V6=direct; } || { CHAT_GPT_OUT_V4=warp-IPv4-out && CHAT_GPT_OUT_V6=warp-IPv6-out ; }
+  [[ "${SUPPORT_COUNTRY}" =~ $(wget -qO- --tries=3 --timeout=2 https://chat.openai.com/cdn-cgi/trace | awk -F '=' '/loc/{print $2}') ]] && CHATGPT_OUT=direct || CHATGPT_OUT=warp-ep
 
   # 生成 log 配置
   cat > ${WORK_DIR}/conf/00_log.json << EOF
@@ -103,7 +103,7 @@ EOF
     "endpoints":[
         {
             "type":"wireguard",
-            "tag":"wireguard-ep",
+            "tag":"warp-ep",
             "mtu":1280,
             "address":[
                 "172.16.0.2/32",
@@ -148,12 +148,27 @@ EOF
                 "action": "sniff"
             },
             {
-                "domain":"api.openai.com",
-                "outbound":"${CHAT_GPT_OUT_V4}"
+                "action": "resolve",
+                "domain":[
+                    "api.openai.com"
+                ],
+                "strategy": "prefer_ipv4"
             },
             {
-                "rule_set":"geosite-openai",
-                "outbound":"${CHAT_GPT_OUT_V6}"
+                "action": "resolve",
+                "rule_set":[
+                    "geosite-openai"
+                ],
+                "strategy": "prefer_ipv6"
+            },
+            {
+                "domain":[
+                    "api.openai.com"
+                ],
+                "rule_set":[
+                    "geosite-openai"
+                ],
+                "outbound":"${CHATGPT_OUT}"
             }
         ]
     }
