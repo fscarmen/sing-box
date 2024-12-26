@@ -19,10 +19,11 @@
 
 * * *
 ## 1.更新信息
+2024.12.29 v1.2.9 Refactored the chatGPT detection method based on lmc999's detection and unlocking script; 根据 lmc999 的检测解锁脚本，重构了检测 chatGPT 方法
 
-2024.12.10 v1.2.7 Thank you to the veteran player Fan Glider Fangliding for the technical guidance on Warp's routing! 感谢资深玩家 风扇滑翔翼 Fangliding 关于 Warp 的分流的技术指导
+2024.12.10 v1.2.8 Thank you to the veteran player Fan Glider Fangliding for the technical guidance on Warp's routing! 感谢资深玩家 风扇滑翔翼 Fangliding 关于 Warp 的分流的技术指导
 
-2024.12.10 v1.2.6 Compatible with Sing-box 1.11.0-beta.8+. Thanks to the PR from brother Maxrxf. I've already given up myself; 适配 Sing-box 1.11.0-beta.8+，感谢 Maxrxf 兄弟的 PR，我自己已经投降的了
+2024.12.10 v1.2.7 Compatible with Sing-box 1.11.0-beta.8+. Thanks to the PR from brother Maxrxf. I've already given up myself; 适配 Sing-box 1.11.0-beta.8+，感谢 Maxrxf 兄弟的 PR，我自己已经投降的了
 
 2024.10.28 v1.2.6 1. Fixed the bug that clash subscription failed when [-n] re-fetches the subscription; 2. vmess + ws encryption changed from none to auto; 3. Replaced a CDN; 1. 修复 [-n] 重新获取订阅时，clash 订阅失效的bug; 2. vmess + ws 加密方式从none改为auto; 3. 更换了一个 CDN
 

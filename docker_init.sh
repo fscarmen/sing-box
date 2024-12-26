@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 脚本更新日期 2024.12.10
+# 脚本更新日期 2024.12.20
 WORK_DIR=/sing-box
 PORT=$START_PORT
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
@@ -37,7 +37,7 @@ install() {
   # 下载 sing-box
   echo "正在下载 sing-box ..."
   local ONLINE=$(check_latest_sing-box)
-  local ONLINE=${ONLINE:-'1.11.0-beta.9'}
+  local ONLINE=${ONLINE:-'1.11.0-beta.15'}
   wget https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -O- | tar xz -C ${WORK_DIR} sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box && mv ${WORK_DIR}/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ${WORK_DIR}/sing-box && rm -rf ${WORK_DIR}/sing-box-$ONLINE-linux-$SING_BOX_ARCH
 
   # 下载 jq
@@ -54,10 +54,8 @@ install() {
 
   # 生成 sing-box 配置文件
   if [[ "$SERVER_IP" =~ : ]]; then
-    local WARP_ENDPOINT=2606:4700:d0::a29f:c101
     local DOMAIN_STRATEG=prefer_ipv6
   else
-    local WARP_ENDPOINT=162.159.193.10
     local DOMAIN_STRATEG=prefer_ipv4
   fi
 
@@ -67,9 +65,23 @@ install() {
   local NODE_NAME=${NODE_NAME:-"sing-box"}
   local CDN=${CDN:-"skk.moe"}
 
-  # 检测是否解锁 chatGPT
-  local SUPPORT_COUNTRY='AD AE AF AG AL AM AO AR AT AU AZ BA BB BD BE BF BG BH BI BJ BN BO BR BS BT BW BZ CA CD CF CG CH CI CL CM CO CR CV CY CZ DE DJ DK DM DO DZ EC EE EG ER ES ET FI FJ FM FR GA GB GD GE GH GM GN GQ GR GT GW GY HN HR HT HU ID IE IL IN IQ IS IT JM JO JP KE KG KH KI KM KN KR KW KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MG MH MK ML MM MN MR MT MU MV MW MX MY MZ NA NE NG NI NL NO NP NR NZ OM PA PE PG PH PK PL PS PT PW PY QA RO RS RW SA SB SC SD SE SG SI SK SL SM SN SO SR SS ST SV SZ TD TG TH TJ TL TM TN TO TR TT TV TW TZ UA UG US UY UZ VA VC VN VU WS YE ZA ZM ZW'
-  [[ "${SUPPORT_COUNTRY}" =~ $(wget -qO- --tries=3 --timeout=2 https://chat.openai.com/cdn-cgi/trace | awk -F '=' '/loc/{print $2}') ]] && CHATGPT_OUT=direct || CHATGPT_OUT=warp-ep
+  # 检测是否解锁 chatGPT，首先检查API访问
+  local CHECK_RESULT1=$(wget --timeout=2 --tries=2 --retry-connrefused --waitretry=5 -qO- --content-on-error --header='authority: api.openai.com' --header='accept: */*' --header='accept-language: en-US,en;q=0.9' --header='authorization: Bearer null' --header='content-type: application/json' --header='origin: https://platform.openai.com' --header='referer: https://platform.openai.com/' --header='sec-ch-ua: "Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"' --header='sec-ch-ua-mobile: ?0' --header='sec-ch-ua-platform: "Windows"' --header='sec-fetch-dest: empty' --header='sec-fetch-mode: cors' --header='sec-fetch-site: same-site' --user-agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' 'https://api.openai.com/compliance/cookie_requirements')
+
+  # 如果API检测失败或者检测到unsupported_country,直接返回ban
+  if [ -z "$CHECK_RESULT1" ] || grep -qi 'unsupported_country' <<< "$CHECK_RESULT1"; then
+    CHATGPT_OUT=warp-ep
+  fi
+
+  # API检测通过后,继续检查网页访问
+  local CHECK_RESULT2=$(wget --timeout=2 --tries=2 --retry-connrefused --waitretry=5 -qO- --content-on-error --header='authority: ios.chat.openai.com' --header='accept: */*;q=0.8,application/signed-exchange;v=b3;q=0.7' --header='accept-language: en-US,en;q=0.9' --header='sec-ch-ua: "Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"' --header='sec-ch-ua-mobile: ?0' --header='sec-ch-ua-platform: "Windows"' --header='sec-fetch-dest: document' --header='sec-fetch-mode: navigate' --header='sec-fetch-site: none' --header='sec-fetch-user: ?1' --header='upgrade-insecure-requests: 1' --user-agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' https://ios.chat.openai.com/)
+
+  # 检查第二个结果
+  if [ -z "$CHECK_RESULT2" ] || grep -qi 'VPN' <<< "$CHECK_RESULT2"; then
+    CHATGPT_OUT=warp-ep
+  else
+    CHATGPT_OUT=direct
+  fi
 
   # 生成 log 配置
   cat > ${WORK_DIR}/conf/00_log.json << EOF
@@ -112,7 +124,7 @@ EOF
             "private_key":"YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY=",
             "peers": [
               {
-                "address": "${WARP_ENDPOINT}",
+                "address": "engage.cloudflareclient.com",
                 "port":2408,
                 "public_key":"bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
                 "allowed_ips": [

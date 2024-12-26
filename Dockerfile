@@ -19,7 +19,7 @@ COPY --from=openssl /cert.pem /sing-box/cert/cert.pem
 COPY docker_init.sh /sing-box/init.sh
 
 RUN set -ex &&\
-  apk add --no-cache supervisor nginx bash &&\
+  apk add --no-cache supervisor wget nginx bash &&\
   mkdir -p /sing-box/conf /sing-box/subscribe /sing-box/logs &&\
   chmod +x /sing-box/init.sh &&\
   rm -rf /var/cache/apk/*
