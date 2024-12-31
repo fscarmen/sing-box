@@ -19,6 +19,8 @@
 
 * * *
 ## 1.更新信息
+2024.12.31 v1.2.10 Adapted v1.11.0-beta.17 to add port hopping for hysteria2 in sing-box client output; 适配 v1.11.0-beta.17，在 sing-box 客户端输出中添加 hysteria2 的端口跳跃
+
 2024.12.29 v1.2.9 Refactored the chatGPT detection method based on lmc999's detection and unlocking script; 根据 lmc999 的检测解锁脚本，重构了检测 chatGPT 方法
 
 2024.12.10 v1.2.8 Thank you to the veteran player Fan Glider Fangliding for the technical guidance on Warp's routing! 感谢资深玩家 风扇滑翔翼 Fangliding 关于 Warp 的分流的技术指导
