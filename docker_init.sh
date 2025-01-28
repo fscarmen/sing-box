@@ -212,6 +212,18 @@ EOF
 }
 EOF
 
+  # 内建的 NTP 客户端服务配置文件，这对于无法进行时间同步的环境很有用
+  cat > ${WORK_DIR}/conf/06_ntp.json << EOF
+{
+    "ntp": {
+        "enabled": true,
+        "server": "time.apple.com",
+        "server_port": 123,
+        "interval": "60m"
+    }
+}
+EOF
+
   # 生成 XTLS + Reality 配置
   [ "${XTLS_REALITY}" = 'true' ] && ((PORT++)) && PORT_XTLS_REALITY=$PORT && cat > ${WORK_DIR}/conf/11_xtls-reality_inbounds.json << EOF
 //  "public_key":"${REALITY_PUBLIC}"

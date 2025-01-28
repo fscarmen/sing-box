@@ -19,6 +19,8 @@
 
 * * *
 ## 1.更新信息
+2025.01.28 v1.2.11 1. Add server-side time synchronization configuration; 2. Replace some CDNs; 3. Fix the bug of getting the latest version error when upgrading; 1. 添加服务端时间同步配置; 2. 替换某些 CDN; 3. 修复升级时获取最新版本错误的 bu
+
 2024.12.31 v1.2.10 Adapted v1.11.0-beta.17 to add port hopping for hysteria2 in sing-box client output; 适配 v1.11.0-beta.17，在 sing-box 客户端输出中添加 hysteria2 的端口跳跃
 
 2024.12.29 v1.2.9 Refactored the chatGPT detection method based on lmc999's detection and unlocking script; 根据 lmc999 的检测解锁脚本，重构了检测 chatGPT 方法
@@ -500,6 +502,7 @@ services:
 |   |-- 03_route.json                        # 路由配置文件，chatGPT 使用 warp ipv6 链式代理出站
 |   |-- 04_experimental.json                 # 缓存配置文件
 |   |-- 05_dns.json                          # DNS 规则文件
+|   |-- 06_ntp.json                          # 服务端时间同步配置文件
 |   |-- 11_xtls-reality_inbounds.json        # Reality vision 协议配置文件
 |   |-- 12_hysteria2_inbounds.json           # Hysteria2 协议配置文件
 |   |-- 13_tuic_inbounds.json                # Tuic V5 协议配置文件 # Hysteria2 协议配置文件
