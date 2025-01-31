@@ -19,22 +19,24 @@
 
 * * *
 ## 1.更新信息
+2025.01.31 v1.2.12 In order to prevent sing-box from upgrading to a certain version which may cause errors, add a mandatory version file; 以防止sing-box某个版本升级导致运行报错，增加强制指定版本号文件
+
 2025.01.28 v1.2.11 1. Add server-side time synchronization configuration; 2. Replace some CDNs; 3. Fix the bug of getting the latest version error when upgrading; 1. 添加服务端时间同步配置; 2. 替换某些 CDN; 3. 修复升级时获取最新版本错误的 bu
-
-2024.12.31 v1.2.10 Adapted v1.11.0-beta.17 to add port hopping for hysteria2 in sing-box client output; 适配 v1.11.0-beta.17，在 sing-box 客户端输出中添加 hysteria2 的端口跳跃
-
-2024.12.29 v1.2.9 Refactored the chatGPT detection method based on lmc999's detection and unlocking script; 根据 lmc999 的检测解锁脚本，重构了检测 chatGPT 方法
-
-2024.12.10 v1.2.8 Thank you to the veteran player Fan Glider Fangliding for the technical guidance on Warp's routing! 感谢资深玩家 风扇滑翔翼 Fangliding 关于 Warp 的分流的技术指导
-
-2024.12.10 v1.2.7 Compatible with Sing-box 1.11.0-beta.8+. Thanks to the PR from brother Maxrxf. I've already given up myself; 适配 Sing-box 1.11.0-beta.8+，感谢 Maxrxf 兄弟的 PR，我自己已经投降的了
-
-2024.10.28 v1.2.6 1. Fixed the bug that clash subscription failed when [-n] re-fetches the subscription; 2. vmess + ws encryption changed from none to auto; 3. Replaced a CDN; 1. 修复 [-n] 重新获取订阅时，clash 订阅失效的bug; 2. vmess + ws 加密方式从none改为auto; 3. 更换了一个 CDN
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
 <br>
 
+>2024.12.31 v1.2.10 Adapted v1.11.0-beta.17 to add port hopping for hysteria2 in sing-box client output; 适配 v1.11.0-beta.17，在 sing-box 客户端输出中添加 hysteria2 的端口跳跃
+>
+>2024.12.29 v1.2.9 Refactored the chatGPT detection method based on lmc999's detection and unlocking script; 根据 lmc999 的检测解锁脚本，重构了检测 chatGPT 方法
+>
+>2024.12.10 v1.2.8 Thank you to the veteran player Fan Glider Fangliding for the technical guidance on Warp's routing! 感谢资深玩家 风扇滑翔翼 Fangliding 关于 Warp 的分流的技术指导
+>
+>2024.12.10 v1.2.7 Compatible with Sing-box 1.11.0-beta.8+. Thanks to the PR from brother Maxrxf. I've already given up myself; 适配 Sing-box 1.11.0-beta.8+，感谢 Maxrxf 兄弟的 PR，我自己已经投降的了
+>
+>2024.10.28 v1.2.6 1. Fixed the bug that clash subscription failed when [-n] re-fetches the subscription; 2. vmess + ws encryption changed from none to auto; 3. Replaced a CDN; 1. 修复 [-n] 重新获取订阅时，clash 订阅失效的bug; 2. vmess + ws 加密方式从none改为auto; 3. 更换了一个 CDN
+>
 >2024.08.06 v1.2.5 Add detection of TCP brutal. Sing-box will not use this module if not installed. 增加 TCP brutal 的检测，如果没有安装，Sing-box 将不使用该模块
 >
 >2024.05.09 v1.2.4 Add hysteria2 port hopping. Supported Clients: ShadowRocket / NekoBox / Clash; 添加 hysteria2 的跳跃端口，支持客户端: ShadowRocket / NekoBox / Clash
