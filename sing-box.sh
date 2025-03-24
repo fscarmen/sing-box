@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.13 (2025.03.18)'
+VERSION='v1.2.14 (2025.03.23)'
 
 # 各变量默认值
 GH_PROXY='https://ghproxy.lvedong.eu.org/'
@@ -13,8 +13,8 @@ MAX_PORT=65520
 MIN_HOPPING_PORT=10000
 MAX_HOPPING_PORT=65535
 TLS_SERVER_DEFAULT=addons.mozilla.org
-PROTOCOL_LIST=("XTLS + reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess + ws" "vless + ws + tls" "H2 + reality" "gRPC + reality")
-NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess-ws" "vless-ws-tls" "h2-reality" "grpc-reality")
+PROTOCOL_LIST=("XTLS + reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess + ws" "vless + ws + tls" "H2 + reality" "gRPC + reality" "AnyTLS")
+NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess-ws" "vless-ws-tls" "h2-reality" "grpc-reality" "anytls")
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
 CDN_DOMAIN=("skk.moe" "cfip.xxxxxxxx.tk" "cm.yutian.us.kg" "fan.yutian.us.kg" "xn--b6gac.eu.org" "dash.cloudflare.com" "visa.com")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
@@ -27,8 +27,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="Compatible with Sing-box 1.12.0-alpha.18+."
-C[1]="适配 Sing-box 1.12.0-alpha.18+"
+E[1]="Added support for the AnyTLS protocol. Thanks to [Betterdoitnow] for providing the configuration."
+C[1]="新增对 AnyTLS 协议的支持，感谢 [Betterdoitnow] 提供的配置。"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -227,6 +227,8 @@ E[99]="The \${SING_BOX_SCRIPT} is detected to be installed. Script exits."
 C[99]="检测到已安装 \${SING_BOX_SCRIPT}，脚本退出!"
 E[100]="Can't get the official latest version. Script exits."
 C[100]="获取不到官方的最新版本，脚本退出!"
+E[101]="The contents of the AnyTLS configuration file need to be updated for the sing_box kernel."
+C[101]="AnyTLS 配置文件内容，需要更新 sing_box 内核"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -1694,7 +1696,7 @@ EOF
                     ]
                 }
             },
-            "transport": {
+            "transport":{
                 "type": "http"
             },
             "multiplex":{
@@ -1746,7 +1748,7 @@ EOF
                     ]
                 }
             },
-            "transport": {
+            "transport":{
                 "type": "grpc",
                 "service_name": "grpc"
             },
@@ -1758,6 +1760,37 @@ EOF
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
+            }
+        }
+    ]
+}
+EOF
+  fi
+
+  # 生成 anytls 配置
+  CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
+  if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
+    [ -z "$PORT_ANYTLS" ] && PORT_ANYTLS=$[START_PORT+$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")]
+    NODE_NAME[21]=${NODE_NAME[21]:-"$NODE_NAME_CONFIRM"} && UUID[21]=${UUID[21]:-"$UUID_CONFIRM"}
+
+    cat > ${WORK_DIR}/conf/21_${NODE_TAG[10]}_inbounds.json << EOF
+{
+    "inbounds":[
+        {
+            "type":"anytls",
+            "tag":"${NODE_NAME[21]} anytls",
+            "listen":"::",
+            "listen_port":$PORT_ANYTLS,
+            "users":[
+                {
+                    "password":"${UUID[21]}"
+                }
+            ],
+            "padding_scheme":[],
+            "tls":{
+                "enabled":true,
+                "certificate_path":"${WORK_DIR}/cert/cert.pem",
+                "key_path":"${WORK_DIR}/cert/private.key"
             }
         }
     ]
@@ -1816,7 +1849,7 @@ EOF
 
 # 获取原有各协议的参数，先清空所有的 key-value
 fetch_nodes_value() {
-  unset FILE NODE_NAME PORT_XTLS_REALITY UUID TLS_SERVER REALITY_PRIVATE REALITY_PUBLIC PORT_HYSTERIA2 OBFS PORT_TUIC TUIC_PASSWORD TUIC_CONGESTION_CONTROL PORT_SHADOWTLS SHADOWTLS_PASSWORD SHADOWSOCKS_METHOD PORT_SHADOWSOCKS PORT_TROJAN TROJAN_PASSWORD PORT_VMESS_WS VMESS_WS_PATH WS_SERVER_IP WS_SERVER_IP_SHOW VMESS_HOST_DOMAIN CDN PORT_VLESS_WS VLESS_WS_PATH VLESS_HOST_DOMAIN PORT_H2_REALITY PORT_GRPC_REALITY ARGO_DOMAIN
+  unset FILE NODE_NAME PORT_XTLS_REALITY UUID TLS_SERVER REALITY_PRIVATE REALITY_PUBLIC PORT_HYSTERIA2 OBFS PORT_TUIC TUIC_PASSWORD TUIC_CONGESTION_CONTROL PORT_SHADOWTLS SHADOWTLS_PASSWORD SHADOWSOCKS_METHOD PORT_SHADOWSOCKS PORT_TROJAN TROJAN_PASSWORD PORT_VMESS_WS VMESS_WS_PATH WS_SERVER_IP WS_SERVER_IP_SHOW VMESS_HOST_DOMAIN CDN PORT_VLESS_WS VLESS_WS_PATH VLESS_HOST_DOMAIN PORT_H2_REALITY PORT_GRPC_REALITY ARGO_DOMAIN PORT_ANYTLS
 
   # 获取公共数据
   ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && SERVER_IP=$(awk -F '"' '/"WS_SERVER_IP_SHOW"/{print $4; exit}' ${WORK_DIR}/conf/*-ws*inbounds.json) || SERVER_IP=$(grep -A1 '"tag"' ${WORK_DIR}/list | sed -E '/-ws(-tls)*",$/{N;d}' | awk -F '"' '/"server"/{count++; if (count == 1) {print $4; exit}}')
@@ -1861,6 +1894,9 @@ fetch_nodes_value() {
 
   # 获取 gRPC + Reality key-value
   [ -s ${WORK_DIR}/conf/*_${NODE_TAG[9]}_inbounds.json ] && local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[9]}_inbounds.json) && NODE_NAME[20]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[9]}.*/\1/p" <<< "$JSON") && PORT_GRPC_REALITY=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[20]=$(awk -F '"' '/"uuid"/{print $4}' <<< "$JSON") && TLS_SERVER[20]=$(awk -F '"' '/"server"/{print $4}' <<< "$JSON") && REALITY_PRIVATE[20]=$(awk -F '"' '/"private_key"/{print $4}' <<< "$JSON") && REALITY_PUBLIC[20]=$(awk -F '"' '/"public_key"/{print $4}' <<< "$JSON")
+
+  # 获取 anytls key-value
+  [ -s ${WORK_DIR}/conf/*_${NODE_TAG[10]}_inbounds.json ] && local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[10]}_inbounds.json) && NODE_NAME[21]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[10]}.*/\1/p" <<< "$JSON") && PORT_ANYTLS=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[21]=$(awk -F '"' '/"password"/{print $4}' <<< "$JSON")
 }
 
 # 获取 Argo 临时隧道域名
@@ -2038,6 +2074,12 @@ export_list() {
   local CLASH_SUBSCRIBE+="
   $CLASH_GRPC_REALITY
 "
+
+  [ -n "$PORT_ANYTLS" ] && local CLASH_ANYTLS="- {name: \"${NODE_NAME[21]} ${NODE_TAG[10]}\", type: anytls, server: ${SERVER_IP}, port: $PORT_ANYTLS, password: ${UUID[21]}, client-fingerprint: chrome, udp: true, idle-session-check-interval: 30, idle-session-timeout: 30, skip-cert-verify: true }" &&
+  local CLASH_SUBSCRIBE+="
+  $CLASH_ANYTLS
+"
+
   echo -n "${CLASH_SUBSCRIBE}" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' > ${WORK_DIR}/subscribe/proxies
 
   # 生成 clash 订阅配置文件
@@ -2146,54 +2188,54 @@ tuic://${UUID[13]}:${TUIC_PASSWORD}@${SERVER_IP_1}:${PORT_TUIC}?alpn=h3&congesti
 # $(text 54)
 
 {
-  \"log\":{
-      \"level\":\"warn\"
-  },
-  \"inbounds\":[
-      {
-          \"domain_strategy\":\"\",
-          \"listen\":\"127.0.0.1\",
-          \"listen_port\":${PORT_SHADOWTLS},
-          \"sniff\":true,
-          \"sniff_override_destination\":false,
-          \"tag\": \"ShadowTLS\",
-          \"type\":\"mixed\"
-      }
-  ],
-  \"outbounds\":[
-      {
-          \"detour\":\"shadowtls-out\",
-          \"domain_strategy\":\"\",
-          \"method\":\"$SHADOWTLS_METHOD\",
-          \"password\":\"$SHADOWTLS_PASSWORD\",
-          \"type\":\"shadowsocks\",
-          \"udp_over_tcp\": false,
-          \"multiplex\": {
-            \"enabled\": true,
-            \"protocol\": \"h2mux\",
-            \"max_connections\": 8,
-            \"min_streams\": 16,
-            \"padding\": true
-          }
-      },
-      {
-          \"domain_strategy\":\"\",
-          \"password\":\"${UUID[14]}\",
-          \"server\":\"${SERVER_IP}\",
-          \"server_port\":${PORT_SHADOWTLS},
-          \"tag\": \"shadowtls-out\",
-          \"tls\":{
-              \"enabled\":true,
-              \"server_name\":\"${TLS_SERVER[14]}\",
-              \"utls\": {
-                \"enabled\": true,
-                \"fingerprint\": \"chrome\"
-              }
-          },
-          \"type\":\"shadowtls\",
-          \"version\":3
-      }
-  ]
+    \"log\":{
+        \"level\":\"warn\"
+    },
+    \"inbounds\":[
+        {
+            \"domain_strategy\":\"\",
+            \"listen\":\"127.0.0.1\",
+            \"listen_port\":${PORT_SHADOWTLS},
+            \"sniff\":true,
+            \"sniff_override_destination\":false,
+            \"tag\": \"${PROTOCOL_LIST[3]}\",
+            \"type\":\"mixed\"
+        }
+    ],
+    \"outbounds\":[
+        {
+            \"detour\":\"shadowtls-out\",
+            \"domain_strategy\":\"\",
+            \"method\":\"$SHADOWTLS_METHOD\",
+            \"password\":\"$SHADOWTLS_PASSWORD\",
+            \"type\":\"shadowsocks\",
+            \"udp_over_tcp\": false,
+            \"multiplex\": {
+              \"enabled\": true,
+              \"protocol\": \"h2mux\",
+              \"max_connections\": 8,
+              \"min_streams\": 16,
+              \"padding\": true
+            }
+        },
+        {
+            \"domain_strategy\":\"\",
+            \"password\":\"${UUID[14]}\",
+            \"server\":\"${SERVER_IP}\",
+            \"server_port\":${PORT_SHADOWTLS},
+            \"tag\": \"shadowtls-out\",
+            \"tls\":{
+                \"enabled\":true,
+                \"server_name\":\"${TLS_SERVER[14]}\",
+                \"utls\": {
+                  \"enabled\": true,
+                  \"fingerprint\": \"chrome\"
+                }
+            },
+            \"type\":\"shadowtls\",
+            \"version\":3
+        }
+    ]
 }"
   [ -n "$PORT_SHADOWSOCKS" ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
@@ -2248,6 +2290,44 @@ vless://${UUID[19]}@${SERVER_IP_1}:${PORT_H2_REALITY}?encryption=none&security=r
   [ -n "$PORT_GRPC_REALITY" ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
 vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?encryption=none&security=reality&sni=${TLS_SERVER[20]}&fp=chrome&pbk=${REALITY_PUBLIC[20]}&type=grpc&serviceName=grpc&mode=gun#${NODE_NAME[20]// /%20}%20${NODE_TAG[9]}"
+
+  [ -n "$PORT_ANYTLS" ] && local V2RAYN_SUBSCRIBE+="
+----------------------------
+# $(text 101)
+
+{
+    \"log\":{
+        \"level\":\"warn\"
+    },
+    \"inbounds\":[
+        {
+            \"domain_strategy\":\"\",
+            \"listen\":\"127.0.0.1\",
+            \"listen_port\":${PORT_ANYTLS},
+            \"sniff\":true,
+            \"sniff_override_destination\":false,
+            \"tag\": \"${PROTOCOL_LIST[10]}\",
+            \"type\":\"mixed\"
+        }
+    ],
+    \"outbounds\":[
+        {
+            \"type\": \"anytls\",
+            \"tag\": \"${NODE_NAME[21]} ${NODE_TAG[10]}\",
+            \"server\": \"${SERVER_IP}\",
+            \"server_port\": ${PORT_ANYTLS},
+            \"password\": \"${UUID[21]}\",
+            \"idle_session_check_interval\": \"30s\",
+            \"idle_session_timeout\": \"30s\",
+            \"min_idle_session\": 5,
+            \"tls\": {
+              \"enabled\": true,
+              \"insecure\": true,
+              \"server_name\": \"\"
+            }
+        }
+    ]
+}"
 
   echo -n "$V2RAYN_SUBSCRIBE" | sed -E '/^[ ]*#|^[ ]+|^--|^\{|^\}/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/v2rayn
 
@@ -2398,6 +2478,10 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
   [ -n "$PORT_GRPC_REALITY" ] &&
   local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[20]} ${NODE_TAG[9]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_GRPC_REALITY}, \"uuid\":\"${UUID[20]}\", \"tls\": { \"enabled\":true, \"server_name\":\"${TLS_SERVER[20]}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[20]}\", \"short_id\":\"\" } }, \"packet_encoding\": \"xudp\", \"transport\": { \"type\": \"grpc\", \"service_name\": \"grpc\" } }," &&
   local NODE_REPLACE+="\"${NODE_NAME[20]} ${NODE_TAG[9]}\","
+
+  [ -n "$PORT_ANYTLS" ] &&
+  local INBOUND_REPLACE+=" { \"type\": \"anytls\", \"tag\": \"${NODE_NAME[21]} ${NODE_TAG[10]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_ANYTLS}, \"password\": \"${UUID[21]}\", \"idle_session_check_interval\": \"30s\", \"idle_session_timeout\": \"30s\", \"min_idle_session\": 5, \"tls\": { \"enabled\": true, \"insecure\": true, \"server_name\": \"\" } }," &&
+  local NODE_REPLACE+="\"${NODE_NAME[21]} ${NODE_TAG[10]}\","
 
   # 模板1
   local SING_BOX_JSON1=$(wget --no-check-certificate -qO- --tries=3 --timeout=2 ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/sing-box1)
@@ -2839,6 +2923,15 @@ change_protocols() {
     PORT_GRPC_REALITY=${REINSTALL_PORTS[POSITION]}
   else
     unset PORT_GRPC_REALITY
+  fi
+
+  # 获取 anytls 端口
+  CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
+  if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
+    POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
+    PORT_ANYTLS=${REINSTALL_PORTS[POSITION]}
+  else
+    unset PORT_ANYTLS
   fi
 
   # 停止 sing-box 服务

@@ -612,6 +612,31 @@ EOF
 }
 EOF
 
+  # 生成 AnyTLS 配置
+  [ "${ANYTLS}" = 'true' ] && ((PORT++)) && PORT_ANYTLS=$PORT && cat > ${WORK_DIR}/conf/21_anytls_inbounds.json << EOF
+{
+    "inbounds":[
+        {
+            "type":"anytls",
+            "tag":"${NODE_NAME} anytls",
+            "listen":"::",
+            "listen_port":$PORT_ANYTLS,
+            "users":[
+                {
+                    "password":"${UUID}"
+                }
+            ],
+            "padding_scheme":[],
+            "tls":{
+                "enabled":true,
+                "certificate_path":"${WORK_DIR}/cert/cert.pem",
+                "key_path":"${WORK_DIR}/cert/private.key"
+            }
+        }
+    ]
+}
+EOF
+
   # 判断 argo 隧道类型
   if [[ -n "$ARGO_DOMAIN" && -n "$ARGO_AUTH" ]]; then
     if [[ "$ARGO_AUTH" =~ TunnelSecret ]]; then
@@ -836,6 +861,11 @@ stdout_logfile=/dev/null
   local CLASH_SUBSCRIBE+="
   $CLASH_GRPC_REALITY
 "
+  [ "${ANYTLS}" = 'true' ] && local CLASH_ANYTLS="- {name: \"${NODE_NAME} anytls\", type: anytls, server: ${SERVER_IP}, port: $PORT_ANYTLS, password: ${UUID}, client-fingerprint: chrome, udp: true, idle-session-check-interval: 30, idle-session-timeout: 30, skip-cert-verify: true }" &&
+  local CLASH_SUBSCRIBE+="
+  $CLASH_ANYTLS
+"
+
   echo -n "${CLASH_SUBSCRIBE}" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' > ${WORK_DIR}/subscribe/proxies
 
   # 生成 clash 订阅配置文件
@@ -975,6 +1005,44 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_H2_REALITY}?encryption=none&security=reali
 ----------------------------
 vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?encryption=none&security=reality&sni=addons.mozilla.org&fp=chrome&pbk=${REALITY_PUBLIC}&type=grpc&serviceName=grpc&mode=gun#${NODE_NAME// /%20}%20grpc-reality"
 
+  [ "${ANYTLS}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
+----------------------------
+# $(info "AnyTLS 配置文件内容，需要更新 sing_box 内核")
+
+{
+    \"log\":{
+        \"level\":\"warn\"
+    },
+    \"inbounds\":[
+        {
+            \"domain_strategy\":\"\",
+            \"listen\":\"127.0.0.1\",
+            \"listen_port\":${PORT_ANYTLS},
+            \"sniff\":true,
+            \"sniff_override_destination\":false,
+            \"tag\": \"AnyTLS\",
+            \"type\":\"mixed\"
+        }
+    ],
+    \"outbounds\":[
+        {
+            \"type\": \"anytls\",
+            \"tag\": \"${NODE_NAME} anytls\",
+            \"server\": \"${SERVER_IP}\",
+            \"server_port\": ${PORT_ANYTLS},
+            \"password\": \"${UUID}\",
+            \"idle_session_check_interval\": \"30s\",
+            \"idle_session_timeout\": \"30s\",
+            \"min_idle_session\": 5,
+            \"tls\": {
+              \"enabled\": true,
+              \"insecure\": true,
+              \"server_name\": \"\"
+            }
+        }
+    ]
+}"
+
   echo -n "$V2RAYN_SUBSCRIBE" | sed -E '/^[ ]*#|^[ ]+|^--|^\{|^\}/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/v2rayn
 
   # 生成 NekoBox 订阅文件
@@ -1066,6 +1134,10 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=addons.
   [ "${GRPC_REALITY}" = 'true' ] &&
   local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME} grpc-reality\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_GRPC_REALITY}, \"uuid\":\"${UUID}\", \"tls\": { \"enabled\":true, \"server_name\":\"addons.mozilla.org\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC}\", \"short_id\":\"\" } }, \"packet_encoding\": \"xudp\", \"transport\": { \"type\": \"grpc\", \"service_name\": \"grpc\" } }," &&
   local NODE_REPLACE+="\"${NODE_NAME} grpc-reality\","
+
+  [ "${ANYTLS}" = 'true' ] &&
+  local INBOUND_REPLACE+=" { \"type\": \"anytls\", \"tag\": \"${NODE_NAME} anytls\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_ANYTLS}, \"password\": \"${UUID}\", \"idle_session_check_interval\": \"30s\", \"idle_session_timeout\": \"30s\", \"min_idle_session\": 5, \"tls\": { \"enabled\": true, \"insecure\": true, \"server_name\": \"\" } }," &&
+  local NODE_REPLACE+="\"${NODE_NAME} anytls\","
 
   # 模板
   local SING_BOX_JSON1=$(wget -qO- --tries=3 --timeout=2 ${SUBSCRIBE_TEMPLATE}/sing-box1)
@@ -1189,8 +1261,7 @@ $(${WORK_DIR}/qrencode https://${ARGO_DOMAIN}/${UUID}/auto)
 
 # Sing-box 的最新版本
 update_sing-box() {
-  #####local ONLINE=$(check_latest_sing-box)
-  local ONLINE='1.11.0-alpha.6'
+  local ONLINE=$(check_latest_sing-box)
   local LOCAL=$(${WORK_DIR}/sing-box version | awk '/version/{print $NF}')
   if [ -n "$ONLINE" ]; then
     if [[ "$ONLINE" != "$LOCAL" ]]; then
