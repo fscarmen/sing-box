@@ -11,20 +11,18 @@ info() { echo -e "\033[32m\033[01m$*\033[0m"; }   # 绿色
 hint() { echo -e "\033[33m\033[01m$*\033[0m"; }   # 黄色
 
 # 判断系统架构，以下载相应的应用
-check_arch() {
-  case "$ARCH" in
-    arm64 )
-      SING_BOX_ARCH=arm64; JQ_ARCH=arm64; QRENCODE_ARCH=arm64; ARGO_ARCH=arm64
-      ;;
-    amd64 )
-      SING_BOX_ARCH=amd64
-      JQ_ARCH=amd64; QRENCODE_ARCH=amd64; ARGO_ARCH=amd64
-      ;;
-    armv7 )
-      SING_BOX_ARCH=armv7; JQ_ARCH=armhf; QRENCODE_ARCH=arm; ARGO_ARCH=arm
-      ;;
-  esac
-}
+case "$ARCH" in
+  arm64 )
+    SING_BOX_ARCH=arm64; JQ_ARCH=arm64; QRENCODE_ARCH=arm64; ARGO_ARCH=arm64
+    ;;
+  amd64 )
+    SING_BOX_ARCH=amd64
+    JQ_ARCH=amd64; QRENCODE_ARCH=amd64; ARGO_ARCH=amd64
+    ;;
+  armv7 )
+    SING_BOX_ARCH=armv7; JQ_ARCH=armhf; QRENCODE_ARCH=arm; ARGO_ARCH=arm
+    ;;
+esac
 
 # 检查 sing-box 最新版本
 check_latest_sing-box() {
@@ -60,11 +58,15 @@ install() {
   echo "正在下载 cloudflared ..."
   wget -O ${WORK_DIR}/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$ARGO_ARCH && chmod +x ${WORK_DIR}/cloudflared
 
+  # 检查系统是否已经安装 tcp-brutal
+  IS_BRUTAL=false && [ -x "$(type -p lsmod)" ] && lsmod | grep -q brutal && IS_BRUTAL=true
+  [ "$IS_BRUTAL" = 'false' ] && [ -x "$(type -p modprobe)" ] && modprobe brutal 2>/dev/null && IS_BRUTAL=true
+
   # 生成 sing-box 配置文件
   if [[ "$SERVER_IP" =~ : ]]; then
-    local DOMAIN_STRATEG=prefer_ipv6
+    local STRATEGY=prefer_ipv6
   else
-    local DOMAIN_STRATEG=prefer_ipv4
+    local STRATEGY=prefer_ipv4
   fi
 
   local REALITY_KEYPAIR=$(${WORK_DIR}/sing-box generate reality-keypair) && REALITY_PRIVATE=$(awk '/PrivateKey/{print $NF}' <<< "$REALITY_KEYPAIR") && REALITY_PUBLIC=$(awk '/PublicKey/{print $NF}' <<< "$REALITY_KEYPAIR")
@@ -110,8 +112,7 @@ EOF
     "outbounds":[
         {
             "type":"direct",
-            "tag":"direct",
-            "domain_strategy":"$DOMAIN_STRATEG"
+            "tag":"direct"
         }
     ]
 }
@@ -215,7 +216,8 @@ EOF
             {
                 "type":"local"
             }
-        ]
+        ],
+        "strategy": "${STRATEGY}"
     }
 }
 EOF
@@ -267,7 +269,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -371,7 +373,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -396,7 +398,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -429,7 +431,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -467,7 +469,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -505,7 +507,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -552,7 +554,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -602,7 +604,7 @@ EOF
                 "enabled":true,
                 "padding":true,
                 "brutal":{
-                    "enabled":true,
+                    "enabled":${IS_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -822,7 +824,7 @@ stdout_logfile=/dev/null
   # 生成 Clash proxy providers 订阅文件
   local CLASH_SUBSCRIBE='proxies:'
 
-  [ "${XTLS_REALITY}" = 'true' ] && local CLASH_XTLS_REALITY="- {name: \"${NODE_NAME} xtls-reality\", type: vless, server: ${SERVER_IP}, port: ${PORT_XTLS_REALITY}, uuid: ${UUID}, network: tcp, udp: true, tls: true, servername: addons.mozilla.org, client-fingerprint: chrome, reality-opts: {public-key: ${REALITY_PUBLIC}, short-id: \"\"}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }" &&
+  [ "${XTLS_REALITY}" = 'true' ] && local CLASH_XTLS_REALITY="- {name: \"${NODE_NAME} xtls-reality\", type: vless, server: ${SERVER_IP}, port: ${PORT_XTLS_REALITY}, uuid: ${UUID}, network: tcp, udp: true, tls: true, servername: addons.mozilla.org, client-fingerprint: chrome, reality-opts: {public-key: ${REALITY_PUBLIC}, short-id: \"\"}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_XTLS_REALITY
 "
@@ -834,30 +836,30 @@ stdout_logfile=/dev/null
   local CLASH_SUBSCRIBE+="
   $CLASH_TUIC
 "
-  [ "${SHADOWTLS}" = 'true' ] && local CLASH_SHADOWTLS="- {name: \"${NODE_NAME} ShadowTLS\", type: ss, server: ${SERVER_IP}, port: ${PORT_SHADOWTLS}, cipher: 2022-blake3-aes-128-gcm, password: ${SHADOWTLS_PASSWORD}, plugin: shadow-tls, client-fingerprint: chrome, plugin-opts: {host: addons.mozilla.org, password: \"${UUID}\", version: 3}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }" &&
+  [ "${SHADOWTLS}" = 'true' ] && local CLASH_SHADOWTLS="- {name: \"${NODE_NAME} ShadowTLS\", type: ss, server: ${SERVER_IP}, port: ${PORT_SHADOWTLS}, cipher: 2022-blake3-aes-128-gcm, password: ${SHADOWTLS_PASSWORD}, plugin: shadow-tls, client-fingerprint: chrome, plugin-opts: {host: addons.mozilla.org, password: \"${UUID}\", version: 3}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_SHADOWTLS
 "
-  [ "${SHADOWSOCKS}" = 'true' ] && local CLASH_SHADOWSOCKS="- {name: \"${NODE_NAME} shadowsocks\", type: ss, server: ${SERVER_IP}, port: $PORT_SHADOWSOCKS, cipher: aes-128-gcm, password: ${UUID}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }" &&
+  [ "${SHADOWSOCKS}" = 'true' ] && local CLASH_SHADOWSOCKS="- {name: \"${NODE_NAME} shadowsocks\", type: ss, server: ${SERVER_IP}, port: $PORT_SHADOWSOCKS, cipher: aes-128-gcm, password: ${UUID}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_SHADOWSOCKS
 "
-  [ "${TROJAN}" = 'true' ] && local CLASH_TROJAN="- {name: \"${NODE_NAME} trojan\", type: trojan, server: ${SERVER_IP}, port: $PORT_TROJAN, password: ${UUID}, client-fingerprint: random, skip-cert-verify: true, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }" &&
+  [ "${TROJAN}" = 'true' ] && local CLASH_TROJAN="- {name: \"${NODE_NAME} trojan\", type: trojan, server: ${SERVER_IP}, port: $PORT_TROJAN, password: ${UUID}, client-fingerprint: random, skip-cert-verify: true, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_TROJAN
 "
-  [ "${VMESS_WS}" = 'true' ] && local CLASH_VMESS_WS="- {name: \"${NODE_NAME} vmess-ws\", type: vmess, server: ${CDN}, port: 80, uuid: ${UUID}, udp: true, tls: false, alterId: 0, cipher: auto, skip-cert-verify: true, network: ws, ws-opts: { path: \"/${UUID}-vmess\", headers: {Host: ${ARGO_DOMAIN}} }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }" &&
+  [ "${VMESS_WS}" = 'true' ] && local CLASH_VMESS_WS="- {name: \"${NODE_NAME} vmess-ws\", type: vmess, server: ${CDN}, port: 80, uuid: ${UUID}, udp: true, tls: false, alterId: 0, cipher: auto, skip-cert-verify: true, network: ws, ws-opts: { path: \"/${UUID}-vmess\", headers: {Host: ${ARGO_DOMAIN}} }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_VMESS_WS
 "
-  [ "${VLESS_WS}" = 'true' ] && local CLASH_VLESS_WS="- {name: \"${NODE_NAME} vless-ws-tls\", type: vless, server: ${CDN}, port: 443, uuid: ${UUID}, udp: true, tls: true, servername: ${ARGO_DOMAIN}, network: ws, skip-cert-verify: true, ws-opts: { path: \"/${UUID}-vless\", headers: {Host: ${ARGO_DOMAIN}}, max-early-data: 2048, early-data-header-name: Sec-WebSocket-Protocol }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }" &&
+  [ "${VLESS_WS}" = 'true' ] && local CLASH_VLESS_WS="- {name: \"${NODE_NAME} vless-ws-tls\", type: vless, server: ${CDN}, port: 443, uuid: ${UUID}, udp: true, tls: true, servername: ${ARGO_DOMAIN}, network: ws, skip-cert-verify: true, ws-opts: { path: \"/${UUID}-vless\", headers: {Host: ${ARGO_DOMAIN}}, max-early-data: 2048, early-data-header-name: Sec-WebSocket-Protocol }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_VLESS_WS
 "
   # Clash 的 H2 传输层未实现多路复用功能，在 Clash.Meta 中更建议使用 gRPC 协议，故不输出相关配置。 https://wiki.metacubex.one/config/proxies/vless/
   [ "${H2_REALITY}" = 'true' ]
 
-  [ "${GRPC_REALITY}" = 'true' ] && local CLASH_GRPC_REALITY="- {name: \"${NODE_NAME} grpc-reality\", type: vless, server: ${SERVER_IP}, port: ${PORT_GRPC_REALITY}, uuid: ${UUID}, network: grpc, tls: true, udp: true, flow:, client-fingerprint: chrome, servername: addons.mozilla.org, grpc-opts: {  grpc-service-name: \"grpc\" }, reality-opts: { public-key: ${REALITY_PUBLIC}, short-id: \"\" }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false } }" &&
+  [ "${GRPC_REALITY}" = 'true' ] && local CLASH_GRPC_REALITY="- {name: \"${NODE_NAME} grpc-reality\", type: vless, server: ${SERVER_IP}, port: ${PORT_GRPC_REALITY}, uuid: ${UUID}, network: grpc, tls: true, udp: true, flow:, client-fingerprint: chrome, servername: addons.mozilla.org, grpc-opts: {  grpc-service-name: \"grpc\" }, reality-opts: { public-key: ${REALITY_PUBLIC}, short-id: \"\" }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_GRPC_REALITY
 "
@@ -933,7 +935,6 @@ tuic://${UUID}:${UUID}@${SERVER_IP_1}:${PORT_TUIC}?alpn=h3&congestion_control=bb
   },
   \"inbounds\":[
       {
-          \"domain_strategy\":\"\",
           \"listen\":\"127.0.0.1\",
           \"listen_port\":${PORT_SHADOWTLS},
           \"sniff\":true,
@@ -945,7 +946,6 @@ tuic://${UUID}:${UUID}@${SERVER_IP_1}:${PORT_TUIC}?alpn=h3&congestion_control=bb
   \"outbounds\":[
       {
           \"detour\":\"shadowtls-out\",
-          \"domain_strategy\":\"\",
           \"method\":\"2022-blake3-aes-128-gcm\",
           \"password\":\"${SHADOWTLS_PASSWORD}\",
           \"type\":\"shadowsocks\",
@@ -959,7 +959,6 @@ tuic://${UUID}:${UUID}@${SERVER_IP_1}:${PORT_TUIC}?alpn=h3&congestion_control=bb
           }
       },
       {
-          \"domain_strategy\":\"\",
           \"password\":\"${UUID}\",
           \"server\":\"${SERVER_IP}\",
           \"server_port\":${PORT_SHADOWTLS},
@@ -1015,7 +1014,6 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?encryption=none&security=rea
     },
     \"inbounds\":[
         {
-            \"domain_strategy\":\"\",
             \"listen\":\"127.0.0.1\",
             \"listen_port\":${PORT_ANYTLS},
             \"sniff\":true,
@@ -1286,8 +1284,6 @@ while getopts ":Vv" OPTNAME; do
 done
 
 # 主流程
-check_arch
-
 case "$ACTION" in
   update )
     update_sing-box
