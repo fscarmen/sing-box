@@ -34,7 +34,7 @@ check_latest_sing-box() {
 
   # 获取最终版本号
   local VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$FORCE_VERSION" '$0 ~ var {print $5; exit}')
-  VERSION=${VERSION:-'1.12.0-alpha.18'}
+  VERSION=${VERSION:-'1.12.0-alpha.23'}
 
   echo "$VERSION"
 }
@@ -66,7 +66,7 @@ install() {
   if [[ "$SERVER_IP" =~ : ]]; then
     local STRATEGY=prefer_ipv6
   else
-    local STRATEGY=prefer_ipv4
+    local STRATEGY=ipv4_only
   fi
 
   local REALITY_KEYPAIR=$(${WORK_DIR}/sing-box generate reality-keypair) && REALITY_PRIVATE=$(awk '/PrivateKey/{print $NF}' <<< "$REALITY_KEYPAIR") && REALITY_PUBLIC=$(awk '/PublicKey/{print $NF}' <<< "$REALITY_KEYPAIR")
