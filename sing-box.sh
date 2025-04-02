@@ -552,7 +552,7 @@ check_install() {
     else
       local VERSION_LATEST=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v-]' '/tag_name/{print $5}' | sort -Vr | sed -n '1p')
       local ONLINE=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
-      ONLINE=${ONLINE:-'1.11.0'}
+      ONLINE=${ONLINE:-'1.12.0'}
     fi
     wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box >/dev/null 2>&1
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
@@ -867,12 +867,12 @@ sing-box_variables() {
   if [[ "$SERVER_IP" =~ : ]]; then
     STRATEGY=prefer_ipv6
   else
-    STRATEGY=prefer_ipv4
+    STRATEGY=ipv4_only
   fi
 
   # 检测是否解锁 chatGPT
   CHATGPT_OUT=warp-ep;
-  [ "$(check_chatgpt ${STRATEGY: -1})" = 'unlock' ] && CHATGPT_OUT=direct
+  [ "$(check_chatgpt $(grep -oE '[46]' <<< "$STRATEGY"))" = 'unlock' ] && CHATGPT_OUT=direct
 
   # 如选择有 c. hysteria2 时，选择是否使用端口跳跃
   [[ "${INSTALL_PROTOCOLS[@]}" =~ 'c' ]] && input_hopping_port
