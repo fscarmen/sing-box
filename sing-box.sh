@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.14 (2025.03.23)'
+VERSION='v1.2.14 (2025.04.03)'
 
 # 各变量默认值
 GH_PROXY='https://ghproxy.lvedong.eu.org/'
@@ -2623,7 +2623,7 @@ $(${WORK_DIR}/qrencode $SUBSCRIBE_ADDRESS/${UUID_CONFIRM}/auto2)
   cat ${WORK_DIR}/list
 
   # 显示脚本使用情况数据
-  hint "\n*******************************************\n\n $(text 55) \n"
+  statistics_of_run-times get
 }
 
 # 创建快捷方式
@@ -3120,7 +3120,7 @@ menu() {
 }
 
 check_cdn
-statistics_of_run-times
+statistics_of_run-times update sing-box.sh
 
 # 传参
 [[ "${*^^}" =~ '-E' ]] && L=E
