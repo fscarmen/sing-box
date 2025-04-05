@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.14 (2025.04.03)'
+VERSION='v1.2.15 (2025.04.05)'
 
 # 各变量默认值
 GH_PROXY='https://ghproxy.lvedong.eu.org/'
@@ -27,8 +27,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="Added support for the AnyTLS protocol. Thanks to [Betterdoitnow] for providing the configuration."
-C[1]="新增对 AnyTLS 协议的支持，感谢 [Betterdoitnow] 提供的配置。"
+E[1]="Added support for the AnyTLS protocol. Thanks to [Betterdoitnow] for providing the configuration. Supports output for clients such as Shadowrocket, Clash Mihomo, and Sing-box."
+C[1]="新增对 AnyTLS 协议的支持，感谢 [Betterdoitnow] 提供的配置。支持小火箭、Clash Mihomo、Sing-box 客户端输出"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -2171,6 +2171,9 @@ vless://$(echo -n auto:${UUID[19]}@${SERVER_IP_2}:${PORT_H2_REALITY} | base64 -w
   [ -n "$PORT_GRPC_REALITY" ] && local SHADOWROCKET_SUBSCRIBE+="
 vless://$(echo -n "auto:${UUID[20]}@${SERVER_IP_2}:${PORT_GRPC_REALITY}" | base64 -w0)?remarks=${NODE_NAME[20]}%20${NODE_TAG[9]}&path=grpc&obfs=grpc&tls=1&peer=${TLS_SERVER[20]}&pbk=${REALITY_PUBLIC[20]}
 "
+  [ -n "$PORT_ANYTLS" ] && local SHADOWROCKET_SUBSCRIBE+="
+anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}?insecure=1&udp=1#${NODE_NAME[21]}%20${NODE_TAG[10]}
+"
   echo -n "$SHADOWROCKET_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/shadowrocket
 
   # 生成 V2rayN 订阅文件
@@ -2537,7 +2540,7 @@ $(hint "${SHADOWROCKET_SUBSCRIBE}")
 *******************************************
 ┌────────────────┐
 │                │
-│   $(warning "Clash Meta")   │
+│   $(warning "Clash Verge")  │
 │                │
 └────────────────┘
 ----------------------------
