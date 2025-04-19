@@ -2588,6 +2588,10 @@ vless://${UUID[19]}@${SERVER_IP_1}:${PORT_H2_REALITY}?security=reality&sni=${TLS
 ----------------------------
 vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${TLS_SERVER[20]}&fp=chrome&pbk=${REALITY_PUBLIC[20]}&type=grpc&serviceName=grpc&encryption=none#${NODE_NAME[20]}%20${NODE_TAG[9]}"
 
+  [ -n "$PORT_ANYTLS" ] && local NEKOBOX_SUBSCRIBE+="
+----------------------------
+anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}/?insecure=1#${NODE_NAME[21]}%20${NODE_TAG[10]}"
+
   echo -n "$NEKOBOX_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/neko
 
   # 生成 Sing-box 订阅文件
