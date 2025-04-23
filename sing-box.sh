@@ -4,7 +4,7 @@
 VERSION='v1.2.16 (2025.04.06)'
 
 # 各变量默认值
-GH_PROXY='https://ghproxy.lvedong.eu.org/'
+GH_PROXY='https://ghfast.top/'
 TEMP_DIR='/tmp/sing-box'
 WORK_DIR='/etc/sing-box'
 START_PORT_DEFAULT='8881'
@@ -411,13 +411,9 @@ input_argo_auth() {
       ARGO_JSON=${ARGO_AUTH//[ ]/}
       [ "$IS_CHANGE_ARGO" = 'is_install' ] && export_argo_json_file $TEMP_DIR || export_argo_json_file ${WORK_DIR}
       ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run"
-    elif [[ "$ARGO_AUTH" =~ ^[A-Z0-9a-z=]{120,250}$ ]]; then
+    elif [[ "${ARGO_AUTH,,}" =~ .*[a-z0-9=]{120,250}$ ]]; then
       ARGO_TYPE=is_token_argo
-      ARGO_TOKEN=$ARGO_AUTH
-      ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto run --token ${ARGO_TOKEN}"
-    elif [[ "$ARGO_AUTH" =~ .*cloudflared.*service[[:space:]]+install[[:space:]]+[A-Z0-9a-z=]{1,100} ]]; then
-      ARGO_TYPE=is_token_argo
-      ARGO_TOKEN=$(awk -F ' ' '{print $NF}' <<< "$ARGO_AUTH")
+      ARGO_TOKEN=$(awk '{print $NF}' <<< "$ARGO_AUTH")
       ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto run --token ${ARGO_TOKEN}"
     fi
   fi
@@ -644,51 +640,58 @@ check_install() {
 
 # 为了适配 alpine，定义 cmd_systemctl 的函数
 cmd_systemctl() {
+  nginx_run() {
+    $(type -p nginx) -c $WORK_DIR/nginx.conf
+  }
+
+  nginx_stop() {
+    local NGINX_PID=$(ps -ef | awk -v work_dir="$WORK_DIR" '$0 ~ "nginx -c " work_dir "/nginx.conf" {print $2; exit}')
+    ss -nltp | sed -n "/pid=$NGINX_PID,/ s/,/ /gp" | grep -oP 'pid=\K\S+' | sort -u | xargs kill -9 >/dev/null 2>&1
+  }
+
   if [ "$SYSTEM" = 'Alpine' ]; then
     case "$1" in
-      enable)
-        if [ "$2" = "sing-box" ]; then
-          rc-update add sing-box default >/dev/null 2>&1
-          rc-service sing-box start >/dev/null 2>&1
-        elif [ "$2" = "argo" ]; then
-          rc-update add argo default >/dev/null 2>&1
-          rc-service argo start >/dev/null 2>&1
-        fi
+      enable )
+        rc-update add "$2" default >/dev/null 2>&1
+        rc-service "$2" start >/dev/null 2>&1
         ;;
-      disable)
-        if [ "$2" = "sing-box" ]; then
-          rc-service sing-box stop >/dev/null 2>&1
-          rc-update del sing-box default >/dev/null 2>&1
-        elif [ "$2" = "argo" ]; then
-          rc-service argo stop >/dev/null 2>&1
-          rc-update del argo default >/dev/null 2>&1
-        fi
+      disable )
+        rc-service "$2" stop >/dev/null 2>&1
+        rc-update del "$2" default >/dev/null 2>&1
         ;;
-      restart)
-        if [ "$2" = "sing-box" ]; then
-          rc-service sing-box restart >/dev/null 2>&1
-        elif [ "$2" = "argo" ]; then
-          rc-service argo restart >/dev/null 2>&1
-        fi
+      restart )
+        rc-service "$2" restart >/dev/null 2>&1
         ;;
-      status)
-        if [ "$2" = "sing-box" ]; then
-          rc-service sing-box status
-        elif [ "$2" = "argo" ]; then
-          rc-service argo status
-        fi
+      status )
+        rc-service "$2" status
         ;;
     esac
   else
-    if [ "$1" = "enable" ] || [ "$1" = "disable" ]; then
-      systemctl "$1" --now "$2" >/dev/null 2>&1
-    elif [ "$1" = "restart" ]; then
-      systemctl restart "$2" >/dev/null 2>&1
-    elif [ "$1" = "status" ]; then
-      systemctl status "$2"
-    else
-      systemctl "$@" >/dev/null 2>&1
-    fi
+    case "$1" in
+      enable | disable )
+        systemctl "$1" --now "$2" >/dev/null 2>&1
+        if [ "$IS_CENTOS" = 'CentOS7' ] && [ "$2" = 'sing-box' ] && [ -s $WORK_DIR/nginx.conf ]; then
+          if [ "$1" = 'enable' ]; then
+            nginx_run
+            firewall_configuration open
+          else
+            nginx_stop
+            firewall_configuration close
+          fi
+        fi
+        ;;
+      restart )
+        [ "$IS_CENTOS" = 'CentOS7' ] && [ "$2" = 'sing-box' ] && [ -s $WORK_DIR/nginx.conf ] && { nginx_stop; firewall_configuration close; }
+        systemctl restart "$2" >/dev/null 2>&1
+        [ "$IS_CENTOS" = 'CentOS7' ] && [ "$2" = 'sing-box' ] && [ -s $WORK_DIR/nginx.conf ] && { nginx_run; firewall_configuration open; }
+        ;;
+      status )
+        systemctl status "$2"
+        ;;
+      * )
+        systemctl "$@" >/dev/null 2>&1
+        ;;
+    esac
   fi
 }
 
@@ -1076,11 +1079,26 @@ ssl_certificate() {
 }
 
 # 处理防火墙规则
-check_firewall_configuration() {
+firewall_configuration() {
+  local LISTEN_PORT=$(sed -n "/listen_port/ s#.*:\([0-9]\+\),#\1#gp" /etc/sing-box/conf/*)
+  local PORT_NGINX=$(awk '/listen/{print $2; exit}' ${WORK_DIR}/nginx.conf)
+  if grep -q "open" <<< "$1"; then
+    local LISTEN_PORT_TCP=$(sed -n "s#\([0-9]\+\)#--add-port=\1/tcp#gp" <<< "$LISTEN_PORT")
+    local LISTEN_PORT_UDP=$(sed -n "s#\([0-9]\+\)#--add-port=\1/udp#gp" <<< "$LISTEN_PORT")
+    firewall-cmd --zone=public --add-port=${PORT_NGINX}/tcp --permanent >/dev/null 2>&1
+  elif grep -q "close" <<< "$1"; then
+    local LISTEN_PORT_TCP=$(sed -n "s#\([0-9]\+\)#--remove-port=\1/tcp#gp" <<< "$LISTEN_PORT")
+    local LISTEN_PORT_UDP=$(sed -n "s#\([0-9]\+\)#--remove-port=\1/udp#gp" <<< "$LISTEN_PORT")
+    firewall-cmd --zone=public --remove-port=${PORT_NGINX}/tcp --permanent >/dev/null 2>&1
+  fi
+  firewall-cmd --zone=public ${LISTEN_PORT_TCP} --permanent >/dev/null 2>&1
+  firewall-cmd --zone=public ${LISTEN_PORT_UDP} --permanent >/dev/null 2>&1
+  firewall-cmd --reload >/dev/null 2>&1
+
   if [[ -s /etc/selinux/config && -x "$(type -p getenforce)" && $(getenforce) = 'Enforcing' ]]; then
     hint "\n $(text 84) "
     setenforce 0
-    sed -i 's/^SELINUX=.*/# &/; /SELINUX=/a\SELINUX=disabled' /etc/selinux/config
+    grep -qs '^SELINUX=disabled$' /etc/selinux/config || sed -i 's/^SELINUX=[epd].*/# &/; /SELINUX=[epd]/a\SELINUX=disabled' /etc/selinux/config
   fi
 }
 
@@ -2087,7 +2105,6 @@ install_sing-box() {
   [ ! -d /etc/systemd/system ] && mkdir -p /etc/systemd/system
   [ ! -d ${WORK_DIR}/logs ] && mkdir -p ${WORK_DIR}/logs
   ssl_certificate
-  [ "$SYSTEM" = 'CentOS' ] && check_firewall_configuration
   hint "\n $(text 2) " && wait
   sing-box_json
   echo "${L^^}" > ${WORK_DIR}/language
@@ -2113,6 +2130,9 @@ install_sing-box() {
 
   # 等待服务启动
   sleep 2
+
+  # 处理防火墙相关端口
+  [ "$SYSTEM" = 'CentOS' ] && firewall_configuration open
 
   # 检查服务是否成功启动
   if cmd_systemctl status sing-box &>/dev/null; then
@@ -3111,6 +3131,9 @@ change_protocols() {
   # 停止 sing-box 服务
   cmd_systemctl disable sing-box
 
+  # 关闭防火墙相关端口
+  [ "$SYSTEM" = 'CentOS' ] && firewall_configuration close
+
   # 生成 Nginx 配置文件
   [ -n "$PORT_NGINX" ] && export_nginx_conf_file
 
@@ -3134,6 +3157,9 @@ change_protocols() {
 
   # 运行 sing-box
   cmd_systemctl enable sing-box
+
+  # 打开防火墙相关端口
+  [ "$SYSTEM" = 'CentOS' ] && firewall_configuration open
 
   # 等待服务启动
   sleep 3
@@ -3170,6 +3196,7 @@ uninstall() {
     [[ -s ${WORK_DIR}/nginx.conf && $(ps -ef | grep 'nginx' | wc -l) -le 1 ]] && reading "\n $(text 83) " REMOVE_NGINX
     [ "${REMOVE_NGINX,,}" = 'y' ] && ${PACKAGE_UNINSTALL[int]} nginx >/dev/null 2>&1
     [ "$IS_HOPPING" = 'is_hopping' ] && del_port_hopping_nat
+    [ "$SYSTEM" = 'CentOS' ] && firewall_configuration close
     rm -rf ${WORK_DIR} $TEMP_DIR /etc/systemd/system/sing-box.service /usr/bin/sb
     info "\n $(text 16) \n"
   else
