@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.16 (2025.04.06)'
+VERSION='v1.2.17 (2025.04.25)'
 
 # 各变量默认值
 GH_PROXY='https://ghfast.top/'
@@ -27,8 +27,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Added support for the AnyTLS protocol. Thanks to [Betterdoitnow] for providing the configuration. Supports output for clients such as Shadowrocket, Clash Mihomo, and Sing-box; 2. Use OpenRC on Alpine to replace systemctl (Python3-compatible version). "
-C[1]="1. 新增对 AnyTLS 协议的支持，感谢 [Betterdoitnow] 提供的配置。支持小火箭、Clash Mihomo、Sing-box 客户端输出; 2. 在 Alpine 系统中使用 OpenRC 取代兼容 Python3 的 systemctl 实现"
+E[1]="1. Added the ability to change CDNs online using [sb -d]; 2. Change GitHub proxy; 3. Optimize code."
+C[1]="1. 新增使用 [sb -d] 在线更换 CDN 功能; 2. 更改 GitHub 代理; 3. 优化代码"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -239,6 +239,18 @@ E[105]="Successfully restored old version \$LOCAL"
 C[105]="已成功恢复旧版本 \$LOCAL"
 E[106]="Failed to restore old version \$LOCAL, please check manually"
 C[106]="恢复旧版本 \$LOCAL 失败，请手动检查"
+E[107]="Sing-box is not installed and cannot change the CDN."
+C[107]="Sing-box 未安装，不能更换 CDN"
+E[108]="Change CDN"
+C[108]="更换 CDN"
+E[109]="Current CDN is: \${CDN_NOW}"
+C[109]="当前 CDN 为: \${CDN_NOW}"
+E[110]="No CDN protocol is currently in use"
+C[110]="当前没有使用 CDN 的协议"
+E[111]="Please select or enter a new CDN (press Enter to keep the current one):"
+C[111]="请选择或输入新的 CDN (回车保持当前值):"
+E[112]="CDN has been changed from \${CDN_NOW} to \${CDN_NEW}"
+C[112]="CDN 已从 \${CDN_NOW} 更改为 \${CDN_NEW}"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -289,7 +301,7 @@ statistics_of_run-times() {
   local UPDATE_OR_GET=$1
   local SCRIPT=$2
   if grep -q 'update' <<< "$UPDATE_OR_GET"; then
-    { wget -qO- --timeout=3 "https://stat-api.netlify.app/updateStats?script=${SCRIPT}" > $TEMP_DIR/statistics; }&
+    { wget -qO- --timeout=3 "https://stat-api.netlify.app/updateStats?script=${SCRIPT}" > $TEMP_DIR/statistics 2>/dev/null || true; }&
   elif grep -q 'get' <<< "$UPDATE_OR_GET"; then
     [ -s $TEMP_DIR/statistics ] && [[ $(cat $TEMP_DIR/statistics) =~ \"todayCount\":([0-9]+),\"totalCount\":([0-9]+) ]] && local TODAY="${BASH_REMATCH[1]}" && local TOTAL="${BASH_REMATCH[2]}" && rm -f $TEMP_DIR/statistics
     hint "\n*******************************************\n\n $(text 55) \n"
@@ -335,6 +347,34 @@ input_cdn() {
     * )
       CDN="${CDN_DOMAIN[0]}"
   esac
+}
+
+# 更换 cdn
+change_cdn() {
+  [ ! -d "${WORK_DIR}" ] && error " $(text 107) "
+  
+  # 检测是否有使用 CDN，方法是查找是否有 ${WORK_DIR}/conf/
+  ! ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && error " $(text 110) "
+  local CDN_NOW=$(awk -F '"' '/"CDN"/{print $4; exit}' ${WORK_DIR}/conf/*-ws*inbounds.json)
+
+  # 提示当前使用的 CDN 并让用户选择或输入新的 CDN
+  hint "\n $(text 109) \n"
+  for ((c=0; c<${#CDN_DOMAIN[@]}; c++)); do
+    hint " $[c+1]. ${CDN_DOMAIN[c]} "
+  done
+  reading "\n $(text 111) " CDN_CHOOSE
+  
+  # 如果用户直接回车，保持当前 CDN
+  [ -z "$CDN_CHOOSE" ] && exit 0
+  
+  # 如果用户输入数字，选择对应的 CDN
+  [[ "$CDN_CHOOSE" =~ ^[1-9][0-9]*$ && "$CDN_CHOOSE" -le "${#CDN_DOMAIN[@]}" ]] && CDN_NEW=${CDN_DOMAIN[$((CDN_CHOOSE-1))]} || CDN_NEW=$CDN_CHOOSE
+  
+  # 使用 sed 更新所有文件中的 CDN 值
+  find ${WORK_DIR} -type f | xargs -P 50 sed -i "s/${CDN_NOW}/${CDN_NEW}/g"
+  
+  # 更新完成后提示并导出订阅列表
+  export_list; info "\n $(text 112) \n"
 }
 
 # 输入 Nginx 服务端口
@@ -441,7 +481,7 @@ change_argo() {
   fi
 
   # 根据系统类型检查 Argo 服务配置
-  [ "$SYSTEM" = 'Alpine' ] && local ARGO_CONFIG=$(grep '^command_args=' /etc/init.d/argo) || local ARGO_CONFIG=$(grep "ExecStart=" /etc/systemd/system/argo.service)
+  local ARGO_CONFIG=$(grep -E '^(command_args=|ExecStart=)' ${ARGO_DAEMON_FILE})
 
   case "$ARGO_CONFIG" in
     *--config* )
@@ -466,7 +506,7 @@ change_argo() {
       [ -s ${WORK_DIR}/tunnel.json ] && rm -f ${WORK_DIR}/tunnel.{json,yml}
 
       # 根据系统类型修改配置文件
-      [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto --no-autoupdate --url http://localhost:$PORT_NGINX\"@g" /etc/init.d/argo || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --no-autoupdate --url http://localhost:$PORT_NGINX@g" /etc/systemd/system/argo.service
+      [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto --no-autoupdate --url http://localhost:$PORT_NGINX\"@g" ${ARGO_DAEMON_FILE} || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --no-autoupdate --url http://localhost:$PORT_NGINX@g" ${ARGO_DAEMON_FILE}
       ;;
     2 )
       [ -s ${WORK_DIR}/tunnel.json ] && rm -f ${WORK_DIR}/tunnel.{json,yml}
@@ -474,9 +514,9 @@ change_argo() {
       cmd_systemctl disable argo
 
       if [ -n "$ARGO_TOKEN" ]; then
-        [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto run --token ${ARGO_TOKEN}\"@g" /etc/init.d/argo || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto run --token ${ARGO_TOKEN}@g" /etc/systemd/system/argo.service
+        [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto run --token ${ARGO_TOKEN}\"@g" ${ARGO_DAEMON_FILE} || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto run --token ${ARGO_TOKEN}@g" ${ARGO_DAEMON_FILE}
       elif [ -n "$ARGO_JSON" ]; then
-        [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run\"@g" /etc/init.d/argo || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run@g" /etc/systemd/system/argo.service
+        [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run\"@g" ${ARGO_DAEMON_FILE} || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run@g" ${ARGO_DAEMON_FILE}
       fi
 
       # 更新相关配置文件中的域名
@@ -510,7 +550,7 @@ check_arch() {
       SING_BOX_ARCH=amd64; JQ_ARCH=amd64; QRENCODE_ARCH=amd64; ARGO_ARCH=amd64
       ;;
     armv7l )
-      SING_BOX_ARCH=armv7; JQ_ARCH=armhf; QRENCODE_ARCH=arm; ARGO_ARCH=amd64
+      SING_BOX_ARCH=armv7; JQ_ARCH=armhf; QRENCODE_ARCH=arm; ARGO_ARCH=arm
       ;;
     * )
       error " $(text 25) "
@@ -533,8 +573,8 @@ check_install() {
 
   if [ "$SYSTEM" = 'Alpine' ]; then
     # Alpine 系统使用 OpenRC 检查服务
-    if [ -s /etc/init.d/sing-box ]; then
-      local OPENRC_EXECSTART=$(grep '^command=' /etc/init.d/sing-box)
+    if [ -s ${SINGBOX_DAEMON_FILE} ]; then
+      local OPENRC_EXECSTART=$(grep '^command=' ${SINGBOX_DAEMON_FILE})
       case "$OPENRC_EXECSTART" in
         *"${WORK_DIR}/sing-box"* )
           if rc-service sing-box status &>/dev/null; then
@@ -551,8 +591,8 @@ check_install() {
     fi
   else
     # 非 Alpine 系统使用 systemd 检查服务
-    if [ -s /etc/systemd/system/sing-box.service ]; then
-      SYSTEMD_EXECSTART=$(grep '^ExecStart=' /etc/systemd/system/sing-box.service)
+    if [ -s ${SINGBOX_DAEMON_FILE} ]; then
+      SYSTEMD_EXECSTART=$(grep '^ExecStart=' ${SINGBOX_DAEMON_FILE})
       case "$SYSTEMD_EXECSTART" in
         'ExecStart=/etc/sing-box/sing-box run -C /etc/sing-box/conf/' | 'ExecStart=/etc/sing-box/sing-box run -C /etc/sing-box/conf' )
           [ "$(systemctl is-active sing-box)" = 'active' ] && STATUS[0]=$(text 28) || STATUS[0]=$(text 27)
@@ -617,14 +657,14 @@ check_install() {
   if [ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' ]; then
     # 检查 Argo 服务状态
     STATUS[1]=$(text 26) && IS_ARGO=no_argo
-    [[ -s /etc/systemd/system/argo.service || -s /etc/init.d/argo ]] && IS_ARGO=is_argo && STATUS[1]=$(text 27)
+    [ -s ${ARGO_DAEMON_FILE} ] && IS_ARGO=is_argo && STATUS[1]=$(text 27)
     cmd_systemctl status argo &>/dev/null && STATUS[1]=$(text 28)
   fi
 
   # 检查 Argo 服务类型
   if [ "$SYSTEM" = 'Alpine' ]; then
-    if [ -s /etc/init.d/argo ]; then
-      local ARGO_CONTENT=$(grep '^command_args=' /etc/init.d/argo)
+    if [ -s ${ARGO_DAEMON_FILE} ]; then
+      local ARGO_CONTENT=$(grep '^command_args=' ${ARGO_DAEMON_FILE})
       if grep -q '\--token' <<< "$ARGO_CONTENT"; then
         ARGO_TYPE=is_token_argo
       elif grep -q '\--config' <<< "$ARGO_CONTENT"; then
@@ -634,8 +674,8 @@ check_install() {
       fi
     fi
   else
-    if [[ -s /etc/systemd/system/argo.service || -s /etc/init.d/argo ]]; then
-      local ARGO_CONTENT=$(grep '^ExecStart' /etc/systemd/system/argo.service)
+    if [ -s ${ARGO_DAEMON_FILE} ]; then
+      local ARGO_CONTENT=$(grep '^ExecStart' ${ARGO_DAEMON_FILE})
       if grep -q '\--token' <<< "$ARGO_CONTENT"; then
         ARGO_TYPE=is_token_argo
       elif grep -q '\--config' <<< "$ARGO_CONTENT"; then
@@ -679,6 +719,7 @@ cmd_systemctl() {
         ;;
     esac
   else
+    systemctl daemon-reload
     case "$1" in
       enable | disable )
         systemctl "$1" --now "$2" >/dev/null 2>&1
@@ -698,7 +739,7 @@ cmd_systemctl() {
         [ "$IS_CENTOS" = 'CentOS7' ] && [ "$2" = 'sing-box' ] && [ -s $WORK_DIR/nginx.conf ] && { nginx_run; firewall_configuration open; }
         ;;
       status )
-        systemctl status "$2"
+        systemctl is-active "$2"
         ;;
       * )
         systemctl "$@" >/dev/null 2>&1
@@ -746,7 +787,12 @@ check_system_info() {
   [[ "$(echo "$SYS" | sed "s/[^0-9.]//g" | cut -d. -f1)" -lt "${MAJOR[int]}" ]] && error " $(text 6) "
 
   # 针对部分系统作特殊处理
-  [ "$SYSTEM" = 'CentOS' ] && IS_CENTOS="CentOS$(echo "$SYS" | sed "s/[^0-9.]//g" | cut -d. -f1)"
+  ARGO_DAEMON_FILE='/etc/systemd/system/argo.service'; SINGBOX_DAEMON_FILE='/etc/systemd/system/sing-box.service'
+  if [ "$SYSTEM" = 'CentOS' ]; then 
+    IS_CENTOS="CentOS$(echo "$SYS" | sed "s/[^0-9.]//g" | cut -d. -f1)"
+  elif [ "$SYSTEM" = 'Alpine' ]; then
+    ARGO_DAEMON_FILE='/etc/init.d/argo'; SINGBOX_DAEMON_FILE='/etc/init.d/sing-box'
+  fi
 }
 
 # 删除端口跳跃
@@ -1943,8 +1989,8 @@ stop_post() {
     fi
 }"
 
-    echo "$OPENRC_SERVICE" > /etc/init.d/sing-box
-    chmod +x /etc/init.d/sing-box
+    echo "$OPENRC_SERVICE" > ${SINGBOX_DAEMON_FILE}
+    chmod +x ${SINGBOX_DAEMON_FILE}
   else
     # 原有的 systemd 服务创建代码
     SING_BOX_SERVICE="[Unit]
@@ -1970,7 +2016,7 @@ LimitNOFILE=infinity
 [Install]
 WantedBy=multi-user.target"
 
-    echo "$SING_BOX_SERVICE" > /etc/systemd/system/sing-box.service
+    echo "$SING_BOX_SERVICE" > ${SINGBOX_DAEMON_FILE}
     systemctl daemon-reload
   fi
 }
@@ -1979,10 +2025,10 @@ WantedBy=multi-user.target"
 argo_systemd() {
   if [ "$SYSTEM" = 'Alpine' ]; then
     # 分离命令和参数
-    local COMMAND="${ARGO_RUNS%% --*}"  # 提取命令部分（包括 cloudflared tunnel）
-    local ARGS="${ARGO_RUNS#$COMMAND}"  # 提取参数部分
+    local COMMAND="${ARGO_RUNS%% --*}"   # 提取命令部分（包括 cloudflared tunnel）
+    local ARGS="${ARGO_RUNS#$COMMAND }"  # 提取参数部分
 
-    cat > /etc/init.d/argo << EOF
+    cat > ${ARGO_DAEMON_FILE} << EOF
 #!/sbin/openrc-run
 
 name="argo"
@@ -2009,10 +2055,10 @@ start_pre() {
     rm -f \$pidfile
 }
 EOF
-    chmod +x /etc/init.d/argo
+    chmod +x ${ARGO_DAEMON_FILE}
   else
     # 原有的 systemd 服务创建代码
-    cat > /etc/systemd/system/argo.service << EOF
+    cat > ${ARGO_DAEMON_FILE} << EOF
 [Unit]
 Description=Cloudflare Tunnel
 After=network.target
@@ -2044,15 +2090,7 @@ fetch_nodes_value() {
   [[ -z "$NODE_NAME_CONFIRM" && -s ${WORK_DIR}/subscribe/clash ]] && NODE_NAME_CONFIRM=$(awk -F "'" '/u: &u/{print $2; exit}' ${WORK_DIR}/subscribe/clash)
 
   # 如有 Argo，获取 Argo Tunnel
-  if [[ ${STATUS[1]} =~ $(text 27)|$(text 28) ]]; then
-    if [ "$SYSTEM" = 'Alpine' ]; then
-      # Alpine 系统使用 OpenRC
-      grep -q '\--url' /etc/init.d/argo && { cmd_systemctl enable argo; sleep 2 && cmd_systemctl status argo &>/dev/null && fetch_quicktunnel_domain; }
-    else
-      # 非 Alpine 系统使用 systemd
-      grep -q '\--url' /etc/systemd/system/argo.service && { cmd_systemctl enable argo; sleep 2 && cmd_systemctl status argo &>/dev/null && fetch_quicktunnel_domain; }
-    fi
-  fi
+  [[ ${STATUS[1]} =~ $(text 27)|$(text 28) ]] && grep -q '\--url' ${ARGO_DAEMON_FILE} && { cmd_systemctl enable argo; sleep 2 && cmd_systemctl status argo &>/dev/null && fetch_quicktunnel_domain; }
 
   # 获取 Nginx 端口和路径
   [[ "${IS_SUB}" = 'is_sub' || "${IS_ARGO}" = 'is_argo' ]] && local NGINX_JSON=$(cat ${WORK_DIR}/nginx.conf) &&
@@ -2114,7 +2152,6 @@ fetch_quicktunnel_domain() {
 install_sing-box() {
   sing-box_variables
   [ -n "$PORT_NGINX" ] && check_nginx
-  [ ! -d /etc/systemd/system ] && mkdir -p /etc/systemd/system
   [ ! -d ${WORK_DIR}/logs ] && mkdir -p ${WORK_DIR}/logs
   ssl_certificate
   hint "\n $(text 2) " && wait
@@ -2136,8 +2173,7 @@ install_sing-box() {
   # 生成 Nginx 配置文件
   [ -n "$PORT_NGINX" ] && export_nginx_conf_file
 
-  # 非 Alpine 系统启动 sing-box 服务
-  [ "$SYSTEM" != 'Alpine' ] && cmd_systemctl daemon-reload
+  # 系统启动 sing-box 服务
   cmd_systemctl enable sing-box
 
   # 等待服务启动
@@ -2158,7 +2194,7 @@ install_sing-box() {
   fi
 
   # 如果配置了 Argo，也启动 Argo 服务
-  if [ "$IS_ARGO" = 'is_argo' ]; then
+  if [ -s ${ARGO_DAEMON_FILE} ]; then
     cmd_systemctl enable argo
 
     sleep 2
@@ -2864,7 +2900,7 @@ change_start_port() {
   [ -n "$ARGO_DOMAIN" ] && export_argo_json_file
   sleep 2
   export_list
-  [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 30) $(text 37) " || error " Sing-box $(text 30) $(text 38) "
+  cmd_systemctl status sing-box &>/dev/null && info " Sing-box $(text 30) $(text 37) " || error " Sing-box $(text 30) $(text 38) "
 }
 
 # 增加或删除协议
@@ -3032,9 +3068,9 @@ change_protocols() {
   fi
 
   # 获取 ws 的 argo 或者 origin 状态
-  if [[ -s /etc/systemd/system/argo.service || -s /etc/init.d/argo ]]; then
+  if [ -s ${ARGO_DAEMON_FILE} ]; then
     local ARGO_ORIGIN_RULES_STATUS=is_argo
-    ARGO_RUNS=$(sed -n "s/^ExecStart=\(.*\)/\1/gp" /etc/systemd/system/argo.service)
+    [ "$SYSTEM" = 'Alpine' ] && ARGO_RUNS="$(sed -n 's/command="\(.*\)"/\1/gp' $ARGO_DAEMON_FILE) $(sed -n 's/command_args="\(.*\)"/\1/gp' $ARGO_DAEMON_FILE)" || ARGO_RUNS=$(sed -n "s/^ExecStart=\(.*\)/\1/gp" ${ARGO_DAEMON_FILE})
   elif ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1; then
     local ARGO_ORIGIN_RULES_STATUS=is_origin
   else
@@ -3155,18 +3191,18 @@ change_protocols() {
 
   # 如有需要，安装和删除 Argo 服务
   if ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1; then
-    if [[ "$ARGO_OR_ORIGIN_RULES" != '2' && "$ARGO_ORIGIN_RULES_STATUS" != 'is_origin' && ! -s /etc/systemd/system/argo.service ]]; then
+    if [[ "$ARGO_OR_ORIGIN_RULES" != '2' && "$ARGO_ORIGIN_RULES_STATUS" != 'is_origin' && ! -s ${ARGO_DAEMON_FILE} ]]; then
       argo_systemd
       cmd_systemctl enable argo >/dev/null 2>&1
     fi
-  elif [[ -s /etc/systemd/system/argo.service || -s /etc/init.d/argo ]]; then
+  elif [ -s ${ARGO_DAEMON_FILE} ]; then
     cmd_systemctl disable argo >/dev/null 2>&1
-    rm -f /etc/systemd/system/argo.service
+    rm -f ${ARGO_DAEMON_FILE}
     [ -s ${WORK_DIR}/tunnel.json ] && rm -f ${WORK_DIR}/tunnel.*
   fi
 
   # 如有需要，删除 nginx 配置文件
-  ! ls /etc/systemd/system/argo.service >/dev/null 2>&1 && [[ -s ${WORK_DIR}/nginx.conf && "$IS_SUB" = 'no_sub' ]] && IS_ARGO=no_argo && rm -f ${WORK_DIR}/nginx.conf
+  ! ls ${ARGO_DAEMON_FILE} >/dev/null 2>&1 && [[ -s ${WORK_DIR}/nginx.conf && "$IS_SUB" = 'no_sub' ]] && IS_ARGO=no_argo && rm -f ${WORK_DIR}/nginx.conf
 
   # 运行 sing-box
   cmd_systemctl enable sing-box
@@ -3198,19 +3234,14 @@ change_protocols() {
 # 卸载 sing-box 全家桶
 uninstall() {
   if [ -d ${WORK_DIR} ]; then
-    [[ -s /etc/systemd/system/argo.service || -s /etc/init.d/argo ]] && ( cmd_systemctl disable argo &>/dev/null; rm -f /etc/systemd/system/argo.service )
-    if [ "$SYSTEM" = 'Alpine' ]; then
-      [ -s /etc/init.d/sing-box ] && ( rc-service sing-box stop &>/dev/null; rc-update del sing-box default &>/dev/null; rm -f /etc/init.d/sing-box )
-      [ -s /etc/init.d/argo ] && ( rc-service argo stop &>/dev/null; rc-update del argo default &>/dev/null; rm -f /etc/init.d/argo )
-    else
-      cmd_systemctl disable sing-box &>/dev/null
-    fi
+    [ -s ${ARGO_DAEMON_FILE} ] && cmd_systemctl disable argo &>/dev/null
+    [ -s ${SINGBOX_DAEMON_FILE} ] && cmd_systemctl disable sing-box &>/dev/null
     sleep 1
     [[ -s ${WORK_DIR}/nginx.conf && $(ps -ef | grep 'nginx' | wc -l) -le 1 ]] && reading "\n $(text 83) " REMOVE_NGINX
     [ "${REMOVE_NGINX,,}" = 'y' ] && ${PACKAGE_UNINSTALL[int]} nginx >/dev/null 2>&1
     [ "$IS_HOPPING" = 'is_hopping' ] && del_port_hopping_nat
     [ "$SYSTEM" = 'CentOS' ] && firewall_configuration close
-    rm -rf ${WORK_DIR} $TEMP_DIR /etc/systemd/system/sing-box.service /usr/bin/sb
+    rm -rf ${WORK_DIR} ${TEMP_DIR} ${ARGO_DAEMON_FILE} ${SINGBOX_DAEMON_FILE} /usr/bin/sb
     info "\n $(text 16) \n"
   else
     error "\n $(text 15) \n"
@@ -3316,59 +3347,29 @@ menu_setting() {
 
     ACTION[1]() { export_list; exit 0; }
 
-    if [ "$SYSTEM" = 'Alpine' ]; then
-      # Alpine 系统使用 OpenRC 命令检查服务状态
-      [ "${STATUS[0]}" = "$(text 28)" ] && ACTION[2]() {
-        cmd_systemctl disable sing-box
-        cmd_systemctl status sing-box &>/dev/null || info " Sing-box $(text 27) $(text 37)" || error " Sing-box $(text 27) $(text 38) "
-      } || ACTION[2]() {
-        cmd_systemctl enable sing-box
-        sleep 2
-        cmd_systemctl status sing-box &>/dev/null && info " Sing-box $(text 28) $(text 37)" || error " Sing-box $(text 28) $(text 38) "
-      }
+    [ "${STATUS[0]}" = "$(text 28)" ] &&
+    ACTION[2]() {
+      cmd_systemctl disable sing-box
+      cmd_systemctl status sing-box &>/dev/null && error " Sing-box $(text 27) $(text 38) " || info " Sing-box $(text 27) $(text 37)"
+    } ||
+    ACTION[2]() {
+      cmd_systemctl enable sing-box
+      sleep 2
+      cmd_systemctl status sing-box &>/dev/null && info " Sing-box $(text 28) $(text 37)" || error " Sing-box $(text 28) $(text 38) "
+    }
 
-      [ "${STATUS[1]}" = "$(text 28)" ] && ACTION[3]() {
-        cmd_systemctl disable argo
-        cmd_systemctl status argo &>/dev/null || info " Argo $(text 27) $(text 37)" || error " Argo $(text 27) $(text 38) "
-      } || ACTION[3]() {
-        cmd_systemctl enable argo
-        sleep 2
-        if cmd_systemctl status argo &>/dev/null; then
-          info " Argo $(text 28) $(text 37)"
-          # 根据系统类型检查不同的配置文件
-          if [ "$SYSTEM" = 'Alpine' ]; then
-            grep -q '\--url' /etc/init.d/argo && fetch_quicktunnel_domain && export_list
-          else
-            grep -q '\--url' /etc/systemd/system/argo.service && fetch_quicktunnel_domain && export_list
-          fi
-        else
-          error " Argo $(text 28) $(text 38) "
-        fi
-      }
-    else
-      # 非 Alpine 系统使用 systemd 命令
-      [ "${STATUS[0]}" = "$(text 28)" ] && ACTION[2]() {
-        cmd_systemctl disable sing-box
-        [[ "$(systemctl is-active sing-box)" =~ 'inactive'|'unknown' ]] && info " Sing-box $(text 27) $(text 37)" || error " Sing-box $(text 27) $(text 38) "
-      } || ACTION[2]() {
-        cmd_systemctl enable sing-box
-        [ "$(systemctl is-active sing-box)" = 'active' ] && info " Sing-box $(text 28) $(text 37)" || error " Sing-box $(text 28) $(text 38) "
-      }
+    [ "${STATUS[1]}" = "$(text 28)" ] &&
+    ACTION[3]() {
+      cmd_systemctl disable argo
+      cmd_systemctl status argo &>/dev/null && error " Argo $(text 27) $(text 38) " || info " Argo $(text 27) $(text 37)"
+    } ||
+    ACTION[3]() {
+      cmd_systemctl enable argo
+      sleep 2
+      cmd_systemctl status argo &>/dev/null &&  info " Argo $(text 28) $(text 37)" || error " Argo $(text 28) $(text 38) "
+      grep -qs '\--url' ${ARGO_DAEMON_FILE} && fetch_quicktunnel_domain && export_list
+    }
 
-      [ "${STATUS[1]}" = "$(text 28)" ] && ACTION[3]() {
-        cmd_systemctl disable argo
-        [[ "$(systemctl is-active argo)" =~ 'inactive'|'unknown' ]] && info " Argo $(text 27) $(text 37)" || error " Argo $(text 27) $(text 38) "
-      } || ACTION[3]() {
-        cmd_systemctl enable argo
-        sleep 2
-        if [ "$(systemctl is-active argo)" = 'active' ]; then
-          info " Argo $(text 28) $(text 37)"
-          grep -q '\--url' /etc/systemd/system/argo.service && fetch_quicktunnel_domain && export_list
-        else
-          error " Argo $(text 28) $(text 38) "
-        fi
-      }
-    fi
     ACTION[4]() { change_argo; exit; }
     ACTION[5]() { change_start_port; exit; }
     ACTION[6]() { version; exit; }
@@ -3460,15 +3461,11 @@ for z in ${!ALL_PARAMETER[@]}; do
         error "\n Sing-box $(text 26) "
       elif [ "${STATUS[0]}" = "$(text 28)" ]; then
         cmd_systemctl disable sing-box
-        cmd_systemctl status sing-box &>/dev/null || info "\n Sing-box $(text 27) $(text 37)"
+        cmd_systemctl status sing-box &>/dev/null && error " Sing-box $(text 27) $(text 38) " || info "\n Sing-box $(text 27) $(text 37)"
       elif [ "${STATUS[0]}" = "$(text 27)" ]; then
         cmd_systemctl enable sing-box
         sleep 2
-        if cmd_systemctl status sing-box &>/dev/null; then
-          info "\n Sing-box $(text 28) $(text 37)"
-        else
-          error "\n Sing-box $(text 28) $(text 38) "
-        fi
+        cmd_systemctl status sing-box &>/dev/null && info "\n Sing-box $(text 28) $(text 37)" || error "\n Sing-box $(text 28) $(text 38)"
       fi
       exit 0
       ;;
@@ -3478,30 +3475,20 @@ for z in ${!ALL_PARAMETER[@]}; do
         error "\n Argo $(text 26) "
       elif [ "${STATUS[1]}" = "$(text 28)" ]; then
         cmd_systemctl disable argo
-        if [ "$SYSTEM" = 'Alpine' ]; then
-          rc-service argo status &>/dev/null || info "\n Argo $(text 27) $(text 37)"
-        else
-          [[ "$(systemctl is-active argo)" =~ 'inactive'|'unknown' ]] && info "\n Argo $(text 27) $(text 37)"
-        fi
+        cmd_systemctl status argo &>/dev/null && error " Argo $(text 27) $(text 38) " || info "\n Argo $(text 27) $(text 37)"
       elif [ "${STATUS[1]}" = "$(text 27)" ]; then
         cmd_systemctl enable argo
         sleep 2
-        if [ "$SYSTEM" = 'Alpine' ]; then
-          if rc-service argo status &>/dev/null; then
-            info "\n Argo $(text 28) $(text 37)"
-            grep -q '\--url' /etc/init.d/argo && fetch_quicktunnel_domain && export_list
-          fi
-        else
-          if [ "$(systemctl is-active argo)" = 'active' ]; then
-            info "\n Argo $(text 28) $(text 37)"
-            grep -q '\--url' /etc/systemd/system/argo.service && fetch_quicktunnel_domain && export_list
-          fi
-        fi
+        cmd_systemctl status argo &>/dev/null && info "\n Argo $(text 28) $(text 37)" || error "\n Argo $(text 28) $(text 38) "
+        grep -qs '\--url' ${ARGO_DAEMON_FILE} && fetch_quicktunnel_domain && export_list
       fi
       exit 0
       ;;
     -T )
       change_argo; exit 0
+      ;;
+    -D )
+      change_cdn; exit 0
       ;;
     -U )
       check_install; uninstall; exit 0

@@ -19,12 +19,13 @@
 
 * * *
 ## 1.更新信息
+2025.04.25 v1.2.17 1. Added the ability to change CDNs online using [sb -d]; 2. Change GitHub proxy; 3. Optimize code; 1. 新增使用 [sb -d] 在线更换 CDN 功能; 2. 更改 GitHub 代理; 3. 优化代码
+
 2025.04.06 v1.2.16 Use OpenRC on Alpine to replace systemctl (Python3-compatible version); 在 Alpine 系统中使用 OpenRC 取代兼容 Python3 的 systemctl 实现
 
 2025.04.05 v1.2.15 Supports output for clients such as Shadowrocket, Clash Mihomo, and Sing-box; 支持小火箭、Clash Mihomo、Sing-box 客户端输出
 
 2025.03.23 v1.2.14 Added support for the AnyTLS protocol. Thanks to [Betterdoitnow] for providing the configuration; 新增对 AnyTLS 协议的支持，感谢 [Betterdoitnow] 提供的配置
-
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
@@ -135,6 +136,7 @@ sb
   | -u              | Uninstall 卸载 |
   | -n              | Export Nodes list 显示节点信息 |
   | -p <start port> | Change the nodes start port 更改节点的起始端口 |
+  | -d              | Change CDN 更换 CDN |
   | -s              | Stop / Start the Sing-box service 停止/开启 Sing-box 服务 |
   | -a              | Stop / Start the Argo Tunnel service 停止/开启 Argo Tunnel 服务 | 
   | -v              | Sync Argo Xray to the newest 同步 Argo Xray 到最新版本 |
