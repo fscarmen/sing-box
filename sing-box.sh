@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.17 (2025.04.25)'
+VERSION='v1.2.17 (2025.05.11)'
 
 # 各变量默认值
 GH_PROXY='https://ghfast.top/'
@@ -18,6 +18,7 @@ NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
 CDN_DOMAIN=("skk.moe" "ip.sb" "time.is" "cfip.xxxxxxxx.tk" "bestcf.top" "cdn.2020111.xyz" "xn--b6gac.eu.org")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
+DEFAULT_NEWEST_VERSION='1.12.0-beta.11'
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -352,7 +353,7 @@ input_cdn() {
 # 更换 cdn
 change_cdn() {
   [ ! -d "${WORK_DIR}" ] && error " $(text 107) "
-  
+
   # 检测是否有使用 CDN，方法是查找是否有 ${WORK_DIR}/conf/
   ! ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && error " $(text 110) "
   local CDN_NOW=$(awk -F '"' '/"CDN"/{print $4; exit}' ${WORK_DIR}/conf/*-ws*inbounds.json)
@@ -363,16 +364,16 @@ change_cdn() {
     hint " $[c+1]. ${CDN_DOMAIN[c]} "
   done
   reading "\n $(text 111) " CDN_CHOOSE
-  
+
   # 如果用户直接回车，保持当前 CDN
   [ -z "$CDN_CHOOSE" ] && exit 0
-  
+
   # 如果用户输入数字，选择对应的 CDN
   [[ "$CDN_CHOOSE" =~ ^[1-9][0-9]*$ && "$CDN_CHOOSE" -le "${#CDN_DOMAIN[@]}" ]] && CDN_NEW=${CDN_DOMAIN[$((CDN_CHOOSE-1))]} || CDN_NEW=$CDN_CHOOSE
-  
+
   # 使用 sed 更新所有文件中的 CDN 值
   find ${WORK_DIR} -type f | xargs -P 50 sed -i "s/${CDN_NOW}/${CDN_NEW}/g"
-  
+
   # 更新完成后提示并导出订阅列表
   export_list; info "\n $(text 112) \n"
 }
@@ -638,15 +639,8 @@ check_install() {
 
   if [ "${STATUS[0]}" = "$(text 26)" ] && [ ! -s ${WORK_DIR}/sing-box ]; then
     {
-    # FORCE_VERSION 用于在 sing-box 某个主程序出现 bug 时，强制为指定版本，以防止运行出错
-    local FORCE_VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://raw.githubusercontent.com/fscarmen/sing-box/refs/heads/main/force_version | sed 's/^[vV]//g; s/\r//g')
-    if grep -q '.' <<< "$FORCE_VERSION"; then
-      local ONLINE="$FORCE_VERSION"
-    else
-      local VERSION_LATEST=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v-]' '/tag_name/{print $5}' | sort -Vr | sed -n '1p')
-      local ONLINE=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
-      ONLINE=${ONLINE:-'1.12.0'}
-    fi
+    # 获取需要下载的 sing-box 版本
+    ONLINE=$(get_sing_box_version)
     wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box >/dev/null 2>&1
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
     wget --no-check-certificate --continue -qO $TEMP_DIR/jq ${GH_PROXY}https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$JQ_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/jq >/dev/null 2>&1
@@ -809,6 +803,25 @@ del_port_hopping_nat(){
     ip6tables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
     [ "$(systemctl is-active netfilter-persistent)" = 'active' ] && netfilter-persistent save 2>/dev/null
   fi
+}
+
+# 获取 sing-box 最新版本
+get_sing_box_version() {
+  # FORCE_VERSION 用于在 sing-box 某个主程序出现 bug 时，强制为指定版本，以防止运行出错
+  local FORCE_VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://raw.githubusercontent.com/fscarmen/sing-box/refs/heads/main/force_version | sed 's/^[vV]//g; s/\r//g')
+  if grep -q '.' <<< "$FORCE_VERSION"; then
+    local RESULT_VERSION="$FORCE_VERSION"
+  else
+    # 先判断 github api 返回 http 状态码是否为 200，有时候 IP 会被限制，导致获取不到最新版本
+    local API_RESPONSE=$(wget --no-check-certificate --server-response --tries=2 --timeout=3 -qO- "${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases" 2>&1 | grep -E '^[ ]+HTTP/|tag_name')
+    if ! grep -q 'HTTP.* 200' <<< "$API_RESPONSE"; then
+      local VERSION_LATEST=$(awk -F '["v-]' '/tag_name/{print $5}' <<< "$API_RESPONSE" | sort -Vr | sed -n '1p')
+      local RESULT_VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
+    else
+      local RESULT_VERSION="$DEFAULT_NEWEST_VERSION"
+    fi
+  fi
+  echo "$RESULT_VERSION"
 }
 
 # 添加端口跳跃
@@ -3248,16 +3261,11 @@ uninstall() {
   fi
 }
 
+
 # Sing-box 的最新版本
 version() {
-  # FORCE_VERSION 用于在 sing-box 某个主程序出现 bug 时，强制为指定版本，以防止运行出错
-  local FORCE_VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://raw.githubusercontent.com/fscarmen/sing-box/refs/heads/main/force_version | sed 's/^[vV]//g; s/\r//g')
-  if grep -q '.' <<< "$FORCE_VERSION"; then
-    local ONLINE="$FORCE_VERSION"
-  else
-    local VERSION_LATEST=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v-]' '/tag_name/{print $5}' | sort -Vr | sed -n '1p')
-    local ONLINE=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
-  fi
+  # 获取需要下载的 sing-box 版本
+  ONLINE=$(get_sing_box_version)
 
   grep -q '.' <<< "$ONLINE" || error " $(text 100) \n"
   local LOCAL=$(${WORK_DIR}/sing-box version | awk '/version/{print $NF}')
