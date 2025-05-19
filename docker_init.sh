@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 脚本更新日期 2025.04.05
+# 脚本更新日期 2025.05.19
 WORK_DIR=/sing-box
 PORT=$START_PORT
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
@@ -34,7 +34,7 @@ check_latest_sing-box() {
 
   # 获取最终版本号
   local VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$FORCE_VERSION" '$0 ~ var {print $5; exit}')
-  VERSION=${VERSION:-'1.12.0-beta.1'}
+  VERSION=${VERSION:-'v1.12.0-beta.15'}
 
   echo "$VERSION"
 }

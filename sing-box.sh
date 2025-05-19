@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.17 (2025.05.11)'
+VERSION='v1.2.17 (2025.05.19)'
 
 # 各变量默认值
 GH_PROXY='https://ghfast.top/'
@@ -18,7 +18,7 @@ NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
 CDN_DOMAIN=("skk.moe" "ip.sb" "time.is" "cfip.xxxxxxxx.tk" "bestcf.top" "cdn.2020111.xyz" "xn--b6gac.eu.org")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
-DEFAULT_NEWEST_VERSION='1.12.0-beta.11'
+DEFAULT_NEWEST_VERSION='1.12.0-beta.15'
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -640,7 +640,7 @@ check_install() {
   if [ "${STATUS[0]}" = "$(text 26)" ] && [ ! -s ${WORK_DIR}/sing-box ]; then
     {
     # 获取需要下载的 sing-box 版本
-    ONLINE=$(get_sing_box_version)
+    local ONLINE=$(get_sing_box_version)
     wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box >/dev/null 2>&1
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
     wget --no-check-certificate --continue -qO $TEMP_DIR/jq ${GH_PROXY}https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$JQ_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/jq >/dev/null 2>&1
@@ -789,22 +789,6 @@ check_system_info() {
   fi
 }
 
-# 删除端口跳跃
-del_port_hopping_nat(){
-  check_port_hopping_nat
-  if [ "$SYSTEM" = 'Alpine' ]; then
-    iptables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
-    ip6tables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
-  elif [ "$(systemctl is-active firewalld)" = 'active' ]; then
-    firewall-cmd --permanent --remove-forward-port=port=${PORT_HOPPING_START}-${PORT_HOPPING_END}:proto=udp:toport=${PORT_HOPPING_TARGET} >/dev/null 2>&1
-    firewall-cmd --reload >/dev/null 2>&1
-  else
-    iptables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
-    ip6tables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
-    [ "$(systemctl is-active netfilter-persistent)" = 'active' ] && netfilter-persistent save 2>/dev/null
-  fi
-}
-
 # 获取 sing-box 最新版本
 get_sing_box_version() {
   # FORCE_VERSION 用于在 sing-box 某个主程序出现 bug 时，强制为指定版本，以防止运行出错
@@ -814,7 +798,7 @@ get_sing_box_version() {
   else
     # 先判断 github api 返回 http 状态码是否为 200，有时候 IP 会被限制，导致获取不到最新版本
     local API_RESPONSE=$(wget --no-check-certificate --server-response --tries=2 --timeout=3 -qO- "${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases" 2>&1 | grep -E '^[ ]+HTTP/|tag_name')
-    if ! grep -q 'HTTP.* 200' <<< "$API_RESPONSE"; then
+    if grep -q 'HTTP.* 200' <<< "$API_RESPONSE"; then
       local VERSION_LATEST=$(awk -F '["v-]' '/tag_name/{print $5}' <<< "$API_RESPONSE" | sort -Vr | sed -n '1p')
       local RESULT_VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}')
     else
@@ -870,6 +854,22 @@ add_port_hopping_nat() {
 
     # 保存当前的 iptables, ip6tables 规则集，以便在开机时恢复
     [ "$(systemctl is-active netfilter-persistent)" != 'active' ] && warning "\n $(text 96) \n" || netfilter-persistent save 2>/dev/null
+  fi
+}
+
+# 删除端口跳跃
+del_port_hopping_nat(){
+  check_port_hopping_nat
+  if [ "$SYSTEM" = 'Alpine' ]; then
+    iptables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    ip6tables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+  elif [ "$(systemctl is-active firewalld)" = 'active' ]; then
+    firewall-cmd --permanent --remove-forward-port=port=${PORT_HOPPING_START}-${PORT_HOPPING_END}:proto=udp:toport=${PORT_HOPPING_TARGET} >/dev/null 2>&1
+    firewall-cmd --reload >/dev/null 2>&1
+  else
+    iptables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    ip6tables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    [ "$(systemctl is-active netfilter-persistent)" = 'active' ] && netfilter-persistent save 2>/dev/null
   fi
 }
 
@@ -3265,7 +3265,7 @@ uninstall() {
 # Sing-box 的最新版本
 version() {
   # 获取需要下载的 sing-box 版本
-  ONLINE=$(get_sing_box_version)
+  local ONLINE=$(get_sing_box_version)
 
   grep -q '.' <<< "$ONLINE" || error " $(text 100) \n"
   local LOCAL=$(${WORK_DIR}/sing-box version | awk '/version/{print $NF}')
