@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 脚本更新日期 2025.05.19
+# 脚本更新日期 2025.07.01
 WORK_DIR=/sing-box
 PORT=$START_PORT
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
@@ -908,8 +908,8 @@ vless://$(echo -n auto:${UUID}@${SERVER_IP_2}:${PORT_H2_REALITY} | base64 -w0)?r
   [ "${GRPC_REALITY}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
 vless://$(echo -n "auto:${UUID}@${SERVER_IP_2}:${PORT_GRPC_REALITY}" | base64 -w0)?remarks=${NODE_NAME}%20grpc-reality&path=grpc&obfs=grpc&tls=1&peer=addons.mozilla.org&pbk=${REALITY_PUBLIC}
 "
-  [ "${PORT_ANYTLS}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
-anytls://${UUID]}@${SERVER_IP_1}:${PORT_ANYTLS}?insecure=1&udp=1#${NODE_NAME}%20&anytls
+  [ "${ANYTLS}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
+anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?insecure=1&udp=1#${NODE_NAME}%20&anytls
 "
   echo -n "$SHADOWROCKET_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/shadowrocket
 
