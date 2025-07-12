@@ -20,18 +20,3 @@ jobs:
             git@gitlab.com:${{ github.repository }}.git
           ssh_private_key:
             ${{ secrets.PRIVATE_KEY }}
-
-  mirror_to_bitbucket:
-    runs-on: ubuntu-latest
-    steps:
-      - name: 'Checkout'
-        uses: actions/checkout@v4.2.2
-        with:
-          fetch-depth: 0
-      - name: 'Mirror to bitbucket'
-        uses: fscarmen/repository-mirroring-action@v1.0.0
-        with:
-          target_repo_url:
-            git@bitbucket.org:${{ github.repository }}.git
-          ssh_private_key:
-            ${{ secrets.PRIVATE_KEY }}
