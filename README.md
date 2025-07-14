@@ -183,7 +183,6 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --LANGUAGE c \
   --CHOOSE_PROTOCOLS a \
   --START_PORT 8881 \
-  --PORT_NGINX 60000 \
   --SERVER_IP 123.123.123.123 \
   --CDN skk.moe \
   --VMESS_HOST_DOMAIN vmess.test.com \
