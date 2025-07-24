@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.17 (2025.07.12)'
+VERSION='v1.2.17 (2025.07.16)'
 
 # 各变量默认值
 GH_PROXY='gh-proxy.com/'
@@ -988,13 +988,6 @@ sing-box_variables() {
   SERVER_IP=${SERVER_IP:-"$SERVER_IP_DEFAULT"} && WS_SERVER_IP_SHOW=$SERVER_IP
   [ -z "$SERVER_IP" ] && error " $(text 47) "
 
-  # 根据服务 IP，使用不同的 warp 配置
-  if [[ "$SERVER_IP" =~ : ]]; then
-    STRATEGY=prefer_ipv6
-  else
-    STRATEGY=ipv4_only
-  fi
-
   # 检测是否解锁 chatGPT
   CHATGPT_OUT=warp-ep;
   [ "$(check_chatgpt $(grep -oE '[46]' <<< "$STRATEGY"))" = 'unlock' ] && CHATGPT_OUT=direct
@@ -1075,8 +1068,9 @@ check_dependencies() {
   fi
 
   # 检测 Linux 系统的依赖，升级库并重新安装依赖
-  local DEPS_CHECK=("wget" "tar" "ip" "bash" "openssl")
-  local DEPS_INSTALL=("wget" "tar" "iproute2" "bash" "openssl")
+  local DEPS_INSTALL=("wget" "tar" "iproute2" "iproute2" "bash" "openssl" "ping")
+  local DEPS_CHECK=("wget" "tar" "ss" "ip" "bash" "openssl" "iputils-ping")
+
   [ "$SYSTEM" != 'Alpine' ] && DEPS_CHECK+=("systemctl") && DEPS_INSTALL+=("systemctl")
   for g in "${!DEPS_CHECK[@]}"; do
     [ ! -x "$(type -p ${DEPS_CHECK[g]})" ] && DEPS+=(${DEPS_INSTALL[g]})
@@ -1092,7 +1086,8 @@ check_dependencies() {
     [ ! -x "$(type -p ip6tables)" ] && DEPS+=(ip6tables)
   fi
 
-  # 如需要安装的依赖大于0，就更新库并安装
+  # 先 DEPS 去重，如需要安装的依赖大于0，就更新库并安装
+  DEPS=($(echo "${DEPS[@]}" | tr ' ' '\n' | awk '!a[$0]++'))
   if [[ "${#DEPS[@]}" > 0 ]]; then
     [[ ! "$SYSTEM" =~ Alpine|CentOS ]] && ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
     ${PACKAGE_INSTALL[int]} ${DEPS[@]} >/dev/null 2>&1
@@ -1323,8 +1318,38 @@ sing-box_json() {
   else
     DIR=$TEMP_DIR
 
-    # 生成 log 配置
-    cat > ${WORK_DIR}/conf/00_log.json << EOF
+  # 根据 IPv4 和 IPv6 的网络状态，使不同的 DNS 策略
+  [ -x "$(type -p ping)" ] && for i in {1..3}; do
+    ping -c 1 -W 1 "151.101.1.91" &>/dev/null && local IS_IPV4=is_ipv4 && break
+  done
+
+  if [ -x "$(type -p ping6)" ]; then
+    for i in {1..3}; do
+      ping6 -c 1 -W 1 "2a04:4e42:200::347" &>/dev/null && local IS_IPV6=is_ipv6 && break
+    done
+  elif [ -x "$(type -p ping)" ]; then
+    for i in {1..3}; do
+      ping -c 1 -W 1 "2a04:4e42:200::347" &>/dev/null && local IS_IPV6=is_ipv6 && break
+    done
+  fi
+
+  case "${IS_IPV4}@${IS_IPV6}" in
+    is_ipv4@is_ipv6)
+      local STRATEGY=prefer_ipv4
+      ;;
+    is_ipv4@)
+      local STRATEGY=ipv4_only
+      ;;
+    @is_ipv6)
+      local STRATEGY=ipv6_only
+      ;;
+    *)
+      local STRATEGY=prefer_ipv4
+      ;;
+  esac
+
+  # 生成 log 配置
+  cat > ${WORK_DIR}/conf/00_log.json << EOF
 {
     "log":{
         "disabled":false,
@@ -1335,8 +1360,8 @@ sing-box_json() {
 }
 EOF
 
-    # 生成 outbound 配置
-    cat > ${WORK_DIR}/conf/01_outbounds.json << EOF
+  # 生成 outbound 配置
+  cat > ${WORK_DIR}/conf/01_outbounds.json << EOF
 {
     "outbounds":[
         {
@@ -1347,8 +1372,8 @@ EOF
 }
 EOF
 
-    # 生成 endpoint 配置
-    cat > ${WORK_DIR}/conf/02_endpoints.json << EOF
+  # 生成 endpoint 配置
+  cat > ${WORK_DIR}/conf/02_endpoints.json << EOF
 {
     "endpoints":[
         {
@@ -1381,8 +1406,8 @@ EOF
 }
 EOF
 
-    # 生成 route 配置
-    cat > ${WORK_DIR}/conf/03_route.json << EOF
+  # 生成 route 配置
+  cat > ${WORK_DIR}/conf/03_route.json << EOF
 {
     "route":{
         "rule_set":[
@@ -1425,8 +1450,8 @@ EOF
 }
 EOF
 
-    # 生成缓存文件
-    cat > ${WORK_DIR}/conf/04_experimental.json << EOF
+  # 生成缓存文件
+  cat > ${WORK_DIR}/conf/04_experimental.json << EOF
 {
     "experimental": {
         "cache_file": {
@@ -1437,8 +1462,8 @@ EOF
 }
 EOF
 
-    # 生成 dns 配置文件
-    cat > ${WORK_DIR}/conf/05_dns.json << EOF
+  # 生成 dns 配置文件
+  cat > ${WORK_DIR}/conf/05_dns.json << EOF
 {
     "dns":{
         "servers":[
@@ -1451,8 +1476,8 @@ EOF
 }
 EOF
 
-    # 内建的 NTP 客户端服务配置文件，这对于无法进行时间同步的环境很有用
-    cat > ${WORK_DIR}/conf/06_ntp.json << EOF
+  # 内建的 NTP 客户端服务配置文件，这对于无法进行时间同步的环境很有用
+  cat > ${WORK_DIR}/conf/06_ntp.json << EOF
 {
     "ntp": {
         "enabled": true,
@@ -2665,7 +2690,7 @@ anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}/?insecure=1#${NODE_NAME[21]}%
 
   # 生成 Sing-box 订阅文件
   [ -n "$PORT_XTLS_REALITY" ] &&
-  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[11]} ${NODE_TAG[0]}\", \"server\":\"${SERVER_IP}\", \"server_port\":${PORT_XTLS_REALITY}, \"uuid\":\"${UUID[11]}\", \"flow\":\"\", \"packet_encoding\":\"xudp\", \"tls\":{ \"enabled\":true, \"server_name\":\"${TLS_SERVER[11]}\", \"utls\":{ \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[11]}\", \"short_id\":\"\" } }, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[11]} ${NODE_TAG[0]}\", \"server\":\"${SERVER_IP}\", \"server_port\":${PORT_XTLS_REALITY}, \"uuid\":\"${UUID[11]}\", \"flow\":\"\", \"tls\":{ \"enabled\":true, \"server_name\":\"${TLS_SERVER[11]}\", \"utls\":{ \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[11]}\", \"short_id\":\"\" } }, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
   local NODE_REPLACE+="\"${NODE_NAME[11]} ${NODE_TAG[0]}\","
 
   if [ -n "$PORT_HYSTERIA2" ]; then
@@ -2726,13 +2751,13 @@ anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}/?insecure=1#${NODE_NAME[21]}%
   fi
 
   [ -n "$PORT_H2_REALITY" ] &&
-  local REALITY_H2_INBOUND=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[19]} ${NODE_TAG[8]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_H2_REALITY}, \"uuid\":\"${UUID[19]}\", \"tls\": { \"enabled\":true, \"server_name\":\"${TLS_SERVER[19]}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[19]}\", \"short_id\":\"\" } }, \"packet_encoding\": \"xudp\", \"transport\": { \"type\": \"http\" } }," &&
+  local REALITY_H2_INBOUND=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[19]} ${NODE_TAG[8]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_H2_REALITY}, \"uuid\":\"${UUID[19]}\", \"tls\": { \"enabled\":true, \"server_name\":\"${TLS_SERVER[19]}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[19]}\", \"short_id\":\"\" } }, \"transport\": { \"type\": \"http\" } }," &&
   local REALITY_H2_NODE="\"${NODE_NAME[19]} ${NODE_TAG[8]}\"" &&
   local NODE_REPLACE+="${REALITY_H2_NODE}," &&
   local INBOUND_REPLACE+=" ${REALITY_H2_INBOUND}"
 
   [ -n "$PORT_GRPC_REALITY" ] &&
-  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[20]} ${NODE_TAG[9]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_GRPC_REALITY}, \"uuid\":\"${UUID[20]}\", \"tls\": { \"enabled\":true, \"server_name\":\"${TLS_SERVER[20]}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[20]}\", \"short_id\":\"\" } }, \"packet_encoding\": \"xudp\", \"transport\": { \"type\": \"grpc\", \"service_name\": \"grpc\" } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[20]} ${NODE_TAG[9]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_GRPC_REALITY}, \"uuid\":\"${UUID[20]}\", \"tls\": { \"enabled\":true, \"server_name\":\"${TLS_SERVER[20]}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"chrome\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[20]}\", \"short_id\":\"\" } }, \"transport\": { \"type\": \"grpc\", \"service_name\": \"grpc\" } }," &&
   local NODE_REPLACE+="\"${NODE_NAME[20]} ${NODE_TAG[9]}\","
 
   [ -n "$PORT_ANYTLS" ] &&
