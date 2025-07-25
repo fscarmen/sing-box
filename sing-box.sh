@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.17 (2025.07.16)'
+VERSION='v1.2.17 (2025.07.25)'
 
 # 各变量默认值
 GH_PROXY='gh-proxy.com/'
@@ -1068,8 +1068,8 @@ check_dependencies() {
   fi
 
   # 检测 Linux 系统的依赖，升级库并重新安装依赖
-  local DEPS_INSTALL=("wget" "tar" "iproute2" "iproute2" "bash" "openssl" "ping")
-  local DEPS_CHECK=("wget" "tar" "ss" "ip" "bash" "openssl" "iputils-ping")
+  local DEPS_INSTALL=("wget" "tar" "iproute2" "iproute2" "bash" "openssl" "iputils-ping")
+  local DEPS_CHECK=("wget" "tar" "ss" "ip" "bash" "openssl" "ping")
 
   [ "$SYSTEM" != 'Alpine' ] && DEPS_CHECK+=("systemctl") && DEPS_INSTALL+=("systemctl")
   for g in "${!DEPS_CHECK[@]}"; do
