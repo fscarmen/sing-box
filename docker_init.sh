@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 脚本更新日期 2025.07.16
+# 脚本更新日期 2025.07.28
 WORK_DIR=/sing-box
 PORT=$START_PORT
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
@@ -1272,7 +1272,7 @@ $(${WORK_DIR}/qrencode https://${ARGO_DOMAIN}/${UUID}/auto)
 
   # 显示脚本使用情况数据
   hint "\n*******************************************\n"
-  local STAT=$(wget --no-check-certificate -qO- --timeout=3 "http://stat.cloudflare.now.cc:4000/api/updateStats?script=sing-box-docker.sh")
+  local STAT=$(wget --no-check-certificate -qO- --timeout=3 "https://stat.cloudflare.now.cc/api/updateStats?script=sing-box-docker.sh")
   [[ "$STAT" =~ \"todayCount\":([0-9]+),\"totalCount\":([0-9]+) ]] && local TODAY="${BASH_REMATCH[1]}" && local TOTAL="${BASH_REMATCH[2]}"
   hint "\n 脚本当天运行次数: $TODAY，累计运行次数: $TOTAL \n"
 }
