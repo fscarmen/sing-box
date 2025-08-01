@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.17 (2025.07.28)'
+VERSION='v1.2.17 (2025.08.02)'
 
 # 各变量默认值
 GH_PROXY='gh-proxy.com/'
@@ -988,6 +988,36 @@ sing-box_variables() {
   SERVER_IP=${SERVER_IP:-"$SERVER_IP_DEFAULT"} && WS_SERVER_IP_SHOW=$SERVER_IP
   [ -z "$SERVER_IP" ] && error " $(text 47) "
 
+  # 根据 IPv4 和 IPv6 的网络状态，使不同的 DNS 策略
+  [ -x "$(type -p ping)" ] && for i in {1..3}; do
+    ping -c 1 -W 1 "151.101.1.91" &>/dev/null && local IS_IPV4=is_ipv4 && break
+  done
+
+  if [ -x "$(type -p ping6)" ]; then
+    for i in {1..3}; do
+      ping6 -c 1 -W 1 "2a04:4e42:200::347" &>/dev/null && local IS_IPV6=is_ipv6 && break
+    done
+  elif [ -x "$(type -p ping)" ]; then
+    for i in {1..3}; do
+      ping -c 1 -W 1 "2a04:4e42:200::347" &>/dev/null && local IS_IPV6=is_ipv6 && break
+    done
+  fi
+
+  case "${IS_IPV4}@${IS_IPV6}" in
+    is_ipv4@is_ipv6)
+      STRATEGY=prefer_ipv4
+      ;;
+    is_ipv4@)
+      STRATEGY=ipv4_only
+      ;;
+    @is_ipv6)
+      STRATEGY=ipv6_only
+      ;;
+    *)
+      STRATEGY=prefer_ipv4
+      ;;
+  esac
+
   # 检测是否解锁 chatGPT
   CHATGPT_OUT=warp-ep;
   [ "$(check_chatgpt $(grep -oE '[46]' <<< "$STRATEGY"))" = 'unlock' ] && CHATGPT_OUT=direct
@@ -1318,38 +1348,8 @@ sing-box_json() {
   else
     DIR=$TEMP_DIR
 
-  # 根据 IPv4 和 IPv6 的网络状态，使不同的 DNS 策略
-  [ -x "$(type -p ping)" ] && for i in {1..3}; do
-    ping -c 1 -W 1 "151.101.1.91" &>/dev/null && local IS_IPV4=is_ipv4 && break
-  done
-
-  if [ -x "$(type -p ping6)" ]; then
-    for i in {1..3}; do
-      ping6 -c 1 -W 1 "2a04:4e42:200::347" &>/dev/null && local IS_IPV6=is_ipv6 && break
-    done
-  elif [ -x "$(type -p ping)" ]; then
-    for i in {1..3}; do
-      ping -c 1 -W 1 "2a04:4e42:200::347" &>/dev/null && local IS_IPV6=is_ipv6 && break
-    done
-  fi
-
-  case "${IS_IPV4}@${IS_IPV6}" in
-    is_ipv4@is_ipv6)
-      local STRATEGY=prefer_ipv4
-      ;;
-    is_ipv4@)
-      local STRATEGY=ipv4_only
-      ;;
-    @is_ipv6)
-      local STRATEGY=ipv6_only
-      ;;
-    *)
-      local STRATEGY=prefer_ipv4
-      ;;
-  esac
-
-  # 生成 log 配置
-  cat > ${WORK_DIR}/conf/00_log.json << EOF
+    # 生成 log 配置
+    cat > ${WORK_DIR}/conf/00_log.json << EOF
 {
     "log":{
         "disabled":false,
@@ -1360,8 +1360,8 @@ sing-box_json() {
 }
 EOF
 
-  # 生成 outbound 配置
-  cat > ${WORK_DIR}/conf/01_outbounds.json << EOF
+    # 生成 outbound 配置
+    cat > ${WORK_DIR}/conf/01_outbounds.json << EOF
 {
     "outbounds":[
         {
@@ -1372,8 +1372,8 @@ EOF
 }
 EOF
 
-  # 生成 endpoint 配置
-  cat > ${WORK_DIR}/conf/02_endpoints.json << EOF
+    # 生成 endpoint 配置
+    cat > ${WORK_DIR}/conf/02_endpoints.json << EOF
 {
     "endpoints":[
         {
@@ -1406,8 +1406,8 @@ EOF
 }
 EOF
 
-  # 生成 route 配置
-  cat > ${WORK_DIR}/conf/03_route.json << EOF
+    # 生成 route 配置
+    cat > ${WORK_DIR}/conf/03_route.json << EOF
 {
     "route":{
         "rule_set":[
@@ -1450,8 +1450,8 @@ EOF
 }
 EOF
 
-  # 生成缓存文件
-  cat > ${WORK_DIR}/conf/04_experimental.json << EOF
+    # 生成缓存文件
+    cat > ${WORK_DIR}/conf/04_experimental.json << EOF
 {
     "experimental": {
         "cache_file": {
@@ -1462,8 +1462,8 @@ EOF
 }
 EOF
 
-  # 生成 dns 配置文件
-  cat > ${WORK_DIR}/conf/05_dns.json << EOF
+    # 生成 dns 配置文件
+    cat > ${WORK_DIR}/conf/05_dns.json << EOF
 {
     "dns":{
         "servers":[
@@ -1476,8 +1476,8 @@ EOF
 }
 EOF
 
-  # 内建的 NTP 客户端服务配置文件，这对于无法进行时间同步的环境很有用
-  cat > ${WORK_DIR}/conf/06_ntp.json << EOF
+    # 内建的 NTP 客户端服务配置文件，这对于无法进行时间同步的环境很有用
+    cat > ${WORK_DIR}/conf/06_ntp.json << EOF
 {
     "ntp": {
         "enabled": true,
