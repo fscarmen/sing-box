@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.2.18 (2025.08.27)'
+VERSION='v1.2.18 (2025.10.31)'
 
 # 各变量默认值
 GH_PROXY='https://hub.glowp.xyz/'
@@ -2874,7 +2874,7 @@ $(${WORK_DIR}/qrencode $SUBSCRIBE_ADDRESS/${UUID_CONFIRM}/auto2)
   cat ${WORK_DIR}/list
 
   # 显示脚本使用情况数据
-  statistics_of_run-times get
+  # statistics_of_run-times get
 }
 
 # 创建快捷方式
@@ -3423,7 +3423,7 @@ menu() {
 }
 
 check_cdn
-statistics_of_run-times update sing-box.sh
+# statistics_of_run-times update sing-box.sh 2>/dev/null
 
 # 传参
 [[ "${*^^}" =~ '-E' ]] && L=E
