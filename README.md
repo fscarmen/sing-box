@@ -20,20 +20,22 @@
 
 * * *
 ## 1.更新信息
+2025.11.05 v1.2.19 Enhance security by replacing certificate skipping with certificate fingerprint verification; 增强安全性：通过使用证书指纹验证来替代跳过证书检查
+
 2025.08.27 v1.2.18 Add support for AnyTLS URI in v2rayN v7.14.3+, including subscription integration; 支持 v2rayN v7.14.3+，新增 AnyTLS URI，并支持在订阅中使用
 
 2025.04.25 v1.2.17 1. Added the ability to change CDNs online using [sb -d]; 2. Change GitHub proxy; 3. Optimize code; 1. 新增使用 [sb -d] 在线更换 CDN 功能; 2. 更改 GitHub 代理; 3. 优化代码
-
-2025.04.06 v1.2.16 Use OpenRC on Alpine to replace systemctl (Python3-compatible version); 在 Alpine 系统中使用 OpenRC 取代兼容 Python3 的 systemctl 实现
-
-2025.04.05 v1.2.15 Supports output for clients such as Shadowrocket, Clash Mihomo, and Sing-box; 支持小火箭、Clash Mihomo、Sing-box 客户端输出
-
-2025.03.23 v1.2.14 Added support for the AnyTLS protocol. Thanks to [Betterdoitnow] for providing the configuration; 新增对 AnyTLS 协议的支持，感谢 [Betterdoitnow] 提供的配置
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
 <br>
 
+>2025.04.06 v1.2.16 Use OpenRC on Alpine to replace systemctl (Python3-compatible version); 在 Alpine 系统中使用 OpenRC 取代兼容 Python3 的 systemctl 实现
+>
+>2025.04.05 v1.2.15 Supports output for clients such as Shadowrocket, Clash Mihomo, and Sing-box; 支持小火箭、Clash Mihomo、Sing-box 客户端输出
+>
+>2025.03.23 v1.2.14 Added support for the AnyTLS protocol. Thanks to [Betterdoitnow] for providing the configuration; 新增对 AnyTLS 协议的支持，感谢 [Betterdoitnow] 提供的配置
+>
 >2025.03.18 v1.2.13 Compatible with Sing-box 1.12.0-alpha.18+; 适配 Sing-box 1.12.0-alpha.18+
 >
 >2025.01.31 v1.2.12 In order to prevent sing-box from upgrading to a certain version which may cause errors, add a mandatory version file; 以防止sing-box某个版本升级导致运行报错，增加强制指定版本号文件
