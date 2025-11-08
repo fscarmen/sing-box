@@ -58,10 +58,11 @@ install() {
   echo "正在下载 cloudflared ..."
   wget -O ${WORK_DIR}/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$ARGO_ARCH && chmod +x ${WORK_DIR}/cloudflared
 
-  # 生成证书文件
+  # 生成100年的自签证书，区分使用 IPv4 / IPv6 / 域名
   echo "生成自签证书 ..."
+  [[ $SERVER_IP =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$|^([0-9a-fA-F:]+)$ ]] && SAN_TYPE="IP" || SAN_TYPE="DNS"
   openssl ecparam -genkey -name prime256v1 -out ${WORK_DIR}/cert/private.key
-  openssl req -new -x509 -days 36500 -key ${WORK_DIR}/cert/private.key -out ${WORK_DIR}/cert/cert.pem -subj "/CN=mozilla.org" -addext "subjectAltName = IP:${SERVER_IP}"
+  openssl req -new -x509 -days 36500 -key ${WORK_DIR}/cert/private.key -out ${WORK_DIR}/cert/cert.pem -subj "/CN=mozilla.org" -addext "subjectAltName = ${SAN_TYPE}:${SERVER_IP}"
 
   # 检查系统是否已经安装 tcp-brutal
   IS_BRUTAL=false && [ -x "$(type -p lsmod)" ] && lsmod | grep -q brutal && IS_BRUTAL=true
@@ -727,25 +728,9 @@ stdout_logfile=/dev/null
     local ARGO_DOMAIN=$(wget -qO- http://localhost:$METRICS_PORT/quicktunnel | awk -F '"' '{print $4}')
   fi
 
-  # 获取自签证书指纹
+  # 获取自签证书指纹。argo 回源的是由 Google Trust Services（谷歌信任服务）作为中间 CA（CN=WE1）签发，受信任的证书（非自签名）
   local SELF_SIGNED_FINGERPRINT_SHA256=$(openssl x509 -fingerprint -noout -sha256 -in ${WORK_DIR}/cert/cert.pem | awk -F '=' '{print $NF}')
   local SELF_SIGNED_FINGERPRINT_BASE64=$(openssl x509 -in ${WORK_DIR}/cert/cert.pem -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64)
-
-  # 如果有 ws 协议，获取证书指纹
-  if grep -q '.' <<< "${ARGO_DOMAIN}"; then
-    local FINGERPRINT_ERROR_TIME=15
-    until [[ $CLOUDFLARE_CERT_FINGERPRINT_SHA256 =~ ^([0-9A-F]{2}:){31}[0-9A-F]{2}$ ]]; do
-      (( FINGERPRINT_ERROR_TIME-- )) || true
-      [ "$FINGERPRINT_ERROR_TIME" = 0 ] && local CERT_FINGERPRINT_METHOD_SHA256="skip-cert-verify: true" && local CERT_FINGERPRINT_METHOD_BASE64='"insecure": true' && break
-      sleep 1
-      local CLOUDFLARE_CERT_FINGERPRINT_SHA256=$(openssl s_client -connect ${ARGO_DOMAIN}:443 -servername ${ARGO_DOMAIN} </dev/null 2>/dev/null | openssl x509 -fingerprint -noout -sha256 | awk -F '=' '{print $NF}')
-      if grep -q '.' <<< "${CLOUDFLARE_CERT_FINGERPRINT_SHA256}"; then
-        local CLOUDFLARE_CERT_FINGERPRINT_BASE64=$(echo | openssl s_client -servername ${ARGO_DOMAIN} -connect ${ARGO_DOMAIN}:443 2>/dev/null | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64)
-        local CERT_FINGERPRINT_METHOD_SHA256="fingerprint: $CLOUDFLARE_CERT_FINGERPRINT_SHA256"
-        local CERT_FINGERPRINT_METHOD_BASE64="\"certificate_public_key_sha256\": [\"$CLOUDFLARE_CERT_FINGERPRINT_BASE64\"]"
-      fi
-    done
-  fi
 
   # 生成 nginx 配置文件
   local NGINX_CONF="user root;
@@ -891,7 +876,7 @@ stdout_logfile=/dev/null
   local CLASH_SUBSCRIBE+="
   $CLASH_VMESS_WS
 "
-  [ "${VLESS_WS}" = 'true' ] && local CLASH_VLESS_WS="- {name: \"${NODE_NAME} vless-ws-tls\", type: vless, server: ${CDN}, port: 443, uuid: ${UUID}, udp: true, tls: true, servername: ${ARGO_DOMAIN}, network: ws, skip-cert-verify: false, $CERT_FINGERPRINT_METHOD_SHA256, ws-opts: { path: \"/${UUID}-vless\", headers: {Host: ${ARGO_DOMAIN}}, max-early-data: 2560, early-data-header-name: Sec-WebSocket-Protocol }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
+  [ "${VLESS_WS}" = 'true' ] && local CLASH_VLESS_WS="- {name: \"${NODE_NAME} vless-ws-tls\", type: vless, server: ${CDN}, port: 443, uuid: ${UUID}, udp: true, tls: true, servername: ${ARGO_DOMAIN}, network: ws, skip-cert-verify: false,  ws-opts: { path: \"/${UUID}-vless\", headers: {Host: ${ARGO_DOMAIN}}, max-early-data: 2560, early-data-header-name: Sec-WebSocket-Protocol }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_VLESS_WS
 "
@@ -938,7 +923,7 @@ vmess://$(echo -n "auto:${UUID}@${CDN}:80" | base64 -w0)?remarks=${NODE_NAME}%20
 "
   [ "${VLESS_WS}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
 ----------------------------
-vless://$(echo -n "auto:${UUID}@${CDN}:443" | base64 -w0)?remarks=${NODE_NAME}%20vless-ws-tls&obfsParam=${ARGO_DOMAIN}&path=/${UUID}-vless?ed=2560&obfs=websocket&tls=1&peer=${ARGO_DOMAIN}&hpkp=${CLOUDFLARE_CERT_FINGERPRINT_SHA256}
+vless://$(echo -n "auto:${UUID}@${CDN}:443" | base64 -w0)?remarks=${NODE_NAME}%20vless-ws-tls&obfsParam=${ARGO_DOMAIN}&path=/${UUID}-vless?ed=2560&obfs=websocket&tls=1&peer=${ARGO_DOMAIN}
 "
   [ "${H2_REALITY}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
 ----------------------------
@@ -963,13 +948,11 @@ hysteria2://${UUID}@${SERVER_IP_1}:${PORT_HYSTERIA2}/?alpn=h3&insecure=1#${NODE_
 
   [ "${TUIC}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-tuic://${UUID}:${UUID}@${SERVER_IP_1}:${PORT_TUIC}?alpn=h3&congestion_control=bbr#${NODE_NAME// /%20}%20tuic
-
-# $(info "请把 tls 里的 inSecure 设置为 true")"
+tuic://${UUID}:${UUID}@${SERVER_IP_1}:${PORT_TUIC}?alpn=h3&insecure=1&congestion_control=bbr#${NODE_NAME// /%20}%20tuic"
 
   [ "${SHADOWTLS}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-# $(info "ShadowTLS 配置文件内容，需要更新 sing_box 内核")
+# $(echo -e "ShadowTLS 配置文件内容，需要更新 sing_box 内核")
 
 {
   \"log\":{
@@ -1024,19 +1007,15 @@ ss://$(echo -n "aes-128-gcm:${UUID}@${SERVER_IP_1}:$PORT_SHADOWSOCKS" | base64 -
 
   [ "${TROJAN}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-trojan://${UUID}@${SERVER_IP_1}:$PORT_TROJAN?security=tls&type=tcp&headerType=none#${NODE_NAME// /%20}%20trojan
-
-# $(info "ShadowTLS 配置文件内容，需要更新 sing_box 内核")"
+trojan://${UUID}@${SERVER_IP_1}:$PORT_TROJAN?security=tls&insecure=1&type=tcp&headerType=none#${NODE_NAME// /%20}%20trojan"
 
   [ "${VMESS_WS}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-vmess://$(echo -n "{ \"v\": \"2\", \"ps\": \"${NODE_NAME} vmess-ws\", \"add\": \"${CDN}\", \"port\": \"80\", \"id\": \"${UUID}\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"${ARGO_DOMAIN}\", \"path\": \"/${UUID}-vmess\", \"tls\": \"\", \"sni\": \"\", \"alpn\": \"\" }" | base64 -w0)
-"
+vmess://$(echo -n "{ \"v\": \"2\", \"ps\": \"${NODE_NAME} vmess-ws\", \"add\": \"${CDN}\", \"port\": \"80\", \"id\": \"${UUID}\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"${ARGO_DOMAIN}\", \"path\": \"/${UUID}-vmess\", \"tls\": \"\", \"sni\": \"\", \"alpn\": \"\" }" | base64 -w0)"
 
   [ "${VLESS_WS}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-vless://${UUID}@${CDN}:443?encryption=none&security=tls&sni=${ARGO_DOMAIN}&type=ws&host=${ARGO_DOMAIN}&path=%2F${UUID}-vless%3Fed%3D2560#${NODE_NAME// /%20}%20vless-ws-tls
-"
+vless://${UUID}@${CDN}:443?encryption=none&security=tls&sni=${ARGO_DOMAIN}&type=ws&host=${ARGO_DOMAIN}&path=%2F${UUID}-vless%3Fed%3D2560#${NODE_NAME// /%20}%20vless-ws-tls"
 
   [ "${H2_REALITY}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
@@ -1048,7 +1027,7 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?encryption=none&security=rea
 
   [ "${ANYTLS}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?security=tls&fp=firefox&allowInsecure=1&type=tcp#${NODE_NAME// /%20}%20anytls"
+anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?security=tls&fp=firefox&insecure=1&type=tcp#${NODE_NAME// /%20}%20anytls"
 
   echo -n "$V2RAYN_SUBSCRIBE" | sed -E '/^[ ]*#|^[ ]+|^--|^\{|^\}/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/v2rayn
 
@@ -1135,7 +1114,7 @@ anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}/?insecure=1#${NODE_NAME}%20anytls
   local INBOUND_REPLACE+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME} vmess-ws\", \"server\":\"${CDN}\", \"server_port\":80, \"uuid\": \"${UUID}\", \"security\": \"auto\", \"transport\": { \"type\":\"ws\", \"path\":\"/${UUID}-vmess\", \"headers\": { \"Host\": \"${ARGO_DOMAIN}\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } }," && local NODE_REPLACE+="\"${NODE_NAME} vmess-ws\","
 
   [ "${VLESS_WS}" = 'true' ] &&
-  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME} vless-ws-tls\", \"server\":\"${CDN}\", \"server_port\":443, \"uuid\": \"${UUID}\", \"tls\": { \"enabled\":true, \"server_name\":\"${ARGO_DOMAIN}\", $CERT_FINGERPRINT_METHOD_BASE64, \"utls\": { \"enabled\":true, \"fingerprint\":\"firefox\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/${UUID}-vless\", \"headers\": { \"Host\": \"${ARGO_DOMAIN}\" }, \"max_early_data\":2560, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME} vless-ws-tls\", \"server\":\"${CDN}\", \"server_port\":443, \"uuid\": \"${UUID}\", \"tls\": { \"enabled\":true, \"server_name\":\"${ARGO_DOMAIN}\", \"insecure\": false, \"utls\": { \"enabled\":true, \"fingerprint\":\"firefox\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/${UUID}-vless\", \"headers\": { \"Host\": \"${ARGO_DOMAIN}\" }, \"max_early_data\":2560, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":true, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
   local NODE_REPLACE+="\"${NODE_NAME} vless-ws-tls\","
 
   [ "${H2_REALITY}" = 'true' ] &&
