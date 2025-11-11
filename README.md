@@ -20,6 +20,8 @@
 
 * * *
 ## 1.更新信息
+2025.11.10 v1.3.0 Replace multiplex with xtls-rprx-vision flow control in reality configuration. The original configuration conversion script: bash <(curl -sSL https://raw.githubusercontent.com/fscarmen/tools/main/vision.sh); 在 reality 配置中将多路复用 multiplex 替换为 xtls-rprx-vision 流控。原来的配置转换脚本: bash <(curl -sSL https://raw.githubusercontent.com/fscarmen/tools/main/vision.sh)
+
 2025.11.05 v1.2.19 Enhance security by replacing certificate skipping with certificate fingerprint verification; 增强安全性：通过使用证书指纹验证来替代跳过证书检查
 
 2025.08.27 v1.2.18 Add support for AnyTLS URI in v2rayN v7.14.3+, including subscription integration; 支持 v2rayN v7.14.3+，新增 AnyTLS URI，并支持在订阅中使用
