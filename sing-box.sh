@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.0 (2025.11.10)'
+VERSION='v1.3.1 (2025.11.12)'
 
 # 各变量默认值
 GH_PROXY='https://hub.glowp.xyz/'
@@ -28,8 +28,8 @@ mkdir -p $TEMP_DIR
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="Replace multiplex with xtls-rprx-vision flow control in reality configuration. The original configuration conversion script: bash <(curl -sSL https://raw.githubusercontent.com/fscarmen/tools/main/vision.sh)"
-C[1]="在 reality 配置中将多路复用 multiplex 替换为 xtls-rprx-vision 流控。原来的配置转换脚本: bash <(curl -sSL https://raw.githubusercontent.com/fscarmen/tools/main/vision.sh)"
+E[1]="\\n 1. Reality Configuration Update: In Reality configurations, the original multiplexing (multiplex) has been replaced with xtls-rprx-vision flow control, improving transmission efficiency, reducing latency, and enhancing security. The original configuration conversion script command remains fully compatible and unchanged. — bash <(curl -sSL https://raw.githubusercontent.com/fscarmen/tools/main/vision.sh)\\n 2. Quick Install Mode: Added a one-click installation feature that auto-fills all parameters, simplifying the deployment process. Chinese users can use -l or -L; English users can use -k or -K. Case-insensitive support makes operations more flexible.\\n 3. Custom Reality Key Support: In response to user feedback, you can now specify a custom Reality private key via --REALITY_PRIVATE=<privateKey>. The script will automatically compute the corresponding public key using the integrated API. If left blank, it generates a random private-public key pair in real-time.\\n 4. Enhanced HTTP + Reality Support in Clash Clients: Added full compatibility for HTTP + Reality transport in Clash clients, improving connection stability and performance."
+C[1]="\\n 1. Reality 配置变更：在 Reality 配置中，将原来的多路复用（multiplex）替换为 xtls-rprx-vision 流控，提升传输效率、降低延迟并增强安全性。原配置转换脚本命令—— bash <(curl -sSL https://raw.githubusercontent.com/fscarmen/tools/main/vision.sh)\\n 2. 极速安装模式：新增一键安装功能，所有参数自动填充，简化部署流程。中文用户使用 -l 或 -L，英文用户使用 -k 或 -K，大小写均支持，操作更灵活\\n 3. 自定义 Reality 密钥支持：响应用户反馈，现支持通过 --REALITY_PRIVATE=<privateKey> 指定自定义 Reality 私钥，脚本将调用相关 API 自动计算对应公钥。若留空，则实时生成随机公私钥对\\n 4. HTTP + Reality 在 Clash 客户端的增强支持：补充了对 Clash 客户端中 HTTP + Reality 传输方式的完整兼容，提升了连接稳定性和性能"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -166,8 +166,8 @@ E[68]="Press [n] if there is an error, other keys to continue:"
 C[68]="如有错误请按 [n]，其他键继续:"
 E[69]="Install sba scripts (argo + sing-box) [https://github.com/fscarmen/sba]"
 C[69]="安装 sba 脚本 (argo + sing-box) [https://github.com/fscarmen/sba]"
-E[70]=""
-C[70]=""
+E[70]="Please enter the reality private key (privateKey), skip to generate randomly:"
+C[70]="请输入 reality 的密钥(privateKey)，跳过则随机生成:"
 E[71]="Create shortcut [ sb ] successfully."
 C[71]="创建快捷 [ sb ] 指令成功!"
 E[72]="Path to each client configuration file: ${WORK_DIR}/subscribe/\n The full template can be found at:\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
@@ -229,7 +229,7 @@ C[99]="检测到已安装 \${SING_BOX_SCRIPT}，脚本退出!"
 E[100]="Can't get the official latest version. Script exits."
 C[100]="获取不到官方的最新版本，脚本退出!"
 E[101]=""
-C[101]=""
+C[101]="privateKey 应该是43位的 base64url 编码，请检查"
 E[102]="Backing up old version sing-box to ${WORK_DIR}/sing-box.bak"
 C[102]="已备份旧版本 sing-box 到 ${WORK_DIR}/sing-box.bak"
 E[103]="New version \$ONLINE is running successfully, backup file deleted"
@@ -252,6 +252,10 @@ E[111]="Please select or enter a new CDN (press Enter to keep the current one):"
 C[111]="请选择或输入新的 CDN (回车保持当前值):"
 E[112]="CDN has been changed from \${CDN_NOW} to \${CDN_NEW}"
 C[112]="CDN 已从 \${CDN_NOW} 更改为 \${CDN_NEW}"
+E[113]="Failed to change CDN, using random privateKey"
+C[113]="privateKey 格式失败次数过多，已使用随机私钥"
+E[114]="Invalid privateKey format: expected a 43-character base64url-encoded string."
+C[114]="privateKey 私钥格式错误，应该为 43位 base64url 编码"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -384,6 +388,7 @@ input_nginx_port() {
   local PORT_ERROR_TIME=6
   # 生成 1000 - 65535 随机默认端口数
   local PORT_NGINX_DEFAULT=$(shuf -i ${MIN_PORT}-${MAX_PORT} -n 1)
+  [[ "$IS_FAST_INSTALL" = 'is_fast_install' && -z "$PORT_NGINX" ]] && PORT_NGINX="$PORT_NGINX_DEFAULT"
   while true; do
     [[ "$PORT_ERROR_TIME" > 1 && "$PORT_ERROR_TIME" < 6 ]] && unset IN_USED PORT_NGINX
     (( PORT_ERROR_TIME-- )) || true
@@ -403,17 +408,19 @@ input_nginx_port() {
 input_hopping_port() {
   local HOPPING_ERROR_TIME=6
   until [ -n "$IS_HOPPING" ]; do
-    (( HOPPING_ERROR_TIME-- )) || true
-    case "$HOPPING_ERROR_TIME" in
-      0 )
-        error "\n $(text 3) \n"
-        ;;
-      5 )
-        hint "\n $(text 97) \n" && reading " $(text 98) " PORT_HOPPING_RANGE
-        ;;
-      * )
-        reading " $(text 98) " PORT_HOPPING_RANGE
-    esac
+    if [ -z "$PORT_HOPPING_RANGE" ]; then
+      (( HOPPING_ERROR_TIME-- )) || true
+      case "$HOPPING_ERROR_TIME" in
+        0 )
+          error "\n $(text 3) \n"
+          ;;
+        5 )
+          hint "\n $(text 97) \n" && reading " $(text 98) " PORT_HOPPING_RANGE
+          ;;
+        * )
+          reading " $(text 98) " PORT_HOPPING_RANGE
+      esac
+    fi
     if [[ "${PORT_HOPPING_RANGE//-/:}" =~ ^[1-6][0-9]{4}:[1-6][0-9]{4}$ ]]; then
       # 为防止输入错误，把 - 改为 : ，比如  10000-11000 改为 10000:11000
       PORT_HOPPING_RANGE=${PORT_HOPPING_RANGE//-/:}
@@ -425,6 +432,22 @@ input_hopping_port() {
     else
       warning "\n $(text 36) "
     fi
+  done
+}
+
+# 输入 Reality 密钥
+input_reality_key() {
+  [[ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' && "$IS_FAST_INSTALL" != 'is_fast_install' ]] && [ -z "$REALITY_PRIVATE" ] && reading "\n $(text 70) " REALITY_PRIVATE
+  [ -z "$REALITY_PRIVATE" ] && unset REALITY_PRIVATE && return
+
+  local PRIVATEKEY_ERROR_TIME=5
+  until [[ "$REALITY_PRIVATE" =~ ^[A-Za-z0-9_-]{43}$ || -z "$REALITY_PRIVATE" ]]; do
+    (( PRIVATEKEY_ERROR_TIME-- )) || true
+    [ "$PRIVATEKEY_ERROR_TIME" = 0 ] && unset REALITY_PRIVATE && hint "\n $(text 113) \n" && break
+    warning "\n $(text 114) "
+    reading "\n $(text 70) " REALITY_PRIVATE
+    # 即使 REALITY_PRIVATE 为空值，但 REALITY_PRIVATE 数组数量 ${REALITY_PRIVATE[@]} 为 1，影响后续的处理，所以要置空
+    [ -z "$REALITY_PRIVATE" ] && unset REALITY_PRIVATE && break
   done
 }
 
@@ -442,7 +465,7 @@ input_argo_auth() {
       reading "\n $(text 88) " ARGO_DOMAIN
       [ -n "$IS_CHANGE_ARGO" ] && ARGO_DOMAIN=$(sed 's/[ ]*//g; s/:[ ]*//' <<< "$ARGO_DOMAIN")
     done
-  elif [ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' ]; then
+  elif [[ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' && "$IS_FAST_INSTALL" != 'is_fast_install' ]]; then
     [ -z "$ARGO_DOMAIN" ] && reading "\n $(text 87) " ARGO_DOMAIN
     ARGO_DOMAIN=$(sed 's/[ ]*//g; s/:[ ]*//' <<< "$ARGO_DOMAIN")
   fi
@@ -984,6 +1007,10 @@ sing-box_variables() {
   [[ "$IS_SUB" = 'is_sub' || "$IS_ARGO" = 'is_argo' ]] && input_nginx_port
 
   # 输入服务器 IP,默认为检测到的服务器 IP，如果全部为空，则提示并退出脚本
+  if [ "$IS_FAST_INSTALL" = 'is_fast_install' ]; then
+    grep -q '^$' <<< "$SERVER_IP" && grep -q '.' <<< "$WAN4" && SERVER_IP=$WAN4
+    grep -q '^$' <<< "$SERVER_IP" && grep -q '.' <<< "$WAN6" && SERVER_IP=$WAN6
+  fi
   [ -z "$SERVER_IP" ] && reading "\n (4/6) $(text 10) " SERVER_IP
   SERVER_IP=${SERVER_IP:-"$SERVER_IP_DEFAULT"} && WS_SERVER_IP_SHOW=$SERVER_IP
   [ -z "$SERVER_IP" ] && error " $(text 47) "
@@ -1022,6 +1049,9 @@ sing-box_variables() {
   CHATGPT_OUT=warp-ep;
   [ "$(check_chatgpt $(grep -oE '[46]' <<< "$STRATEGY"))" = 'unlock' ] && CHATGPT_OUT=direct
 
+  # 如果选择有 b j k 这些 reality 协议，自定义 reality 公私钥，如果没有则自动生成
+  [ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' ] && [[ "${INSTALL_PROTOCOLS[@]}" =~ 'b'|'j'|'k' ]] && input_reality_key
+
   # 如选择有 c. hysteria2 时，选择是否使用端口跳跃
   [[ "${INSTALL_PROTOCOLS[@]}" =~ 'c' ]] && input_hopping_port
 
@@ -1057,6 +1087,7 @@ sing-box_variables() {
 
   # 输入 UUID ，错误超过 5 次将会退出
   UUID_DEFAULT=$(cat /proc/sys/kernel/random/uuid)
+  [ "$IS_FAST_INSTALL" = 'is_fast_install' ] && UUID_CONFIRM="$UUID_DEFAULT"
   [ -z "$UUID_CONFIRM" ] && reading "\n (5/6) $(text 12) " UUID_CONFIRM
   local UUID_ERROR_TIME=5
   until [[ -z "$UUID_CONFIRM" || "${UUID_CONFIRM,,}" =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ ]]; do
@@ -1074,7 +1105,8 @@ sing-box_variables() {
     else
       NODE_NAME_DEFAULT="Sing-Box"
     fi
-    reading "\n (6/6) $(text 13) " NODE_NAME_CONFIRM
+    NODE_NAME_CONFIRM="$NODE_NAME_DEFAULT"
+    [ -z "$NODE_NAME_CONFIRM" ] && reading "\n (6/6) $(text 13) " NODE_NAME_CONFIRM
     NODE_NAME_CONFIRM="${NODE_NAME_CONFIRM:-"$NODE_NAME_DEFAULT"}"
   fi
 }
@@ -1491,8 +1523,10 @@ EOF
 EOF
   fi
 
-  # 生成 Reality 公私钥，第一次安装的时候使用新生成的；添加协议的时，使用相应数组里的第一个非空值，如全空则像第一次安装那样使用新生成的
-  if [[ "${#REALITY_PRIVATE[@]}" = 0 || "${#REALITY_PUBLIC[@]}" = 0 ]]; then
+  # 生成 Reality 公私钥，第一次安装的时候，如有指定的私钥，则使用该私钥及生成对应的公钥；如没有指定私钥则使用新生成的；添加协议的时，使用相应数组里的第一个非空值，如全空则像第一次安装那样使用新生成的
+  if [[ "${#REALITY_PRIVATE}" = 43 && "${#REALITY_PUBLIC}" = 0 ]]; then
+    REALITY_PUBLIC=$(wget --no-check-certificate -qO- --tries=3 --timeout=2 https://realitykey.cloudflare.now.cc/?privateKey=$REALITY_PRIVATE | awk -F '"' '/publicKey/{print $4}')
+  elif [[ "${#REALITY_PRIVATE[@]}" = 0 && "${#REALITY_PUBLIC[@]}" = 0 ]]; then
     REALITY_KEYPAIR=$($DIR/sing-box generate reality-keypair) && REALITY_PRIVATE=$(awk '/PrivateKey/{print $NF}' <<< "$REALITY_KEYPAIR") && REALITY_PUBLIC=$(awk '/PublicKey/{print $NF}' <<< "$REALITY_KEYPAIR")
   else
     REALITY_PRIVATE=$(awk '{print $1}' <<< "${REALITY_PRIVATE[@]}") && REALITY_PUBLIC=$(awk '{print $1}' <<< "${REALITY_PUBLIC[@]}")
@@ -2362,8 +2396,10 @@ export_list() {
     fi
   fi
 
-  # Clash 的 H2 传输层未实现多路复用功能，在 Clash.Meta 中更建议使用 gRPC 协议，故不输出相关配置。 https://wiki.metacubex.one/config/proxies/vless/
-  [ -n "$PORT_H2_REALITY" ]
+  [ -n "$PORT_H2_REALITY" ] && local CLASH_H2_REALITY="- {name: \"${NODE_NAME[19]} ${NODE_TAG[8]}\", type: vless, server: ${SERVER_IP}, port: ${PORT_H2_REALITY}, uuid: ${UUID[19]}, network: http, tls: true, servername: ${TLS_SERVER[19]}, client-fingerprint: firefox, reality-opts: { public-key: ${REALITY_PUBLIC[19]}, short-id: \"\" }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
+  local CLASH_SUBSCRIBE+="
+  $CLASH_H2_REALITY
+"
 
   [ -n "$PORT_GRPC_REALITY" ] && local CLASH_GRPC_REALITY="- {name: \"${NODE_NAME[20]} ${NODE_TAG[9]}\", type: vless, server: ${SERVER_IP}, port: ${PORT_GRPC_REALITY}, uuid: ${UUID[20]}, network: grpc, tls: true, udp: true, flow: , client-fingerprint: firefox, servername: ${TLS_SERVER[20]}, grpc-opts: {  grpc-service-name: \"grpc\" }, reality-opts: { public-key: ${REALITY_PUBLIC[20]}, short-id: \"\" }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
   local CLASH_SUBSCRIBE+="
@@ -3039,6 +3075,7 @@ change_protocols() {
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_XTLS_REALITY=${REINSTALL_PORTS[POSITION]}
+    NEED_PRIVATE_KEY='need_private_key'
   else
     unset PORT_XTLS_REALITY
   fi
@@ -3201,6 +3238,7 @@ change_protocols() {
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_H2_REALITY=${REINSTALL_PORTS[POSITION]}
+    NEED_PRIVATE_KEY='need_private_key'
   else
     unset PORT_H2_REALITY
   fi
@@ -3210,9 +3248,13 @@ change_protocols() {
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
     PORT_GRPC_REALITY=${REINSTALL_PORTS[POSITION]}
+    NEED_PRIVATE_KEY='need_private_key'
   else
     unset PORT_GRPC_REALITY
   fi
+
+  # 如之前没有 Reality，现新增的 reality，则确认 privateKey
+  [[ "${#REALITY_PRIVATE[@]}" = 0 && "${NEED_PRIVATE_KEY}" = 'need_private_key' ]] && input_reality_key
 
   # 获取 anytls 端口
   CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
@@ -3467,8 +3509,8 @@ check_cdn
 # statistics_of_run-times update sing-box.sh 2>/dev/null
 
 # 传参
-[[ "${*^^}" =~ '-E' ]] && L=E
-[[ "${*^^}" =~ '-C'|'-B' ]] && L=C
+[[ "${*^^}" =~ '-E'|'-K' ]] && L=E
+[[ "${*^^}" =~ '-C'|'-B'|'-L' ]] && L=C
 
 # 获取 -F 参数的值
 CONFIG_FILE=$(awk '-F[ =]' 'tolower($1) ~ /^-f$/{print $2}' <<< "$*")
@@ -3493,6 +3535,10 @@ ALL_PARAMETER=($(sed -E 's/(-c|-e|-f|-C|-E|-F) //; s/=([^"])/ \1/g; s/sudo cloud
 # 传参处理，无交互快速安装参数
 for z in ${!ALL_PARAMETER[@]}; do
   case "${ALL_PARAMETER[z]^^}" in
+    -K|-L )
+      ((z++))
+      IS_FAST_INSTALL=is_fast_install
+      ;;
     -P )
       ((z++)); START_PORT=${ALL_PARAMETER[z]}; check_install; [ "${STATUS[0]}" = "$(text 26)" ] && error "\n Sing-box $(text 26) "; change_start_port; exit 0
       ;;
@@ -3596,6 +3642,9 @@ for z in ${!ALL_PARAMETER[@]}; do
       ((z++)); [[ "${ALL_PARAMETER[z]//:/-}" =~ ^[1-6][0-9]{4}-[1-6][0-9]{4}$ ]] && PORT_HOPPING_RANGE=${ALL_PARAMETER[z]//-/:} && PORT_HOPPING_START=${ALL_PARAMETER[z]%:*} && PORT_HOPPING_END=${ALL_PARAMETER[z]#*:}
       [[ "$PORT_HOPPING_START" < "$PORT_HOPPING_END" && "$PORT_HOPPING_START" -ge "$MIN_HOPPING_PORT" && "$PORT_HOPPING_END" -le "$MAX_HOPPING_PORT" ]] && IS_HOPPING=is_hopping
       ;;
+    --REALITY_PRIVATE )
+      ((z++)); REALITY_PRIVATE=${ALL_PARAMETER[z]}
+      ;;
   esac
 done
 
@@ -3610,6 +3659,18 @@ if [ "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]; then
   IS_SUB=${IS_SUB:-'no_sub'}
   IS_ARGO=${IS_ARGO:-'no_argo'}
   IS_HOPPING=${IS_HOPPING:-'no_hoppinng'}
+
+  install_sing-box
+  export_list install
+  create_shortcut
+elif [ "$IS_FAST_INSTALL" = 'is_fast_install' ]; then
+  # 预设默认值
+  CHOOSE_PROTOCOLS=${CHOOSE_PROTOCOLS:-'a'}
+  START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}
+  CDN=${CDN:-"${CDN_DOMAIN[0]}"}
+  IS_SUB='is_sub'
+  IS_ARGO='is_argo'
+  PORT_HOPPING_RANGE=${PORT_HOPPING_RANGE:-'50000:51000'}
 
   install_sing-box
   export_list install
