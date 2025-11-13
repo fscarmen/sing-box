@@ -256,6 +256,8 @@ E[113]="Failed to change CDN, using random privateKey"
 C[113]="privateKey 格式失败次数过多，已使用随机私钥"
 E[114]="Invalid privateKey format: expected a 43-character base64url-encoded string."
 C[114]="privateKey 私钥格式错误，应该为 43位 base64url 编码"
+E[115]="Quick install mode (all protocols + subscription) (sb -k)"
+C[115]="极速安装模式 (所有协议 + 订阅) (sb -l)"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -587,7 +589,7 @@ check_brutal() {
   [ "$IS_BRUTAL" = 'false' ] && [ -x "$(type -p modprobe)" ] && modprobe brutal 2>/dev/null && IS_BRUTAL=true
 }
 
-# 查安装及运行状态，下标0: sing-box，下标1: argo，下标2：docker；状态码: 26 未安装， 27 已安装未运行， 28 运行中
+# 查安装及运行状态，下标0: sing-box，下标1: argo，下标2: nginx；状态码: 26 未安装， 27 已安装未运行， 28 运行中
 check_install() {
   [[ "$IS_SUB" = 'is_sub' || -s ${WORK_DIR}/subscribe/qr ]] && IS_SUB=is_sub || IS_SUB=no_sub
   if ls ${WORK_DIR}/conf/*${NODE_TAG[1]}_inbounds.json >/dev/null 2>&1; then
@@ -701,6 +703,16 @@ check_install() {
         ARGO_TYPE=is_quicktunnel_argo
       fi
     fi
+  fi
+
+  # 检查 Nginx 状态
+  if [ ! -x "$(type -p nginx)" ]; then
+    STATUS[2]=$(text 26)
+  elif [ ! -s ${WORK_DIR}/nginx.conf ]; then
+    STATUS[2]=$(text 27)
+  else
+    [ "$SYSTEM" = 'Alpine' ] && NGINX_PID=$(ps -ef | awk -v WORK_DIR="${WORK_DIR}" '$0 ~ WORK_DIR"/nginx.conf" {print $1; exit}') || NGINX_PID=$(ps -ef | awk -v WORK_DIR="${WORK_DIR}" '$0 ~ WORK_DIR"/nginx.conf" {print $2; exit}')
+    [[ "$NGINX_PID" =~ ^[0-9]+$ ]] && STATUS[2]=$(text 28) || STATUS[2]=$(text 27)
   fi
 
   # 下载 cloudflared 如果需要
@@ -1105,7 +1117,7 @@ sing-box_variables() {
     else
       NODE_NAME_DEFAULT="Sing-Box"
     fi
-    NODE_NAME_CONFIRM="$NODE_NAME_DEFAULT"
+    [ "$IS_FAST_INSTALL" = 'is_fast_install' ] && NODE_NAME_CONFIRM="$NODE_NAME_DEFAULT"
     [ -z "$NODE_NAME_CONFIRM" ] && reading "\n (6/6) $(text 13) " NODE_NAME_CONFIRM
     NODE_NAME_CONFIRM="${NODE_NAME_CONFIRM:-"$NODE_NAME_DEFAULT"}"
   fi
@@ -1140,7 +1152,7 @@ check_dependencies() {
 
   if [ "$SYSTEM" = 'CentOS' ]; then
     if [ "$IS_CENTOS" = 'CentOS7' ]; then
-      yum repolist | grep -q epef || DEPS+=(epel-release)
+      yum repolist 2>/dev/null | grep -q epel || DEPS+=(epel-release)
     fi
     [ ! -x "$(type -p firewalld)" ] && DEPS+=(firewalld)
   else
@@ -1205,13 +1217,32 @@ ssl_certificate() {
   mkdir -p ${WORK_DIR}/cert
   [[ $SERVER_IP =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$|^([0-9a-fA-F:]+)$ ]] && SAN_TYPE="IP" || SAN_TYPE="DNS"
   openssl ecparam -genkey -name prime256v1 -out ${WORK_DIR}/cert/private.key
-  openssl req -new -x509 -days 36500 -key ${WORK_DIR}/cert/private.key -out ${WORK_DIR}/cert/cert.pem -subj "/CN=$(awk -F . '{print $(NF-1)"."$NF}' <<< "$TLS_SERVER_DEFAULT")" -addext "subjectAltName = ${SAN_TYPE}:${SERVER_IP}"
+
+  cat > ${WORK_DIR}/cert/cert.conf << EOF
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+CN = $(awk -F . '{print $(NF-1)"."$NF}' <<< "$TLS_SERVER_DEFAULT")
+
+[v3_req]
+subjectAltName = @alt_names
+
+[alt_names]
+${SAN_TYPE} = ${SERVER_IP}
+EOF
+
+  openssl req -new -x509 -days 36500 -key ${WORK_DIR}/cert/private.key -out ${WORK_DIR}/cert/cert.pem -config ${WORK_DIR}/cert/cert.conf -extensions v3_req
+
+  rm -f ${WORK_DIR}/cert/cert.conf
 }
 
 # 处理防火墙规则
 firewall_configuration() {
   local LISTEN_PORT=$(sed -n "/listen_port/ s#.*:\([0-9]\+\),#\1#gp" /etc/sing-box/conf/*)
-  local PORT_NGINX=$(awk '/listen/{print $2; exit}' ${WORK_DIR}/nginx.conf)
+  [ -s ${WORK_DIR}/nginx.conf ] && local PORT_NGINX=$(awk '/listen/{print $2; exit}' ${WORK_DIR}/nginx.conf)
   if grep -q "open" <<< "$1"; then
     local LISTEN_PORT_TCP=$(sed -n "s#\([0-9]\+\)#--add-port=\1/tcp#gp" <<< "$LISTEN_PORT")
     local LISTEN_PORT_UDP=$(sed -n "s#\([0-9]\+\)#--add-port=\1/udp#gp" <<< "$LISTEN_PORT")
@@ -3274,6 +3305,9 @@ change_protocols() {
   # 生成 Nginx 配置文件
   [ -n "$PORT_NGINX" ] && export_nginx_conf_file
 
+  # 重新生成 Sing-box 守护进程文件
+  sing-box_systemd
+
   # 生成各协议的 json 文件
   sing-box_json change
 
@@ -3407,8 +3441,7 @@ menu_setting() {
 
     # 查 Nginx 版本号
     [ -x "$(type -p nginx)" ] && NGINX_VERSION=$(nginx -v 2>&1 | sed "s#.*/#Version: #")
-    [ "$SYSTEM" = 'Alpine' ] && NGINX_PID=$(ps -ef | awk -v WORK_DIR="${WORK_DIR}" '$0 ~ WORK_DIR"/nginx.conf" {print $1; exit}') || NGINX_PID=$(ps -ef | awk -v WORK_DIR="${WORK_DIR}" '$0 ~ WORK_DIR"/nginx.conf" {print $2; exit}')
-    [[ "$NGINX_PID" =~ ^[0-9]+$ ]] && NGINX_MEMORY_USAGE="$(text 58): $(awk '/VmRSS/{printf "%.1f\n", $2/1024}' /proc/$NGINX_PID/status) MB"
+    [ "${STATUS[2]}" = "$(text 28)" ] && NGINX_MEMORY_USAGE="$(text 58): $(awk '/VmRSS/{printf "%.1f\n", $2/1024}' /proc/$NGINX_PID/status) MB"
 
     NOW_PORTS=$(awk -F ':|,' '/listen_port/{print $2}' ${WORK_DIR}/conf/*)
     NOW_START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$NOW_PORTS")
@@ -3463,23 +3496,25 @@ menu_setting() {
     ACTION[11]() { bash <(wget --no-check-certificate -qO- ${GH_PROXY}https://raw.githubusercontent.com/fscarmen/sba/main/sba.sh) -$L; exit; }
     ACTION[12]() { bash <(wget --no-check-certificate -qO- https://tcp.hy2.sh/); exit; }
   else
-    OPTION[1]="1.  $(text 34) + Argo + $(text 80) $(text 89)"
-    OPTION[2]="2.  $(text 34) + Argo $(text 89)"
-    OPTION[3]="3.  $(text 34) + $(text 80) $(text 89)"
-    OPTION[4]="4.  $(text 34)"
-    OPTION[5]="5.  $(text 32)"
-    OPTION[6]="6.  $(text 59)"
-    OPTION[7]="7.  $(text 69)"
-    OPTION[8]="8.  $(text 76)"
+    OPTION[1]="1.  $(text 115)"
+    OPTION[2]="2.  $(text 34) + Argo + $(text 80) $(text 89)"
+    OPTION[3]="3.  $(text 34) + Argo $(text 89)"
+    OPTION[4]="4.  $(text 34) + $(text 80) $(text 89)"
+    OPTION[5]="5.  $(text 34)"
+    OPTION[6]="6.  $(text 32)"
+    OPTION[7]="7.  $(text 59)"
+    OPTION[8]="8.  $(text 69)"
+    OPTION[9]="9.  $(text 76)"
 
-    ACTION[1]() { IS_SUB=is_sub; IS_ARGO=is_argo; install_sing-box; export_list install; create_shortcut; exit; }
-    ACTION[2]() { IS_SUB=no_sub; IS_ARGO=is_argo; install_sing-box; export_list install; create_shortcut; exit; }
-    ACTION[3]() { IS_SUB=is_sub; IS_ARGO=no_argo; install_sing-box; export_list install; create_shortcut; exit; }
-    ACTION[4]() { install_sing-box; export_list install; create_shortcut; exit; }
-    ACTION[5]() { bash <(wget --no-check-certificate -qO- ${GH_PROXY}https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh); exit; }
-    ACTION[6]() { bash <(wget --no-check-certificate -qO- ${GH_PROXY}https://raw.githubusercontent.com/fscarmen/argox/main/argox.sh) -$L; exit; }
-    ACTION[7]() { bash <(wget --no-check-certificate -qO- ${GH_PROXY}https://raw.githubusercontent.com/fscarmen/sba/main/sba.sh) -$L; exit; }
-    ACTION[8]() { bash <(wget --no-check-certificate -qO- ${GH_PROXY}https://tcp.hy2.sh/); exit; }
+    ACTION[1]() { IS_FAST_INSTALL='is_fast_install';   CHOOSE_PROTOCOLS=${CHOOSE_PROTOCOLS:-'a'}; START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}; CDN=${CDN:-"${CDN_DOMAIN[0]}"}; IS_SUB='is_sub'; IS_ARGO='is_argo'; PORT_HOPPING_RANGE=${PORT_HOPPING_RANGE:-'50000:51000'}; install_sing-box; export_list install; create_shortcut; exit; }
+    ACTION[2]() { IS_SUB=is_sub; IS_ARGO=is_argo; install_sing-box; export_list install; create_shortcut; exit; }
+    ACTION[3]() { IS_SUB=no_sub; IS_ARGO=is_argo; install_sing-box; export_list install; create_shortcut; exit; }
+    ACTION[4]() { IS_SUB=is_sub; IS_ARGO=no_argo; install_sing-box; export_list install; create_shortcut; exit; }
+    ACTION[5]() { install_sing-box; export_list install; create_shortcut; exit; }
+    ACTION[6]() { bash <(wget --no-check-certificate -qO- ${GH_PROXY}https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh); exit; }
+    ACTION[7]() { bash <(wget --no-check-certificate -qO- ${GH_PROXY}https://raw.githubusercontent.com/fscarmen/argox/main/argox.sh) -$L; exit; }
+    ACTION[8]() { bash <(wget --no-check-certificate -qO- ${GH_PROXY}https://raw.githubusercontent.com/fscarmen/sba/main/sba.sh) -$L; exit; }
+    ACTION[9]() { bash <(wget --no-check-certificate -qO- ${GH_PROXY}https://tcp.hy2.sh/); exit; }
   fi
 
   [ "${#OPTION[@]}" -ge '10' ] && OPTION[0]="0 .  $(text 35)" || OPTION[0]="0.  $(text 35)"
@@ -3492,7 +3527,7 @@ menu() {
   info " $(text 17): $VERSION\n $(text 18): $(text 1)\n $(text 19):\n\t $(text 20): $SYS\n\t $(text 21): $(uname -r)\n\t $(text 22): $SING_BOX_ARCH\n\t $(text 23): $VIRT "
   info "\t IPv4: $WAN4 $WARPSTATUS4 $COUNTRY4  $ASNORG4 "
   info "\t IPv6: $WAN6 $WARPSTATUS6 $COUNTRY6  $ASNORG6 "
-  info "\t Sing-box: ${STATUS[0]}\t $SING_BOX_VERSION\t\t $SING_BOX_MEMORY_USAGE\n\t Argo: ${STATUS[1]}\t $ARGO_VERSION\t\t $ARGO_MEMORY_USAGE\n \t Nginx: ${STATUS[0]}\t $NGINX_VERSION\t $NGINX_MEMORY_USAGE "
+  info "\t Sing-box: ${STATUS[0]}\t $SING_BOX_VERSION\t\t $SING_BOX_MEMORY_USAGE\n\t Argo: ${STATUS[1]}\t $ARGO_VERSION\t\t $ARGO_MEMORY_USAGE\n \t Nginx: ${STATUS[2]}\t $NGINX_VERSION\t $NGINX_MEMORY_USAGE "
   echo -e "\n======================================================================================================================\n"
   for ((b=1;b<=${#OPTION[*]};b++)); do [ "$b" = "${#OPTION[*]}" ] && hint " ${OPTION[0]} " || hint " ${OPTION[b]} "; done
   reading "\n $(text 24) " CHOOSE
