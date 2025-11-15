@@ -258,6 +258,8 @@ E[114]="Invalid privateKey format: expected a 43-character base64url-encoded str
 C[114]="privateKey 私钥格式错误，应该为 43位 base64url 编码"
 E[115]="Quick install mode (all protocols + subscription) (sb -k)"
 C[115]="极速安装模式 (所有协议 + 订阅) (sb -l)"
+E[116]="Failed to generate publicKey from privateKey, using random privateKey"
+C[116]="从 privateKey 生成 publicKey失败，将使用随机公私钥"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -813,12 +815,13 @@ check_system_info() {
 
   # 先排除 EXCLUDE 里包括的特定系统，其他系统需要作大发行版本的比较
   for ex in "${EXCLUDE[@]}"; do [[ ! "{$SYS,,}"  =~ $ex ]]; done &&
-  [[ "$(echo "$SYS" | sed "s/[^0-9.]//g" | cut -d. -f1)" -lt "${MAJOR[int]}" ]] && error " $(text 6) "
+  [[ "$(sed -E 's/[^0-9.]//g; s/\..*//' <<< "$SYS")" -lt "${MAJOR[int]}" ]] && error " $(text 6) "
 
-  # 针对部分系统作特殊处理
+  # 针对部分系统作特殊处理，CentOS7 使用 yum，以上使用 dnf
   ARGO_DAEMON_FILE='/etc/systemd/system/argo.service'; SINGBOX_DAEMON_FILE='/etc/systemd/system/sing-box.service'
   if [ "$SYSTEM" = 'CentOS' ]; then
-    IS_CENTOS="CentOS$(echo "$SYS" | sed "s/[^0-9.]//g" | cut -d. -f1)"
+    IS_CENTOS="CentOS$(sed -E 's/[^0-9.]//g; s/\..*//' <<< "$SYS")"
+    [ "$IS_CENTOS" != 'CentOS7' ] && int=5
   elif [ "$SYSTEM" = 'Alpine' ]; then
     ARGO_DAEMON_FILE='/etc/init.d/argo'; SINGBOX_DAEMON_FILE='/etc/init.d/sing-box'
   fi
@@ -1555,10 +1558,57 @@ EOF
   fi
 
   # 生成 Reality 公私钥，第一次安装的时候，如有指定的私钥，则使用该私钥及生成对应的公钥；如没有指定私钥则使用新生成的；添加协议的时，使用相应数组里的第一个非空值，如全空则像第一次安装那样使用新生成的
-  if [[ "${#REALITY_PRIVATE}" = 43 && "${#REALITY_PUBLIC}" = 0 ]]; then
-    REALITY_PUBLIC=$(wget --no-check-certificate -qO- --tries=3 --timeout=2 https://realitykey.cloudflare.now.cc/?privateKey=$REALITY_PRIVATE | awk -F '"' '/publicKey/{print $4}')
-  elif [[ "${#REALITY_PRIVATE[@]}" = 0 && "${#REALITY_PUBLIC[@]}" = 0 ]]; then
+  generate_reality_keypair() {
+    [ "$1" = 'convert_error' ] && hint " $(text 116) "
     REALITY_KEYPAIR=$($DIR/sing-box generate reality-keypair) && REALITY_PRIVATE=$(awk '/PrivateKey/{print $NF}' <<< "$REALITY_KEYPAIR") && REALITY_PUBLIC=$(awk '/PublicKey/{print $NF}' <<< "$REALITY_KEYPAIR")
+  }
+
+  if [[ "${#REALITY_PRIVATE}" = 43 && "${#REALITY_PUBLIC}" = 0 ]]; then
+    if [ "$(type -p xxd)" ]; then
+      until [ -n "$REALITY_PUBLIC" ]; do
+        # convert base64url -> base64 (standard), add padding
+        local B64=$(printf '%s' "$REALITY_PRIVATE" | tr '_-' '/+')
+        local MOD=$(( ${#B64} % 4 ))
+        if [ $MOD -eq 2 ]; then
+          B64="${B64}=="
+        elif [ $MOD -eq 3 ]; then
+          B64="${B64}="
+        elif [ $MOD -eq 1 ]; then
+          generate_reality_keypair convert_error
+          continue
+        fi
+
+        # decode to raw 32 bytes
+        echo "$B64" | base64 -d > $TEMP_DIR/_X25519_PRIV_RAW || { generate_reality_keypair convert_error; continue; }
+
+        local PRIV_LEN=$(stat -c%s $TEMP_DIR/_X25519_PRIV_RAW 2>/dev/null || stat -f%z $TEMP_DIR/_X25519_PRIV_RAW)
+        [ "$PRIV_LEN" -ne 32 ] && { generate_reality_keypair convert_error; continue; }
+
+        # DER prefix for PKCS#8 private key with OID 1.3.101.110 (X25519)
+        # Hex: 30 2e 02 01 00 30 05 06 03 2b 65 6e 04 22 04 20
+        local PREFIX_HEX="302e020100300506032b656e04220420"
+
+        # append raw private key hex and create DER
+        local PRIV_HEX=$(xxd -p -c 256 $TEMP_DIR/_X25519_PRIV_RAW | tr -d '\n')
+        printf "%s%s" "$PREFIX_HEX" "$PRIV_HEX" | xxd -r -p > $TEMP_DIR/_X25519_PRIV_DER
+
+        # convert DER PKCS8 -> PEM private key
+        openssl pkcs8 -inform DER -in $TEMP_DIR/_X25519_PRIV_DER -nocrypt -out $TEMP_DIR/_X25519_PRIV_PEM 2>/dev/null
+
+        # extract public key in DER
+        openssl pkey -in $TEMP_DIR/_X25519_PRIV_PEM -pubout -outform DER > $TEMP_DIR/_X25519_PUB_DER 2>/dev/null
+
+        # last 32 bytes are the raw public key
+        tail -c 32 $TEMP_DIR/_X25519_PUB_DER > $TEMP_DIR/_X25519_PUB_RAW
+
+        # encode to base64url (no padding)
+        REALITY_PUBLIC=$(base64 -w0 $TEMP_DIR/_X25519_PUB_RAW | tr '+/' '-_' | sed -E 's/=+$//')
+      done
+    else
+      REALITY_PUBLIC=$(wget --no-check-certificate -qO- --tries=3 --timeout=2 https://realitykey.cloudflare.now.cc/?privateKey=$REALITY_PRIVATE | awk -F '"' '/publicKey/{print $4}')
+    fi
+  elif [[ "${#REALITY_PRIVATE[@]}" = 0 && "${#REALITY_PUBLIC[@]}" = 0 ]]; then
+    generate_reality_keypair new_keypair
   else
     REALITY_PRIVATE=$(awk '{print $1}' <<< "${REALITY_PRIVATE[@]}") && REALITY_PUBLIC=$(awk '{print $1}' <<< "${REALITY_PUBLIC[@]}")
   fi
@@ -3447,7 +3497,6 @@ menu_setting() {
     NOW_START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$NOW_PORTS")
     NOW_CONSECUTIVE_PORTS=$(awk 'END { print NR }' <<< "$NOW_PORTS")
     [ -s ${WORK_DIR}/sing-box ] && SING_BOX_VERSION="Version: $(${WORK_DIR}/sing-box version | awk '/version/{print $NF}')"
-    [ -s ${WORK_DIR}/conf/02_route.json ] && { grep -q 'direct' ${WORK_DIR}/conf/02_route.json && RETURN_STATUS=$(text 27) || RETURN_STATUS=$(text 28); }
     OPTION[1]="1 .  $(text 29)"
     [ "${STATUS[0]}" = "$(text 28)" ] && OPTION[2]="2 .  $(text 27) Sing-box (sb -s)" || OPTION[2]="2 .  $(text 28) Sing-box (sb -s)"
     [ "${STATUS[1]}" = "$(text 28)" ] && OPTION[3]="3 .  $(text 27) Argo (sb -a)" || OPTION[3]="3 .  $(text 28) Argo (sb -a)"

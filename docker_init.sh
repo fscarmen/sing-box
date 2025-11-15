@@ -90,7 +90,45 @@ install() {
   esac
 
   if [[ "$REALITY_PRIVATE" =~ ^[A-Za-z0-9_-]{43}$ ]]; then
-    REALITY_PUBLIC=$(wget --no-check-certificate -qO- --tries=3 --timeout=2 https://realitykey.cloudflare.now.cc/?privateKey=$REALITY_PRIVATE | awk -F '"' '/publicKey/{print $4}')
+    # convert base64url -> base64 (standard), add padding
+    local B64=$(printf '%s' "$REALITY_PRIVATE" | tr '_-' '/+')
+    local MOD=$(( ${#B64} % 4 ))
+    if [ $MOD -eq 2 ]; then
+      B64="${B64}=="
+    elif [ $MOD -eq 3 ]; then
+      B64="${B64}="
+    elif [ $MOD -eq 1 ]; then
+      echo "Invalid base64url length" >&2
+      exit 1
+    fi
+
+    # decode to raw 32 bytes
+    echo "$B64" | base64 -d > /tmp/_x25519_priv_raw
+
+    local PRIV_LEN=$(stat -c%s /tmp/_x25519_priv_raw 2>/dev/null || stat -f%z /tmp/_x25519_priv_raw)
+    [ "$PRIV_LEN" -ne 32 ] && echo "Decoded private key is ${PRIV_LEN} bytes (expected 32)." >&2 && echo "Make sure you passed a 32-byte X25519 private scalar (base64url, no padding)." >&2 && rm -f /tmp/_x25519_* && exit 1
+
+    # DER prefix for PKCS#8 private key with OID 1.3.101.110 (X25519)
+    # Hex: 30 2e 02 01 00 30 05 06 03 2b 65 6e 04 22 04 20
+    local PREFIX_HEX="302e020100300506032b656e04220420"
+
+    # append raw private key hex and create DER
+    local PRIV_HEX=$(xxd -p -c 256 /tmp/_x25519_priv_raw | tr -d '\n')
+    printf "%s%s" "$PREFIX_HEX" "$PRIV_HEX" | xxd -r -p > /tmp/_x25519_priv_der
+
+    # convert DER PKCS8 -> PEM private key
+    openssl pkcs8 -inform DER -in /tmp/_x25519_priv_der -nocrypt -out /tmp/_x25519_priv_pem 2>/dev/null
+
+    # extract public key in DER
+    openssl pkey -in /tmp/_x25519_priv_pem -pubout -outform DER > /tmp/_x25519_pub_der 2>/dev/null
+
+    # last 32 bytes are the raw public key
+    tail -c 32 /tmp/_x25519_pub_der > /tmp/_x25519_pub_raw
+
+    # encode to base64url (no padding)
+    local REALITY_PUBLIC=$(base64 -w0 /tmp/_x25519_pub_raw | tr '+/' '-_' | sed -E 's/=+$//')
+
+    rm -f /tmp/_x25519_*
   else
     local REALITY_KEYPAIR=$(${WORK_DIR}/sing-box generate reality-keypair) && REALITY_PRIVATE=$(awk '/PrivateKey/{print $NF}' <<< "$REALITY_KEYPAIR") && REALITY_PUBLIC=$(awk '/PublicKey/{print $NF}' <<< "$REALITY_KEYPAIR")
   fi
@@ -1293,6 +1331,6 @@ case "$ACTION" in
     ;;
   * )
     install
-    # 运行 supervisor 进程守护
-    supervisord -c /etc/supervisord.conf
+    # 运行 supervisor 进程守护，并让其成为真正的 PID 1
+    exec supervisord -c /etc/supervisord.conf
 esac
