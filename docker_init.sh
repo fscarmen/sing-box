@@ -34,7 +34,7 @@ check_latest_sing-box() {
 
   # 获取最终版本号
   local VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$FORCE_VERSION" '$0 ~ var {print $5; exit}')
-  VERSION=${VERSION:-'v1.12.0-beta.15'}
+  VERSION=${VERSION:-'1.13.0-alpha.27'}
 
   echo "$VERSION"
 }
@@ -730,45 +730,34 @@ EOF
     ARGO_RUNS="cloudflared tunnel --edge-ip-version auto --no-autoupdate --no-tls-verify --metrics 0.0.0.0:$METRICS_PORT --url https://localhost:$START_PORT"
   fi
 
-  # 生成 supervisord 配置文件
-  mkdir -p /etc/supervisor.d
-  SUPERVISORD_CONF="[supervisord]
-user=root
-nodaemon=true
-logfile=/dev/null
-pidfile=/run/supervisord.pid
+  # 生成 s6-overlay 服务脚本（替代 supervisord）
+  mkdir -p /etc/services.d/nginx /etc/services.d/sing-box
+  cat > /etc/services.d/nginx/run << 'EOF'
+#!/usr/bin/env sh
+exec /usr/sbin/nginx -g 'daemon off;'
+EOF
+  cat > /etc/services.d/sing-box/run << EOF
+#!/usr/bin/env sh
+exec ${WORK_DIR}/sing-box run -C ${WORK_DIR}/conf/
+EOF
+  chmod +x /etc/services.d/nginx/run /etc/services.d/sing-box/run
 
-[program:nginx]
-command=/usr/sbin/nginx -g 'daemon off;'
-autostart=true
-autorestart=true
-stderr_logfile=/dev/null
-stdout_logfile=/dev/null
+  # 命名隧道模式时，argo 作为 s6 服务；Quick Tunnel 模式维持原先的前置后台拉起逻辑
+  if [ -z "$METRICS_PORT" ]; then
+    mkdir -p /etc/services.d/argo
+    cat > /etc/services.d/argo/run << EOF
+#!/usr/bin/env sh
+exec ${WORK_DIR}/${ARGO_RUNS} 2>/dev/null
+EOF
+    chmod +x /etc/services.d/argo/run
 
-[program:sing-box]
-command=${WORK_DIR}/sing-box run -C ${WORK_DIR}/conf/
-autostart=true
-autorestart=true
-stderr_logfile=/dev/null
-stdout_logfile=/dev/null"
-
-[ -z "$METRICS_PORT" ] && SUPERVISORD_CONF+="
-
-[program:argo]
-command=${WORK_DIR}/$ARGO_RUNS
-autostart=true
-autorestart=true
-stderr_logfile=/dev/null
-stdout_logfile=/dev/null
-"
-
-  echo "$SUPERVISORD_CONF" > /etc/supervisor.d/daemon.ini
-
-  # 如使用临时隧道，先运行 cloudflared 以获取临时隧道域名
-  if [ -n "$METRICS_PORT" ]; then
-    ${WORK_DIR}/$ARGO_RUNS >/dev/null 2>&1 &
-    sleep 15
-    local ARGO_DOMAIN=$(wget -qO- http://localhost:$METRICS_PORT/quicktunnel | awk -F '"' '{print $4}')
+  else
+    # 如使用临时隧道，先运行 cloudflared 以获取临时隧道域名
+    nohup ${WORK_DIR}/${ARGO_RUNS} >/dev/null 2>&1 &
+    until grep -q 'trycloudflare\.com' <<< "$ARGO_DOMAIN" ; do
+      sleep 1
+      local ARGO_DOMAIN=$(wget -qO- http://localhost:$METRICS_PORT/quicktunnel | awk -F '"' '{print $4}')
+    done
   fi
 
   # 获取自签证书指纹。argo 回源的是由 Google Trust Services（谷歌信任服务）作为中间 CA（CN=WE1）签发，受信任的证书（非自签名）
@@ -1304,11 +1293,26 @@ update_sing-box() {
   local LOCAL=$(${WORK_DIR}/sing-box version | awk '/version/{print $NF}')
   if [ -n "$ONLINE" ]; then
     if [[ "$ONLINE" != "$LOCAL" ]]; then
-      wget https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -O- | tar xz -C ${WORK_DIR} sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box &&
-      mv ${WORK_DIR}/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ${WORK_DIR}/sing-box &&
-      rm -rf ${WORK_DIR}/sing-box-$ONLINE-linux-$SING_BOX_ARCH &&
-      supervisorctl restart sing-box
-      info " Sing-box v${ONLINE} 更新成功！"
+      cp -f ${WORK_DIR}/sing-box /tmp/sing-box.bak
+      wget https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -O- | tar xz -C /tmp sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
+      mv /tmp/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ${WORK_DIR}/sing-box
+      local SING_BOX_PID_OLD=$(ps aux | grep '[s]ing-box run' | awk '{print $1}')
+      kill -9 ${SING_BOX_PID_OLD}
+      sleep 1
+      local SING_BOX_PID_NEW=$(ps aux | grep '[s]ing-box run' | awk '{print $1}')
+      until [[ "${SING_BOX_PID_NEW}" =~ ^[0-9]+$ ]]; do
+        (( i++ ))
+        [ "$i" -gt 5 ] && break
+        sleep 1
+        local SING_BOX_PID_NEW=$(ps aux | grep '[s]ing-box run' | awk '{print $1}')
+      done
+      if [[ "${SING_BOX_PID_NEW}" =~ ^[0-9]+$ ]]; then
+        info " Sing-box v${ONLINE} 更新成功！"
+      else
+        cp -f /tmp/sing-box.bak ${WORK_DIR}/sing-box
+        warning " Sing-box v${ONLINE} 运行不成功，使用回旧版本 v${LOCAL} 更新成功！"
+      fi
+      rm -rf ${WORK_DIR}/sing-box-$ONLINE-linux-$SING_BOX_ARCH /tmp/sing-box.bak
     else
       info " Sing-box v${ONLINE} 已是最新版本！"
     fi
@@ -1331,6 +1335,6 @@ case "$ACTION" in
     ;;
   * )
     install
-    # 运行 supervisor 进程守护，并让其成为真正的 PID 1
-    exec supervisord -c /etc/supervisord.conf
+    # 用 s6-overlay 作为 PID 1 承载守护
+    exec /init
 esac

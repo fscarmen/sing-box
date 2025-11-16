@@ -2308,6 +2308,7 @@ install_sing-box() {
   sing-box_variables
   [ -n "$PORT_NGINX" ] && check_nginx
   [ ! -d ${WORK_DIR}/logs ] && mkdir -p ${WORK_DIR}/logs
+  [ ! -d ${TEMP_DIR} ] && mkdir -p $TEMP_DIR
   ssl_certificate
   hint "\n $(text 2) " && wait
   sing-box_json
