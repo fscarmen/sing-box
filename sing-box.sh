@@ -587,7 +587,7 @@ check_arch() {
 
 # 检查系统是否已经安装 tcp-brutal
 check_brutal() {
-  IS_BRUTAL=false && [ -x "$(type -p lsmod)" ] && lsmod | grep -q brutal && IS_BRUTAL=true
+  IS_BRUTAL=false && [ -x "$(type -p lsmod)" ] && lsmod 2>/dev/null | grep -q 'brutal' && IS_BRUTAL=true
   [ "$IS_BRUTAL" = 'false' ] && [ -x "$(type -p modprobe)" ] && modprobe brutal 2>/dev/null && IS_BRUTAL=true
 }
 
@@ -1291,8 +1291,8 @@ http {
     default                    /;               # 默认路径
     ~*v2rayN                   /v2rayn;         # 匹配 V2rayN 客户端
     ~*clash                    /clash;          # 匹配 Clash 客户端
-    ~*Neko                     /neko;           # 匹配 Neko 客户端
-    ~*ShadowRocket             /shadowrocket;   # 匹配 ShadowRocket  客户端
+    ~*Neko|Throne              /neko;           # 匹配 Neko 客户端
+    ~*ShadowRocket             /shadowrocket;   # 匹配 ShadowRocket 客户端
     ~*SFM                      /sing-box-pc;    # 匹配 Sing-box pc 客户端
     ~*SFI|SFA                  /sing-box-phone; # 匹配 Sing-box phone 客户端
 #   ~*Chrome|Firefox|Mozilla   /;               # 添加更多的分流规则
@@ -1301,8 +1301,8 @@ http {
     default                    /;               # 默认路径
     ~*v2rayN                   /v2rayn;         # 匹配 V2rayN 客户端
     ~*clash                    /clash2;         # 匹配 Clash 客户端
-    ~*Neko                     /neko;           # 匹配 Neko 客户端
-    ~*ShadowRocket             /shadowrocket;   # 匹配 ShadowRocket  客户端
+    ~*Neko|Throne              /neko;           # 匹配 Neko 客户端
+    ~*ShadowRocket             /shadowrocket;   # 匹配 ShadowRocket 客户端
     ~*SFM|SFI|SFA              /sing-box2;      # 匹配 Sing-box pc 和 phone 客户端
 #   ~*Chrome|Firefox|Mozilla   /;               # 添加更多的分流规则
   }"

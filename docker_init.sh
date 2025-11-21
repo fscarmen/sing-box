@@ -65,7 +65,7 @@ install() {
   openssl req -new -x509 -days 36500 -key ${WORK_DIR}/cert/private.key -out ${WORK_DIR}/cert/cert.pem -subj "/CN=mozilla.org" -addext "subjectAltName = ${SAN_TYPE}:${SERVER_IP}"
 
   # 检查系统是否已经安装 tcp-brutal
-  IS_BRUTAL=false && [ -x "$(type -p lsmod)" ] && lsmod | grep -q brutal && IS_BRUTAL=true
+  IS_BRUTAL=false && [ -x "$(type -p lsmod)" ] && lsmod 2>/dev/null | grep -q 'brutal' && IS_BRUTAL=true
   [ "$IS_BRUTAL" = 'false' ] && [ -x "$(type -p modprobe)" ] && modprobe brutal 2>/dev/null && IS_BRUTAL=true
 
   # 生成 sing-box 配置文件
@@ -716,7 +716,7 @@ ingress:
   - hostname: ${ARGO_DOMAIN}
     service: https://localhost:${START_PORT}
     originRequest:
-      noTLSVerify: true
+      noTLSVerify: false
   - service: http_status:404
 EOF
 
@@ -806,16 +806,17 @@ EOF
       #include /etc/nginx/conf.d/*.conf;
 
     server {
-      listen 127.0.0.1:$START_PORT ssl ; # sing-box backend
-      http2 on;
+      listen 127.0.0.1:$START_PORT;
+      # listen 127.0.0.1:$START_PORT ssl ; # sing-box backend
+      # http2 on;
       server_name addons.mozilla.org;
 
-      ssl_certificate            ${WORK_DIR}/cert/cert.pem;
-      ssl_certificate_key        ${WORK_DIR}/cert/private.key;
-      ssl_protocols              TLSv1.3;
-      ssl_session_tickets        on;
-      ssl_stapling               off;
-      ssl_stapling_verify        off;"
+      # ssl_certificate            ${WORK_DIR}/cert/cert.pem;
+      # ssl_certificate_key        ${WORK_DIR}/cert/private.key;
+      # ssl_protocols              TLSv1.3;
+      # ssl_session_tickets        on;
+      # ssl_stapling               off;
+      # ssl_stapling_verify        off;"
 
   [ "${VLESS_WS}" = 'true' ] && NGINX_CONF+="
       # 反代 sing-box vless websocket
