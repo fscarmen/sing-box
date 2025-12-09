@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.1 (2025.11.12)'
+VERSION='v1.3.1 (2025.12.08)'
 
 # 各变量默认值
 GH_PROXY='https://hub.glowp.xyz/'
@@ -228,7 +228,7 @@ E[99]="The \${SING_BOX_SCRIPT} is detected to be installed. Script exits."
 C[99]="检测到已安装 \${SING_BOX_SCRIPT}，脚本退出!"
 E[100]="Can't get the official latest version. Script exits."
 C[100]="获取不到官方的最新版本，脚本退出!"
-E[101]=""
+E[101]="The privateKey should be a 43-character base64url encoding; please check."
 C[101]="privateKey 应该是43位的 base64url 编码，请检查"
 E[102]="Backing up old version sing-box to ${WORK_DIR}/sing-box.bak"
 C[102]="已备份旧版本 sing-box 到 ${WORK_DIR}/sing-box.bak"
@@ -478,7 +478,7 @@ input_argo_auth() {
     ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --no-autoupdate --url http://localhost:$PORT_NGINX"
   elif [ -n "${ARGO_DOMAIN}" ]; then
     if [ -z "${ARGO_AUTH}" ]; then
-      until [[ "$ARGO_AUTH" =~ TunnelSecret || "$ARGO_AUTH" =~ ^[A-Z0-9a-z=]{120,250}$ || "$ARGO_AUTH" =~ .*cloudflared.*service[[:space:]]+install[[:space:]]+[A-Z0-9a-z=]{1,100} ]]; do
+      until [[ "$ARGO_AUTH" =~ TunnelSecret || "$ARGO_AUTH" =~ [A-Z0-9a-z=]{120,250}$ ]]; do
         [ "$DOMAIN_ERROR_TIME" != 6 ] && warning "\n $(text 86) \n"
       (( DOMAIN_ERROR_TIME-- )) || true
         [ "$DOMAIN_ERROR_TIME" != 0 ] && reading "\n $(text 85) " ARGO_AUTH || error "\n $(text 3) \n"
@@ -491,7 +491,7 @@ input_argo_auth() {
       ARGO_JSON=${ARGO_AUTH//[ ]/}
       [ "$IS_CHANGE_ARGO" = 'is_install' ] && export_argo_json_file $TEMP_DIR || export_argo_json_file ${WORK_DIR}
       ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run"
-    elif [[ "${ARGO_AUTH,,}" =~ .*[a-z0-9=]{120,250}$ ]]; then
+    elif [[ "${ARGO_AUTH}" =~ [A-Z0-9a-z=]{120,250}$ ]]; then
       ARGO_TYPE=is_token_argo
       ARGO_TOKEN=$(awk '{print $NF}' <<< "$ARGO_AUTH")
       ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto run --token ${ARGO_TOKEN}"
@@ -1218,7 +1218,6 @@ EOF
 # 生成100年的自签证书，区分使用 IPv4 / IPv6 / 域名
 ssl_certificate() {
   mkdir -p ${WORK_DIR}/cert
-  [[ $SERVER_IP =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$|^([0-9a-fA-F:]+)$ ]] && SAN_TYPE="IP" || SAN_TYPE="DNS"
   openssl ecparam -genkey -name prime256v1 -out ${WORK_DIR}/cert/private.key
 
   cat > ${WORK_DIR}/cert/cert.conf << EOF
@@ -1234,7 +1233,7 @@ CN = $(awk -F . '{print $(NF-1)"."$NF}' <<< "$TLS_SERVER_DEFAULT")
 subjectAltName = @alt_names
 
 [alt_names]
-${SAN_TYPE} = ${SERVER_IP}
+DNS = ${TLS_SERVER_DEFAULT}
 EOF
 
   openssl req -new -x509 -days 36500 -key ${WORK_DIR}/cert/private.key -out ${WORK_DIR}/cert/cert.pem -config ${WORK_DIR}/cert/cert.conf -extensions v3_req
@@ -1291,7 +1290,7 @@ http {
     default                    /;               # 默认路径
     ~*v2rayN                   /v2rayn;         # 匹配 V2rayN 客户端
     ~*clash                    /clash;          # 匹配 Clash 客户端
-    ~*Neko|Throne              /neko;           # 匹配 Neko 客户端
+    ~*Neko|Throne              /neko;           # 匹配 Neko / Throne 客户端
     ~*ShadowRocket             /shadowrocket;   # 匹配 ShadowRocket 客户端
     ~*SFM                      /sing-box-pc;    # 匹配 Sing-box pc 客户端
     ~*SFI|SFA                  /sing-box-phone; # 匹配 Sing-box phone 客户端
@@ -1331,15 +1330,7 @@ http {
   server {
     listen $PORT_NGINX ;  # ipv4
     listen [::]:$PORT_NGINX ;  # ipv6
-#    listen $PORT_NGINX ssl http2 ;  # https
     server_name localhost;
-
-#    ssl_certificate            ${WORK_DIR}/cert/cert.pem;
-#    ssl_certificate_key        ${WORK_DIR}/cert/private.key;
-#    ssl_protocols              TLSv1.3;
-#    ssl_session_tickets        on;
-#    ssl_stapling               off;
-#    ssl_stapling_verify        off;
 "
 
   [[ -n "$PORT_VMESS_WS" && "$IS_ARGO" = 'is_argo' ]] && NGINX_CONF+="
@@ -1688,7 +1679,6 @@ EOF
             "ignore_client_bandwidth":false,
             "tls":{
                 "enabled":true,
-                "server_name":"",
                 "alpn":[
                     "h3"
                 ],
@@ -2415,13 +2405,13 @@ export_list() {
 "
   if [ -n "$PORT_HYSTERIA2" ]; then
     [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && local CLASH_HOPPING=" ports: ${PORT_HOPPING_START}-${PORT_HOPPING_END}, HopInterval: 60,"
-    local CLASH_HYSTERIA2="- {name: \"${NODE_NAME[12]} ${NODE_TAG[1]}\", type: hysteria2, server: ${SERVER_IP}, port: ${PORT_HYSTERIA2},${CLASH_HOPPING} up: \"200 Mbps\", down: \"1000 Mbps\", password: ${UUID[12]}, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256}}" &&
+    local CLASH_HYSTERIA2="- {name: \"${NODE_NAME[12]} ${NODE_TAG[1]}\", type: hysteria2, server: ${SERVER_IP}, port: ${PORT_HYSTERIA2},${CLASH_HOPPING} up: \"200 Mbps\", down: \"1000 Mbps\", password: ${UUID[12]}, sni: ${TLS_SERVER_DEFAULT}, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256}}" &&
     local CLASH_SUBSCRIBE+="
   $CLASH_HYSTERIA2
 "
   fi
 
-  [ -n "$PORT_TUIC" ] && local CLASH_TUIC="- {name: \"${NODE_NAME[13]} ${NODE_TAG[2]}\", type: tuic, server: ${SERVER_IP}, port: ${PORT_TUIC}, uuid: ${UUID[13]}, password: ${TUIC_PASSWORD}, alpn: [h3], disable-sni: true, reduce-rtt: true, request-timeout: 8000, udp-relay-mode: native, congestion-controller: $TUIC_CONGESTION_CONTROL, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256}}" &&
+  [ -n "$PORT_TUIC" ] && local CLASH_TUIC="- {name: \"${NODE_NAME[13]} ${NODE_TAG[2]}\", type: tuic, server: ${SERVER_IP}, port: ${PORT_TUIC}, uuid: ${UUID[13]}, password: ${TUIC_PASSWORD}, alpn: [h3], reduce-rtt: true, request-timeout: 8000, udp-relay-mode: native, congestion-controller: $TUIC_CONGESTION_CONTROL, sni: ${TLS_SERVER_DEFAULT}, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256}}" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_TUIC
 "
@@ -2434,7 +2424,7 @@ export_list() {
   local CLASH_SUBSCRIBE+="
   $CLASH_SHADOWSOCKS
 "
-  [ -n "$PORT_TROJAN" ] && local CLASH_TROJAN="- {name: \"${NODE_NAME[16]} ${NODE_TAG[5]}\", type: trojan, server: ${SERVER_IP}, port: $PORT_TROJAN, password: $TROJAN_PASSWORD, client-fingerprint: firefox, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
+  [ -n "$PORT_TROJAN" ] && local CLASH_TROJAN="- {name: \"${NODE_NAME[16]} ${NODE_TAG[5]}\", type: trojan, server: ${SERVER_IP}, port: $PORT_TROJAN, password: $TROJAN_PASSWORD, client-fingerprint: firefox, sni: ${TLS_SERVER_DEFAULT}, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_TROJAN
 "
@@ -2488,7 +2478,7 @@ export_list() {
   $CLASH_GRPC_REALITY
 "
 
-  [ -n "$PORT_ANYTLS" ] && local CLASH_ANYTLS="- {name: \"${NODE_NAME[21]} ${NODE_TAG[10]}\", type: anytls, server: ${SERVER_IP}, port: $PORT_ANYTLS, password: ${UUID[21]}, client-fingerprint: firefox, udp: true, idle-session-check-interval: 30, idle-session-timeout: 30, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256} }" &&
+  [ -n "$PORT_ANYTLS" ] && local CLASH_ANYTLS="- {name: \"${NODE_NAME[21]} ${NODE_TAG[10]}\", type: anytls, server: ${SERVER_IP}, port: $PORT_ANYTLS, password: ${UUID[21]}, client-fingerprint: firefox, udp: true, idle-session-check-interval: 30, idle-session-timeout: 30, sni: ${TLS_SERVER_DEFAULT}, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256} }" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_ANYTLS
 "
@@ -2518,11 +2508,11 @@ vless://$(echo -n "auto:${UUID[11]}@${SERVER_IP_2}:${PORT_XTLS_REALITY}" | base6
   if [ -n "$PORT_HYSTERIA2" ]; then
     [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && local SHADOWROCKET_HOPPING="&mport=${PORT_HYSTERIA2},${PORT_HOPPING_START}-${PORT_HOPPING_END}"
     local SHADOWROCKET_SUBSCRIBE+="
-hysteria2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}?hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}&obfs=none${SHADOWROCKET_HOPPING}#${NODE_NAME[12]// /%20}%20${NODE_TAG[1]}
+hysteria2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}?peer=${TLS_SERVER_DEFAULT}&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}&obfs=none${SHADOWROCKET_HOPPING}#${NODE_NAME[12]// /%20}%20${NODE_TAG[1]}
 "
   fi
   [ -n "$PORT_TUIC" ] && local SHADOWROCKET_SUBSCRIBE+="
-tuic://${TUIC_PASSWORD}:${UUID[13]}@${SERVER_IP_2}:${PORT_TUIC}?congestion_control=$TUIC_CONGESTION_CONTROL&udp_relay_mode=native&alpn=h3&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}#${NODE_NAME[13]// /%20}%20${NODE_TAG[2]}
+tuic://${TUIC_PASSWORD}:${UUID[13]}@${SERVER_IP_2}:${PORT_TUIC}?peer=${TLS_SERVER_DEFAULT}&congestion_control=$TUIC_CONGESTION_CONTROL&udp_relay_mode=native&alpn=h3&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}#${NODE_NAME[13]// /%20}%20${NODE_TAG[2]}
 "
   [ -n "$PORT_SHADOWTLS" ] && local SHADOWROCKET_SUBSCRIBE+="
 ss://$(echo -n "$SHADOWTLS_METHOD:$SHADOWTLS_PASSWORD@${SERVER_IP_2}:${PORT_SHADOWTLS}" | base64 -w0)?shadow-tls=$(echo -n "{\"version\":\"3\",\"host\":\"${TLS_SERVER[14]}\",\"password\":\"${UUID[14]}\"}" | base64 -w0)#${NODE_NAME[14]// /%20}%20${NODE_TAG[3]}
@@ -2531,7 +2521,7 @@ ss://$(echo -n "$SHADOWTLS_METHOD:$SHADOWTLS_PASSWORD@${SERVER_IP_2}:${PORT_SHAD
 ss://$(echo -n "${SHADOWSOCKS_METHOD}:${UUID[15]}@${SERVER_IP_2}:$PORT_SHADOWSOCKS" | base64 -w0)#${NODE_NAME[15]// /%20}%20${NODE_TAG[4]}
 "
   [ -n "$PORT_TROJAN" ] && local SHADOWROCKET_SUBSCRIBE+="
-trojan://$TROJAN_PASSWORD@${SERVER_IP_1}:$PORT_TROJAN?peer=${TLS_SERVER_DEFAULT}&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}#${NODE_NAME[16]// /%20}%20${NODE_TAG[5]}
+trojan://${TROJAN_PASSWORD}@${SERVER_IP_1}:$PORT_TROJAN?peer=${TLS_SERVER_DEFAULT}&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}#${NODE_NAME[16]// /%20}%20${NODE_TAG[5]}
 "
   if [ -n "$PORT_VMESS_WS" ]; then
      if [[ "${STATUS[1]}" =~ $(text 27)|$(text 28) ]] || [[ "$IS_ARGO" = 'is_argo' && "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]]; then
@@ -2579,7 +2569,7 @@ vless://$(echo -n auto:${UUID[19]}@${SERVER_IP_2}:${PORT_H2_REALITY} | base64 -w
 vless://$(echo -n "auto:${UUID[20]}@${SERVER_IP_2}:${PORT_GRPC_REALITY}" | base64 -w0)?remarks=${NODE_NAME[20]// /%20}%20${NODE_TAG[9]}&path=grpc&obfs=grpc&tls=1&peer=${TLS_SERVER[20]}&pbk=${REALITY_PUBLIC[20]}
 "
   [ -n "$PORT_ANYTLS" ] && local SHADOWROCKET_SUBSCRIBE+="
-anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}?udp=1&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}#${NODE_NAME[21]// /%20}%20${NODE_TAG[10]}
+anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}?peer=${TLS_SERVER_DEFAULT}&udp=1&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}#${NODE_NAME[21]// /%20}%20${NODE_TAG[10]}
 "
   echo -n "$SHADOWROCKET_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/shadowrocket
 
@@ -2590,11 +2580,11 @@ vless://${UUID[11]}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?encryption=none${VISION_
 
   [ -n "$PORT_HYSTERIA2" ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-hysteria2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}/?alpn=h3&insecure=1#${NODE_NAME[12]// /%20}%20${NODE_TAG[1]}"
+hysteria2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}?sni=${TLS_SERVER_DEFAULT}&alpn=h3&insecure=1&allowInsecure=1#${NODE_NAME[12]// /%20}%20${NODE_TAG[1]}"
 
   [ -n "$PORT_TUIC" ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-tuic://${UUID[13]}:${TUIC_PASSWORD}@${SERVER_IP_1}:${PORT_TUIC}?alpn=h3&insecure=1&congestion_control=$TUIC_CONGESTION_CONTROL#${NODE_NAME[13]// /%20}%20${NODE_TAG[2]}"
+tuic://${UUID[13]}:${TUIC_PASSWORD}@${SERVER_IP_1}:${PORT_TUIC}?sni=${TLS_SERVER_DEFAULT}&alpn=h3&insecure=1&allowInsecure=1&congestion_control=$TUIC_CONGESTION_CONTROL#${NODE_NAME[13]// /%20}%20${NODE_TAG[2]}"
 
   [ -n "$PORT_SHADOWTLS" ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
@@ -2653,7 +2643,7 @@ ss://$(echo -n "${SHADOWSOCKS_METHOD}:${UUID[15]}@${SERVER_IP_1}:$PORT_SHADOWSOC
 
   [ -n "$PORT_TROJAN" ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-trojan://$TROJAN_PASSWORD@${SERVER_IP_1}:$PORT_TROJAN?security=tls&insecure=1&type=tcp&headerType=none#${NODE_NAME[16]// /%20}%20${NODE_TAG[5]}"
+trojan://$TROJAN_PASSWORD@${SERVER_IP_1}:$PORT_TROJAN?security=tls&sni=${TLS_SERVER_DEFAULT}&insecure=1&type=tcp&headerType=none#${NODE_NAME[16]// /%20}%20${NODE_TAG[5]}"
 
   if [ -n "$PORT_VMESS_WS" ]; then
      if [[ "${STATUS[1]}" =~ $(text 27)|$(text 28) ]] || [[ "$IS_ARGO" = 'is_argo' && "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]]; then
@@ -2701,26 +2691,25 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?encryption=none&security
 
   [ -n "$PORT_ANYTLS" ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}?security=tls&fp=firefox&insecure=1&type=tcp#${NODE_NAME[21]// /%20}%20${NODE_TAG[10]}"
+anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}?security=tls&sni=${TLS_SERVER_DEFAULT}&fp=firefox&insecure=1&allowInsecure=1&type=tcp#${NODE_NAME[21]// /%20}%20${NODE_TAG[10]}"
 
   echo -n "$V2RAYN_SUBSCRIBE" | sed -E '/^[ ]*#|^[ ]+|^--|^\{|^\}/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/v2rayn
 
   # 生成 NekoBox 订阅文件
   [ -n "$PORT_XTLS_REALITY" ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-vless://${UUID[11]}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?security=reality&sni=${TLS_SERVER[11]}&fp=firefox&pbk=${REALITY_PUBLIC[11]}&type=tcp${VISION_FLOW}&encryption=none#${NODE_NAME[11]}%20${NODE_TAG[0]}"
+vless://${UUID[11]}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?security=reality&sni=${TLS_SERVER[11]}&fp=firefox&pbk=${REALITY_PUBLIC[11]}&type=tcp${VISION_FLOW}&encryption=none#${NODE_NAME[11]// /%20}%20${NODE_TAG[0]}"
 
   if [ -n "$PORT_HYSTERIA2" ]; then
     [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && NEKOBOX_HOPPING="mport=${PORT_HOPPING_START}-${PORT_HOPPING_END}&"
     local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-hy2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}?${NEKOBOX_HOPPING}insecure=1#${NODE_NAME[12]}%20${NODE_TAG[1]}"
+hy2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}?${NEKOBOX_HOPPING}insecure=1&sni=${TLS_SERVER_DEFAULT}#${NODE_NAME[12]// /%20}%20${NODE_TAG[1]}"
   fi
 
   [ -n "$PORT_TUIC" ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-tuic://${TUIC_PASSWORD}:${UUID[13]}@${SERVER_IP_1}:${PORT_TUIC}?congestion_control=$TUIC_CONGESTION_CONTROL&alpn=h3&udp_relay_mode=native&allow_insecure=1&disable_sni=1#${NODE_NAME[13]}%20${NODE_TAG[2]}"
-
+tuic://${TUIC_PASSWORD}:${UUID[13]}@${SERVER_IP_1}:${PORT_TUIC}?congestion_control=$TUIC_CONGESTION_CONTROL&alpn=h3&sni=${TLS_SERVER_DEFAULT}&udp_relay_mode=native&allow_insecure=1#${NODE_NAME[13]// /%20}%20${NODE_TAG[2]}"
   [ -n "$PORT_SHADOWTLS" ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
 nekoray://custom#$(echo -n "{\"_v\":0,\"addr\":\"127.0.0.1\",\"cmd\":[\"\"],\"core\":\"internal\",\"cs\":\"{\n    \\\"password\\\": \\\"${UUID[14]}\\\",\n    \\\"server\\\": \\\"${SERVER_IP_1}\\\",\n    \\\"server_port\\\": ${PORT_SHADOWTLS},\n    \\\"tag\\\": \\\"shadowtls-out\\\",\n    \\\"tls\\\": {\n        \\\"enabled\\\": true,\n        \\\"server_name\\\": \\\"${TLS_SERVER[14]}\\\"\n    },\n    \\\"type\\\": \\\"shadowtls\\\",\n    \\\"version\\\": 3\n}\n\",\"mapping_port\":0,\"name\":\"1-tls-not-use\",\"port\":1080,\"socks_port\":0}" | base64 -w0)
@@ -2729,11 +2718,11 @@ nekoray://shadowsocks#$(echo -n "{\"_v\":0,\"method\":\"$SHADOWTLS_METHOD\",\"na
 
   [ -n "$PORT_SHADOWSOCKS" ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-ss://$(echo -n "${SHADOWSOCKS_METHOD}:${UUID[15]}" | base64 -w0)@${SERVER_IP_1}:$PORT_SHADOWSOCKS#${NODE_NAME[15]}%20${NODE_TAG[4]}"
+ss://$(echo -n "${SHADOWSOCKS_METHOD}:${UUID[15]}" | base64 -w0)@${SERVER_IP_1}:$PORT_SHADOWSOCKS#${NODE_NAME[15]// /%20}%20${NODE_TAG[4]}"
 
   [ -n "$PORT_TROJAN" ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-trojan://$TROJAN_PASSWORD@${SERVER_IP_1}:$PORT_TROJAN?security=tls&allowInsecure=1&fp=firefox&type=tcp#${NODE_NAME[16]}%20${NODE_TAG[5]}"
+trojan://${TROJAN_PASSWORD}@${SERVER_IP_1}:$PORT_TROJAN?security=tls&sni=${TLS_SERVER_DEFAULT}&allowInsecure=1&fp=firefox&type=tcp#${NODE_NAME[16]// /%20}%20${NODE_TAG[5]}"
 
   if [ -n "$PORT_VMESS_WS" ]; then
      if [[ "${STATUS[1]}" =~ $(text 27)|$(text 28) ]] || [[ "$IS_ARGO" = 'is_argo' && "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]]; then
@@ -2757,7 +2746,7 @@ vmess://$(echo -n "{\"add\":\"${CDN[17]}\",\"aid\":\"0\",\"host\":\"$VMESS_HOST_
      if [[ "${STATUS[1]}" =~ $(text 27)|$(text 28) ]] || [[ "$IS_ARGO" = 'is_argo' && "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]]; then
       local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-vless://${UUID[18]}@${CDN[18]}:443?security=tls&sni=$ARGO_DOMAIN&type=ws&path=/$VLESS_WS_PATH?ed%3D2560&host=$ARGO_DOMAIN&encryption=zero#${NODE_NAME[18]}%20${NODE_TAG[7]}"
+vless://${UUID[18]}@${CDN[18]}:443?security=tls&sni=$ARGO_DOMAIN&type=ws&path=/$VLESS_WS_PATH?ed%3D2560&host=$ARGO_DOMAIN&encryption=zero#${NODE_NAME[18]// /%20}%20${NODE_TAG[7]}"
       [ "$ARGO_TYPE" = 'is_token_argo' ] && NEKOBOX_SUBSCRIBE+="
 
   # $(text 94)
@@ -2765,7 +2754,7 @@ vless://${UUID[18]}@${CDN[18]}:443?security=tls&sni=$ARGO_DOMAIN&type=ws&path=/$
     else
       WS_SERVER_IP_SHOW=${WS_SERVER_IP[18]} && TYPE_HOST_DOMAIN=$VLESS_HOST_DOMAIN && TYPE_PORT_WS=$PORT_VLESS_WS && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-vless://${UUID[18]}@${CDN[18]}:443?security=tls&sni=$VLESS_HOST_DOMAIN&type=ws&path=/$VLESS_WS_PATH?ed%3D2560&host=$VLESS_HOST_DOMAIN&encryption=zero#${NODE_NAME[18]}%20${NODE_TAG[7]}
+vless://${UUID[18]}@${CDN[18]}:443?security=tls&sni=$VLESS_HOST_DOMAIN&type=ws&path=/$VLESS_WS_PATH?ed%3D2560&host=$VLESS_HOST_DOMAIN&encryption=zero#${NODE_NAME[18]// /%20}%20${NODE_TAG[7]}
 
 # $(text 52)"
     fi
@@ -2773,15 +2762,15 @@ vless://${UUID[18]}@${CDN[18]}:443?security=tls&sni=$VLESS_HOST_DOMAIN&type=ws&p
 
   [ -n "$PORT_H2_REALITY" ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-vless://${UUID[19]}@${SERVER_IP_1}:${PORT_H2_REALITY}?security=reality&sni=${TLS_SERVER[19]}&alpn=h2&fp=firefox&pbk=${REALITY_PUBLIC[19]}&type=http&encryption=none#${NODE_NAME[19]}%20${NODE_TAG[8]}"
+vless://${UUID[19]}@${SERVER_IP_1}:${PORT_H2_REALITY}?security=reality&sni=${TLS_SERVER[19]}&alpn=h2&fp=firefox&pbk=${REALITY_PUBLIC[19]// /%20}&type=http&encryption=none#${NODE_NAME[19]// /%20}%20${NODE_TAG[8]}"
 
   [ -n "$PORT_GRPC_REALITY" ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${TLS_SERVER[20]}&fp=firefox&pbk=${REALITY_PUBLIC[20]}&type=grpc&serviceName=grpc&encryption=none#${NODE_NAME[20]}%20${NODE_TAG[9]}"
+vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${TLS_SERVER[20]}&fp=firefox&pbk=${REALITY_PUBLIC[20]// /%20}&type=grpc&serviceName=grpc&encryption=none#${NODE_NAME[20]// /%20}%20${NODE_TAG[9]}"
 
   [ -n "$PORT_ANYTLS" ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}/?insecure=1#${NODE_NAME[21]}%20${NODE_TAG[10]}"
+anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}?security=tls&sni=${TLS_SERVER_DEFAULT}&insecure=1&fp=firefox#${NODE_NAME[21]// /%20}%20${NODE_TAG[10]}"
 
   echo -n "$NEKOBOX_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/neko
 
@@ -2793,12 +2782,12 @@ anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}/?insecure=1#${NODE_NAME[21]}%
   if [ -n "$PORT_HYSTERIA2" ]; then
     local INBOUND_REPLACE+=" { \"type\": \"hysteria2\", \"tag\": \"${NODE_NAME[12]} ${NODE_TAG[1]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_HYSTERIA2},"
     [[ -n "${PORT_HOPPING_START}" && -n "${PORT_HOPPING_END}" ]] && local INBOUND_REPLACE+=" \"server_ports\": [ \"${PORT_HOPPING_START}:${PORT_HOPPING_END}\" ],"
-    local INBOUND_REPLACE+=" \"up_mbps\": 200, \"down_mbps\": 1000, \"password\": \"${UUID[12]}\", \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\": \"\", \"alpn\": [ \"h3\" ] } },"
+    local INBOUND_REPLACE+=" \"up_mbps\": 200, \"down_mbps\": 1000, \"password\": \"${UUID[12]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER_DEFAULT}\", \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"alpn\": [ \"h3\" ] } },"
     local NODE_REPLACE+="\"${NODE_NAME[12]} ${NODE_TAG[1]}\","
   fi
 
   [ -n "$PORT_TUIC" ] &&
-  local TUIC_INBOUND=" { \"type\": \"tuic\", \"tag\": \"${NODE_NAME[13]} ${NODE_TAG[2]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_TUIC}, \"uuid\": \"${UUID[13]}\", \"password\": \"${TUIC_PASSWORD}\", \"congestion_control\": \"$TUIC_CONGESTION_CONTROL\", \"udp_relay_mode\": \"native\", \"zero_rtt_handshake\": false, \"heartbeat\": \"10s\", \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\": \"\", \"alpn\": [ \"h3\" ] } }," &&
+  local TUIC_INBOUND=" { \"type\": \"tuic\", \"tag\": \"${NODE_NAME[13]} ${NODE_TAG[2]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_TUIC}, \"uuid\": \"${UUID[13]}\", \"password\": \"${TUIC_PASSWORD}\", \"congestion_control\": \"$TUIC_CONGESTION_CONTROL\", \"udp_relay_mode\": \"native\", \"zero_rtt_handshake\": false, \"heartbeat\": \"10s\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER_DEFAULT}\", \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"alpn\": [ \"h3\" ] } }," &&
   local INBOUND_REPLACE+="${TUIC_INBOUND}" &&
   local NODE_REPLACE+="\"${NODE_NAME[13]} ${NODE_TAG[2]}\","
 
@@ -2812,7 +2801,7 @@ anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}/?insecure=1#${NODE_NAME[21]}%
   local NODE_REPLACE+="\"${NODE_NAME[15]} ${NODE_TAG[4]}\","
 
   [ -n "$PORT_TROJAN" ] &&
-  local INBOUND_REPLACE+=" { \"type\": \"trojan\", \"tag\": \"${NODE_NAME[16]} ${NODE_TAG[5]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_TROJAN, \"password\": \"$TROJAN_PASSWORD\", \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\":\"\", \"utls\": { \"enabled\":true, \"fingerprint\":\"firefox\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"trojan\", \"tag\": \"${NODE_NAME[16]} ${NODE_TAG[5]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_TROJAN, \"password\": \"$TROJAN_PASSWORD\", \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\":\"${TLS_SERVER_DEFAULT}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"firefox\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
   local NODE_REPLACE+="\"${NODE_NAME[16]} ${NODE_TAG[5]}\","
 
   if [ -n "$PORT_VMESS_WS" ]; then
@@ -2858,7 +2847,7 @@ anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}/?insecure=1#${NODE_NAME[21]}%
   local NODE_REPLACE+="\"${NODE_NAME[20]} ${NODE_TAG[9]}\","
 
   [ -n "$PORT_ANYTLS" ] &&
-  local INBOUND_REPLACE+=" { \"type\": \"anytls\", \"tag\": \"${NODE_NAME[21]} ${NODE_TAG[10]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_ANYTLS}, \"password\": \"${UUID[21]}\", \"idle_session_check_interval\": \"30s\", \"idle_session_timeout\": \"30s\", \"min_idle_session\": 5, \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\": \"\" } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"anytls\", \"tag\": \"${NODE_NAME[21]} ${NODE_TAG[10]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_ANYTLS}, \"password\": \"${UUID[21]}\", \"idle_session_check_interval\": \"30s\", \"idle_session_timeout\": \"30s\", \"min_idle_session\": 5, \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\": \"${TLS_SERVER_DEFAULT}\", \"utls\": { \"enabled\": true, \"fingerprint\": \"firefox\" } } }," &&
   local NODE_REPLACE+="\"${NODE_NAME[21]} ${NODE_TAG[10]}\","
 
   # 模板1
@@ -3556,7 +3545,7 @@ menu_setting() {
     OPTION[8]="8.  $(text 69)"
     OPTION[9]="9.  $(text 76)"
 
-    ACTION[1]() { IS_FAST_INSTALL='is_fast_install';   CHOOSE_PROTOCOLS=${CHOOSE_PROTOCOLS:-'a'}; START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}; CDN=${CDN:-"${CDN_DOMAIN[0]}"}; IS_SUB='is_sub'; IS_ARGO='is_argo'; PORT_HOPPING_RANGE=${PORT_HOPPING_RANGE:-'50000:51000'}; install_sing-box; export_list install; create_shortcut; exit; }
+    ACTION[1]() { IS_FAST_INSTALL='is_fast_install'; CHOOSE_PROTOCOLS=${CHOOSE_PROTOCOLS:-'a'}; START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}; CDN=${CDN:-"${CDN_DOMAIN[0]}"}; IS_SUB='is_sub'; IS_ARGO='is_argo'; PORT_HOPPING_RANGE=${PORT_HOPPING_RANGE:-'50000:51000'}; install_sing-box; export_list install; create_shortcut; exit; }
     ACTION[2]() { IS_SUB=is_sub; IS_ARGO=is_argo; install_sing-box; export_list install; create_shortcut; exit; }
     ACTION[3]() { IS_SUB=no_sub; IS_ARGO=is_argo; install_sing-box; export_list install; create_shortcut; exit; }
     ACTION[4]() { IS_SUB=is_sub; IS_ARGO=no_argo; install_sing-box; export_list install; create_shortcut; exit; }

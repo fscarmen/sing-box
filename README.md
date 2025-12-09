@@ -8,15 +8,17 @@
 - [2.项目特点](README.md#2项目特点)
 - [3.Sing-box for VPS 运行脚本](README.md#3sing-box-for-vps-运行脚本)
 - [4.无交互极速安装](README.md#4无交互极速安装)
-- [5.Token Argo Tunnel 方案设置任意端口回源以使用 cdn](README.md#5token-argo-tunnel-方案设置任意端口回源以使用-cdn)
-- [6.Vmess / Vless 方案设置任意端口回源以使用 cdn](README.md#6vmess--vless-方案设置任意端口回源以使用-cdn)
-- [7.Docker 和 Docker compose 安装](README.md#7docker-和-docker-compose-安装)
-- [8.Nekobox 设置 shadowTLS 方法](README.md#8nekobox-设置-shadowtls-方法)
-- [9.主体目录文件及说明](README.md#9主体目录文件及说明)
-- [10.鸣谢下列作者的文章和项目](README.md#10鸣谢下列作者的文章和项目)
-- [11.感谢赞助商](README.md#11感谢赞助商)
-- [12.免责声明](README.md#12免责声明)
-- [13.开源证书](README.md#13开源证书)
+- [5.Json Argo Tunnel 获取 (推荐)](README.md#5json-argo-tunnel-获取-推荐)
+- [6.Token Argo Tunnel 方案设置任意端口回源以使用 cdn](README.md#6token-argo-tunnel-方案设置任意端口回源以使用-cdn)
+- [7.Vmess / Vless 方案设置任意端口回源以使用 cdn](README.md#7vmess--vless-方案设置任意端口回源以使用-cdn)
+- [8.Docker 和 Docker compose 安装](README.md#8docker-和-docker-compose-安装)
+- [9.Nekobox 设置 shadowTLS 方法](README.md#9nekobox-设置-shadowtls-方法)
+- [10.主体目录文件及说明](README.md#10主体目录文件及说明)
+- [11.自签证书在不同客户端中的处理方式对比](README.md#11自签证书在不同客户端中的处理方式对比)
+- [12.鸣谢下列作者的文章和项目](README.md#12鸣谢下列作者的文章和项目)
+- [13.感谢赞助商](README.md#13感谢赞助商)
+- [14.免责声明](README.md#14免责声明)
+- [15.开源证书](README.md#15开源证书)
 
 
 * * *
@@ -145,7 +147,6 @@ sb
   | -e              | English 英文 |
   | -l              | Quick deploy (Chinese version) 使用中文快速安装 |
   | -k              | Quick deploy (English version) 使用英文快速安装 |
-
   | -u              | Uninstall 卸载 |
   | -n              | Export Nodes list 显示节点信息 |
   | -p <start port> | Change the nodes start port 更改节点的起始端口 |
@@ -371,7 +372,16 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 | --NODE_NAME_CONFIRM | 节点名 |
 
 
-## 5.Token Argo Tunnel 方案设置任意端口回源以使用 cdn
+## 5.Json Argo Tunnel 获取 (推荐)
+
+### 用户可以通过 Cloudflare Json 生成网轻松获取: https://fscarmen.cloudflare.now.cc
+
+<img width="784" alt="image" src="https://github.com/fscarmen/sba/assets/62703343/fb7c6e90-fb3e-4e77-bcd4-407e4660a33c">
+
+如想手动，可以参考，以 Debian 为例，需要用到的命令，[Deron Cheng - CloudFlare Argo Tunnel 试用](https://zhengweidong.com/try-cloudflare-argo-tunnel)
+
+
+## 6.Token Argo Tunnel 方案设置任意端口回源以使用 cdn
 详细教程: [群晖套件：Cloudflare Tunnel 内网穿透中文教程 支持DSM6、7](https://imnks.com/5984.html)
 
 <img width="1510" alt="image" src="https://github.com/fscarmen/sba/assets/62703343/bb2d9c43-3585-4abd-a35b-9cfd7404c87c">
@@ -379,7 +389,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 <img width="1638" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/a4868388-d6ab-4dc7-929c-88bc775ca851">
 
 
-## 6.Vmess / Vless 方案设置任意端口回源以使用 cdn
+## 7.Vmess / Vless 方案设置任意端口回源以使用 cdn
 举例子 IPv6: vmess [2a01:4f8:272:3ae6:100b:ee7a:ad2f:1]:10006
 <img width="1052" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/bc2df37a-95c4-4ba0-9c84-5d9c745c3a7b">
 
@@ -390,7 +400,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 <img width="1556" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/164bf255-a6be-40bc-a724-56e13da7a1e6">
 
 
-## 7.Docker 和 Docker compose 安装
+## 8.Docker 和 Docker compose 安装
 
 ### 说明:
 * 支持三种 Argo 类型隧道: 临时 (不需要域名) / Json / Token
@@ -483,23 +493,6 @@ services:
 | 停止并删除容器 | docker: `docker rm -f sing-box`</br> compose: `docker-compose down` |
 | 删除镜像 | `docker rmi -f fscarmen/sb:latest` |
 
-
-### 用户可以通过 Cloudflare Json 生成网轻松获取: https://fscarmen.cloudflare.now.cc
-
-<img width="784" alt="image" src="https://github.com/fscarmen/sba/assets/62703343/fb7c6e90-fb3e-4e77-bcd4-407e4660a33c">
-
-如想手动，可以参考，以 Debian 为例，需要用到的命令，[Deron Cheng - CloudFlare Argo Tunnel 试用](https://zhengweidong.com/try-cloudflare-argo-tunnel)
-
-
-### Argo Token 的获取
-
-详细教程: [群晖套件：Cloudflare Tunnel 内网穿透中文教程 支持DSM6、7](https://imnks.com/5984.html)
-
-<img width="1510" alt="image" src="https://github.com/fscarmen/sba/assets/62703343/bb2d9c43-3585-4abd-a35b-9cfd7404c87c">
-
-<img width="1616" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/ecb844be-1e93-4208-bb7c-6b00b9d1f00a">
-
-
 ### 参数说明
 | 参数 | 是否必须 | 说明 |
 | --- | ------- | --- |
@@ -525,7 +518,7 @@ services:
 | -e ARGO_AUTH | 否 | Argo 认证信息，可以是 Json 也可以是 Token，与 ARGO_DOMAIN 一并使用才能生效，不指定的话将使用临时隧道 |
 
 
-## 8.Nekobox 设置 shadowTLS 方法
+## 9.Nekobox 设置 shadowTLS 方法
 1. 复制脚本输出的两个 Neko links 进去
 <img width="630" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/db5960f3-63b1-4145-90a5-b01066dd39be">
 
@@ -537,7 +530,7 @@ services:
 <img width="408" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/753e7159-92f9-4c88-91b5-867fdc8cca47">
 
 
-## 9.主体目录文件及说明
+## 10.主体目录文件及说明
 
 ```
 /etc/sing-box/                               # 项目主体目录
@@ -590,11 +583,69 @@ services:
 ```
 
 
-## 10.鸣谢下列作者的文章和项目:
+## 11.自签证书在不同客户端中的处理方式对比
+
+| 客户端 / 工具 | 使用的证书验证方式 | SNI 是否必须匹配 SAN | 是否依赖完整证书链 | 使用的 Hash / 指纹类型 | SNI 用途说明 |
+|---------------|---------------------|------------------------|------------------------|--------------------------|----------------------|
+| **V2RayN** | 标准 X.509 证书链验证 | **是**（必须匹配） | ✔ 是 | 不使用指纹 | 用于 TLS Hostname 验证（必须与 SAN 一致） |
+| **NekoBox** | 标准 X.509 证书链验证 | **是**（必须匹配） | ✔ 是 | 不使用指纹 | 用于 TLS Hostname 验证（必须与 SAN 一致） |
+| **ShadowRocket** | 对证书 **DER 全内容** 做 SHA-256 | ✖ 不需要匹配 | ✖ 不依赖证书链 | **SHA-256(DER)** | 仅用于伪装，可为空或任意域名 |
+| **Clash Verge / Meta** | 对证书 **DER 全内容** 做 SHA-256 | ✖ 不需要匹配 | ✖ 不依赖证书链 | **SHA-256(DER)** | 仅用于伪装，可为空或任意域名 |
+| **Sing-box** | 仅验证 SPKI 公钥（SPKI pin） | ✖ 不需要匹配 | ✖ 不依赖证书链 | **SHA-256(SPKI Base64)** | 仅用于伪装，可为空或任意域名 |
+
+
+### 结论：
+ - **V2RayN、NekoBox 必须要 SAN = SNI**，否则“x509: cannot validate certificate because it doesn't contain IP SAN”。  
+ - **ShadowRocket、Clash、Sing-box、HY2、TUIC 完全不需要 SAN**，因为用的是指纹机制。
+
+---
+
+### X.509 自签证书结构与不同指纹方式包含内容对比
+
+| 证书字段 / 内容 | X.509 完整证书（TBSCert + Sig） | DER 指纹（SHA-256(DER)） | 公钥 SPKI（Subject Public Key Info） |
+|----------------|---------------------------------|----------------------------|-------------------------------------|
+| Version | ✔ 包含 | ✔ 包含 | ✖ 不包含 |
+| Serial Number | ✔ | ✔ | ✖ |
+| Issuer | ✔ | ✔ | ✖ |
+| Validity (Not Before / Not After) | ✔ | ✔ | ✖ |
+| Subject（CN） | ✔ | ✔ | ✖ |
+| **SAN（Subject Alternative Name）** | ✔ | ✔ | ✖ |
+| Extensions | ✔ | ✔ | ✖ |
+| **Public Key** | ✔ | ✔ | ✔ |
+| 公钥算法（ECC/P256 等） | ✔ | ✔ | ✔ |
+| EC 曲线参数 | ✔ | ✔ | ✔ |
+| Signature Algorithm | ✔ | ✔ | ✖ |
+| Signature Value | ✔ | ✔ | ✖ |
+| 用途场景 | V2RayN / NekoBox | ShadowRocket / Clash | Sing-box / Hysteria2 / TUIC |
+
+---
+
+### 指纹方式说明
+
+#### **1. X.509 证书链验证**
+- 完整验证 CA → Leaf 证书  
+- **必须要求：SNI = SAN 中的一个 DNS 名称**
+- 不允许 SAN 不匹配或缺失
+- 用于：**V2RayN / NekoBox**
+
+#### **2. SHA-256(DER) 指纹**
+- 对证书 **整体 DER（二进制）内容** 计算 SHA-256  
+- 包含所有字段（版本、序列号、Subject、SAN、扩展、公钥、签名等）  
+- **任意字段变化 → 指纹都会改变**
+- 用于：**ShadowRocket / Clash Mihomo**
+
+#### **3. SHA-256(SPKI) 指纹**
+- 只包含 **公钥 SPKI（Subject Public Key Info）**
+- 证书重新签发、变更 Issuer、Subject、SAN **都不会改变**
+- 更稳定、更适合自签证书
+- 用于：**Sing-box**
+
+
+## 12.鸣谢下列作者的文章和项目:
 千歌 sing-box 模板: https://github.com/chika0801/sing-box-examples  
 
 
-## 11.感谢赞助商
+## 13.感谢赞助商
 
 ### 🚀 Sponsored by SharonNetworks
 
@@ -616,11 +667,12 @@ SharonNetworks 为您的业务起飞保驾护航！
 想体验同款构建环境？欢迎 [访问 Sharon 官网](https://sharon.io) 或 [加入 Telegram 群组](https://t.me/SharonNetwork) 了解更多并申请赞助。
 
 
-## 12.免责声明:
+## 14.免责声明
 * 本程序仅供学习了解, 非盈利目的，请于下载后 24 小时内删除, 不得用作任何商业用途, 文字、数据及图片均有所属版权, 如转载须注明来源。
 * 使用本程序必循遵守部署免责声明。使用本程序必循遵守部署服务器所在地、所在国家和用户所在国家的法律法规, 程序作者不对使用者任何不当行为负责。
 
-## 13.开源证书
+
+## 15.开源证书
 * 本项目严格遵守 GNU GPL v3 许可证 [LICENSE](LICENSE)。
 * 任何形式的复制、分发、修改或衍生使用，必须完整保留原版权声明、许可证文本，并以相同许可证开源发布。违反此条款（如闭源使用、商业独占或未开源修改版）将被视为抄袭，作者保留追究法律责任的权利。
 * 鼓励社区贡献，但请通过 Pull Request 提交。

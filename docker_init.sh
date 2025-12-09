@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 脚本更新日期 2025.11.05
+# 脚本更新日期 2025.12.08
 WORK_DIR=/sing-box
 PORT=$START_PORT
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
@@ -60,9 +60,8 @@ install() {
 
   # 生成100年的自签证书，区分使用 IPv4 / IPv6 / 域名
   echo "生成自签证书 ..."
-  [[ $SERVER_IP =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$|^([0-9a-fA-F:]+)$ ]] && SAN_TYPE="IP" || SAN_TYPE="DNS"
   openssl ecparam -genkey -name prime256v1 -out ${WORK_DIR}/cert/private.key
-  openssl req -new -x509 -days 36500 -key ${WORK_DIR}/cert/private.key -out ${WORK_DIR}/cert/cert.pem -subj "/CN=mozilla.org" -addext "subjectAltName = ${SAN_TYPE}:${SERVER_IP}"
+  openssl req -new -x509 -days 36500 -key ${WORK_DIR}/cert/private.key -out ${WORK_DIR}/cert/cert.pem -subj "/CN=mozilla.org" -addext "subjectAltName = DNS:addons.mozilla.org"
 
   # 检查系统是否已经安装 tcp-brutal
   IS_BRUTAL=false && [ -x "$(type -p lsmod)" ] && lsmod 2>/dev/null | grep -q 'brutal' && IS_BRUTAL=true
@@ -359,7 +358,6 @@ EOF
             "ignore_client_bandwidth":false,
             "tls":{
                 "enabled":true,
-                "server_name":"",
                 "alpn":[
                     "h3"
                 ],
@@ -714,9 +712,7 @@ credentials-file: ${WORK_DIR}/tunnel.json
 
 ingress:
   - hostname: ${ARGO_DOMAIN}
-    service: https://localhost:${START_PORT}
-    originRequest:
-      noTLSVerify: false
+    service: http://localhost:${START_PORT}
   - service: http_status:404
 EOF
 
@@ -727,7 +723,7 @@ EOF
   else
     ((PORT++))
     METRICS_PORT=$PORT
-    ARGO_RUNS="cloudflared tunnel --edge-ip-version auto --no-autoupdate --no-tls-verify --metrics 0.0.0.0:$METRICS_PORT --url https://localhost:$START_PORT"
+    ARGO_RUNS="cloudflared tunnel --edge-ip-version auto --no-autoupdate --no-tls-verify --metrics 0.0.0.0:$METRICS_PORT --url http://localhost:$START_PORT"
   fi
 
   # 生成 s6-overlay 服务脚本（替代 supervisord）
@@ -806,17 +802,8 @@ EOF
       #include /etc/nginx/conf.d/*.conf;
 
     server {
-      listen 127.0.0.1:$START_PORT;
-      # listen 127.0.0.1:$START_PORT ssl ; # sing-box backend
-      # http2 on;
-      server_name addons.mozilla.org;
-
-      # ssl_certificate            ${WORK_DIR}/cert/cert.pem;
-      # ssl_certificate_key        ${WORK_DIR}/cert/private.key;
-      # ssl_protocols              TLSv1.3;
-      # ssl_session_tickets        on;
-      # ssl_stapling               off;
-      # ssl_stapling_verify        off;"
+      listen 127.0.0.1:$START_PORT; # sing-box backend
+"
 
   [ "${VLESS_WS}" = 'true' ] && NGINX_CONF+="
       # 反代 sing-box vless websocket
@@ -885,11 +872,11 @@ EOF
   local CLASH_SUBSCRIBE+="
   $CLASH_XTLS_REALITY
 "
-  [ "${HYSTERIA2}" = 'true' ] && local CLASH_HYSTERIA2="- {name: \"${NODE_NAME} hysteria2\", type: hysteria2, server: ${SERVER_IP}, port: ${PORT_HYSTERIA2}, up: \"200 Mbps\", down: \"1000 Mbps\", password: ${UUID}, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256}}" &&
+  [ "${HYSTERIA2}" = 'true' ] && local CLASH_HYSTERIA2="- {name: \"${NODE_NAME} hysteria2\", type: hysteria2, server: ${SERVER_IP}, port: ${PORT_HYSTERIA2}, up: \"200 Mbps\", down: \"1000 Mbps\", password: ${UUID}, sni: addons.mozilla.org, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256}}" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_HYSTERIA2
 "
-  [ "${TUIC}" = 'true' ] && local CLASH_TUIC="- {name: \"${NODE_NAME} tuic\", type: tuic, server: ${SERVER_IP}, port: ${PORT_TUIC}, uuid: ${UUID}, password: ${UUID}, alpn: [h3], disable-sni: true, reduce-rtt: true, request-timeout: 8000, udp-relay-mode: native, congestion-controller: bbr, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256}}" &&
+  [ "${TUIC}" = 'true' ] && local CLASH_TUIC="- {name: \"${NODE_NAME} tuic\", type: tuic, server: ${SERVER_IP}, port: ${PORT_TUIC}, uuid: ${UUID}, password: ${UUID}, alpn: [h3], reduce-rtt: true, request-timeout: 8000, udp-relay-mode: native, congestion-controller: bbr, sni: addons.mozilla.org, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256}}" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_TUIC
 "
@@ -901,7 +888,7 @@ EOF
   local CLASH_SUBSCRIBE+="
   $CLASH_SHADOWSOCKS
 "
-  [ "${TROJAN}" = 'true' ] && local CLASH_TROJAN="- {name: \"${NODE_NAME} trojan\", type: trojan, server: ${SERVER_IP}, port: $PORT_TROJAN, password: ${UUID}, client-fingerprint: firefox, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
+  [ "${TROJAN}" = 'true' ] && local CLASH_TROJAN="- {name: \"${NODE_NAME} trojan\", type: trojan, server: ${SERVER_IP}, port: $PORT_TROJAN, password: ${UUID}, client-fingerprint: firefox, sni: addons.mozilla.org, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_TROJAN
 "
@@ -923,7 +910,7 @@ EOF
   local CLASH_SUBSCRIBE+="
   $CLASH_GRPC_REALITY
 "
-  [ "${ANYTLS}" = 'true' ] && local CLASH_ANYTLS="- {name: \"${NODE_NAME} anytls\", type: anytls, server: ${SERVER_IP}, port: $PORT_ANYTLS, password: ${UUID}, client-fingerprint: firefox, udp: true, idle-session-check-interval: 30, idle-session-timeout: 30, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256} }" &&
+  [ "${ANYTLS}" = 'true' ] && local CLASH_ANYTLS="- {name: \"${NODE_NAME} anytls\", type: anytls, server: ${SERVER_IP}, port: $PORT_ANYTLS, password: ${UUID}, client-fingerprint: firefox, udp: true, idle-session-check-interval: 30, idle-session-timeout: 30, sni: addons.mozilla.org, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256} }" &&
   local CLASH_SUBSCRIBE+="
   $CLASH_ANYTLS
 "
@@ -936,40 +923,40 @@ EOF
 
   # 生成 ShadowRocket 订阅配置文件
   [ "${XTLS_REALITY}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
-vless://$(echo -n "auto:${UUID}@${SERVER_IP_2}:${PORT_XTLS_REALITY}" | base64 -w0)?remarks=${NODE_NAME}%20xtls-reality&obfs=none&tls=1&peer=addons.mozilla.org&xtls=2&pbk=${REALITY_PUBLIC}
+vless://$(echo -n "auto:${UUID}@${SERVER_IP_2}:${PORT_XTLS_REALITY}" | base64 -w0)?remarks=${NODE_NAME// /%20}%20xtls-reality&obfs=none&tls=1&peer=addons.mozilla.org&xtls=2&pbk=${REALITY_PUBLIC}
 "
   [ "${HYSTERIA2}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
-hysteria2://${UUID}@${SERVER_IP_1}:${PORT_HYSTERIA2}?hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}&obfs=none#${NODE_NAME}%20hysteria2
+hysteria2://${UUID}@${SERVER_IP_1}:${PORT_HYSTERIA2}?peer=addons.mozilla.org&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}&obfs=none#${NODE_NAME// /%20}%20hysteria2
 "
   [ "${TUIC}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
-tuic://${UUID}:${UUID}@${SERVER_IP_2}:${PORT_TUIC}?congestion_control=bbr&udp_relay_mode=native&alpn=h3&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}#${NODE_NAME}%20tuic
+tuic://${UUID}:${UUID}@${SERVER_IP_2}:${PORT_TUIC}?peer=addons.mozilla.org&congestion_control=bbr&udp_relay_mode=native&alpn=h3&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}#${NODE_NAME// /%20}%20tuic
 "
   [ "${SHADOWTLS}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
-ss://$(echo -n "2022-blake3-aes-128-gcm:${SHADOWTLS_PASSWORD}@${SERVER_IP_2}:${PORT_SHADOWTLS}" | base64 -w0)?shadow-tls=$(echo -n "{\"version\":\"3\",\"host\":\"addons.mozilla.org\",\"password\":\"${UUID}\"}" | base64 -w0)#${NODE_NAME}%20ShadowTLS
+ss://$(echo -n "2022-blake3-aes-128-gcm:${SHADOWTLS_PASSWORD}@${SERVER_IP_2}:${PORT_SHADOWTLS}" | base64 -w0)?shadow-tls=$(echo -n "{\"version\":\"3\",\"host\":\"addons.mozilla.org\",\"password\":\"${UUID}\"}" | base64 -w0)#${NODE_NAME// /%20}%20ShadowTLS
 "
   [ "${SHADOWSOCKS}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
-ss://$(echo -n "aes-128-gcm:${UUID}@${SERVER_IP_2}:$PORT_SHADOWSOCKS" | base64 -w0)#${NODE_NAME}%20shadowsocks
+ss://$(echo -n "aes-128-gcm:${UUID}@${SERVER_IP_2}:$PORT_SHADOWSOCKS" | base64 -w0)#${NODE_NAME// /%20}%20shadowsocks
 "
   [ "${TROJAN}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
-trojan://${UUID}@${SERVER_IP_1}:$PORT_TROJAN?peer=addons.mozilla.org&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}#${NODE_NAME}%20trojan
+trojan://${UUID}@${SERVER_IP_1}:$PORT_TROJAN?peer=addons.mozilla.org&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}#${NODE_NAME// /%20}%20trojan
 "
   [ "${VMESS_WS}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
 ----------------------------
-vmess://$(echo -n "auto:${UUID}@${CDN}:80" | base64 -w0)?remarks=${NODE_NAME}%20vmess-ws&obfsParam=${ARGO_DOMAIN}&path=/${UUID}-vmess&obfs=websocket&alterId=0
+vmess://$(echo -n "auto:${UUID}@${CDN}:80" | base64 -w0)?remarks=${NODE_NAME// /%20}%20vmess-ws&obfsParam=${ARGO_DOMAIN}&path=/${UUID}-vmess&obfs=websocket&alterId=0
 "
   [ "${VLESS_WS}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
 ----------------------------
-vless://$(echo -n "auto:${UUID}@${CDN}:443" | base64 -w0)?remarks=${NODE_NAME}%20vless-ws-tls&obfsParam=${ARGO_DOMAIN}&path=/${UUID}-vless?ed=2560&obfs=websocket&tls=1&peer=${ARGO_DOMAIN}
+vless://$(echo -n "auto:${UUID}@${CDN}:443" | base64 -w0)?remarks=${NODE_NAME// /%20}%20vless-ws-tls&obfsParam=${ARGO_DOMAIN}&path=/${UUID}-vless?ed=2560&obfs=websocket&tls=1&peer=${ARGO_DOMAIN}
 "
   [ "${H2_REALITY}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
 ----------------------------
-vless://$(echo -n auto:${UUID}@${SERVER_IP_2}:${PORT_H2_REALITY} | base64 -w0)?remarks=${NODE_NAME}%20h2-reality&path=/&obfs=h2&tls=1&peer=addons.mozilla.org&alpn=h2&mux=1&pbk=${REALITY_PUBLIC}
+vless://$(echo -n auto:${UUID}@${SERVER_IP_2}:${PORT_H2_REALITY} | base64 -w0)?remarks=${NODE_NAME// /%20}%20h2-reality&path=/&obfs=h2&tls=1&peer=addons.mozilla.org&alpn=h2&mux=1&pbk=${REALITY_PUBLIC}
 "
   [ "${GRPC_REALITY}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
-vless://$(echo -n "auto:${UUID}@${SERVER_IP_2}:${PORT_GRPC_REALITY}" | base64 -w0)?remarks=${NODE_NAME}%20grpc-reality&path=grpc&obfs=grpc&tls=1&peer=addons.mozilla.org&pbk=${REALITY_PUBLIC}
+vless://$(echo -n "auto:${UUID}@${SERVER_IP_2}:${PORT_GRPC_REALITY}" | base64 -w0)?remarks=${NODE_NAME// /%20}%20grpc-reality&path=grpc&obfs=grpc&tls=1&peer=addons.mozilla.org&pbk=${REALITY_PUBLIC}
 "
   [ "${ANYTLS}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
-anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}&udp=1#${NODE_NAME}%20anytls
+anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?peer=addons.mozilla.org&udp=1&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}#${NODE_NAME// /%20}%20anytls
 "
   echo -n "$SHADOWROCKET_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/shadowrocket
 
@@ -980,11 +967,11 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?encryption=none&flow=xtls-rp
 
   [ "${HYSTERIA2}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-hysteria2://${UUID}@${SERVER_IP_1}:${PORT_HYSTERIA2}/?alpn=h3&insecure=1#${NODE_NAME// /%20}%20hysteria2"
+hysteria2://${UUID}@${SERVER_IP_1}:${PORT_HYSTERIA2}?sni=addons.mozilla.org&alpn=h3&insecure=1&allowInsecure=1#${NODE_NAME// /%20}%20hysteria2"
 
   [ "${TUIC}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-tuic://${UUID}:${UUID}@${SERVER_IP_1}:${PORT_TUIC}?alpn=h3&insecure=1&congestion_control=bbr#${NODE_NAME// /%20}%20tuic"
+tuic://${UUID}:${UUID}@${SERVER_IP_1}:${PORT_TUIC}?sni=addons.mozilla.org&alpn=h3&insecure=1&allowInsecure=1&congestion_control=bbr#${NODE_NAME// /%20}%20tuic"
 
   [ "${SHADOWTLS}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
@@ -1043,7 +1030,7 @@ ss://$(echo -n "aes-128-gcm:${UUID}@${SERVER_IP_1}:$PORT_SHADOWSOCKS" | base64 -
 
   [ "${TROJAN}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-trojan://${UUID}@${SERVER_IP_1}:$PORT_TROJAN?security=tls&insecure=1&type=tcp&headerType=none#${NODE_NAME// /%20}%20trojan"
+trojan://${UUID}@${SERVER_IP_1}:$PORT_TROJAN?security=tls&sni=addons.mozilla.org&insecure=1&allowInsecure=1&type=tcp&headerType=none#${NODE_NAME// /%20}%20trojan"
 
   [ "${VMESS_WS}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
@@ -1063,22 +1050,22 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?encryption=none&security=rea
 
   [ "${ANYTLS}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?security=tls&fp=firefox&insecure=1&type=tcp#${NODE_NAME// /%20}%20anytls"
+anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?security=tls&sni=addons.mozilla.org&fp=firefox&insecure=1&allowInsecure=1&type=tcp#${NODE_NAME// /%20}%20anytls"
 
   echo -n "$V2RAYN_SUBSCRIBE" | sed -E '/^[ ]*#|^[ ]+|^--|^\{|^\}/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/v2rayn
 
   # 生成 NekoBox 订阅文件
   [ "${XTLS_REALITY}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-vless://${UUID}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?security=reality&sni=addons.mozilla.org&fp=firefox&pbk=${REALITY_PUBLIC}&type=tcp&flow=xtls-rprx-vision&encryption=none#${NODE_NAME}%20xtls-reality"
+vless://${UUID}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?security=reality&sni=addons.mozilla.org&fp=firefox&pbk=${REALITY_PUBLIC}&type=tcp&flow=xtls-rprx-vision&encryption=none#${NODE_NAME// /%20}%20xtls-reality"
 
   [ "${HYSTERIA2}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-hy2://${UUID}@${SERVER_IP_1}:${PORT_HYSTERIA2}?insecure=1#${NODE_NAME}%20hysteria2"
+hy2://${UUID}@${SERVER_IP_1}:${PORT_HYSTERIA2}?insecure=1&sni=addons.mozilla.org#${NODE_NAME// /%20}%20hysteria2"
 
   [ "${TUIC}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-tuic://${UUID}:${UUID}@${SERVER_IP_1}:${PORT_TUIC}?congestion_control=bbr&alpn=h3&udp_relay_mode=native&allow_insecure=1&disable_sni=1#${NODE_NAME}%20tuic"
+tuic://${UUID}:${UUID}@${SERVER_IP_1}:${PORT_TUIC}?congestion_control=bbr&alpn=h3&sni=addons.mozilla.org&udp_relay_mode=native&allow_insecure=1#${NODE_NAME// /%20}%20tuic"
 
   [ "${SHADOWTLS}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
@@ -1088,11 +1075,11 @@ nekoray://shadowsocks#$(echo -n "{\"_v\":0,\"method\":\"2022-blake3-aes-128-gcm\
 
   [ "${SHADOWSOCKS}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-ss://$(echo -n "aes-128-gcm:${UUID}" | base64 -w0)@${SERVER_IP_1}:$PORT_SHADOWSOCKS#${NODE_NAME}%20shadowsocks"
+ss://$(echo -n "aes-128-gcm:${UUID}" | base64 -w0)@${SERVER_IP_1}:$PORT_SHADOWSOCKS#${NODE_NAME// /%20}%20shadowsocks"
 
   [ "${TROJAN}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-trojan://${UUID}@${SERVER_IP_1}:$PORT_TROJAN?security=tls&allowInsecure=1&fp=firefox&type=tcp#${NODE_NAME}%20trojan"
+trojan://${UUID}@${SERVER_IP_1}:$PORT_TROJAN?security=tls&sni=addons.mozilla.org&allowInsecure=1&fp=firefox&type=tcp#${NODE_NAME// /%20}%20trojan"
 
   [ "${VMESS_WS}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
@@ -1101,20 +1088,20 @@ vmess://$(echo -n "{\"add\":\"${CDN}\",\"aid\":\"0\",\"host\":\"${ARGO_DOMAIN}\"
 
   [ "${VLESS_WS}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-vless://${UUID}@${CDN}:443?security=tls&sni=${ARGO_DOMAIN}&type=ws&path=/${UUID}-vless?ed%3D2560&host=${ARGO_DOMAIN}#${NODE_NAME}%20vless-ws-tls
+vless://${UUID}@${CDN}:443?security=tls&sni=${ARGO_DOMAIN}&type=ws&path=/${UUID}-vless?ed%3D2560&host=${ARGO_DOMAIN}#${NODE_NAME// /%20}%20vless-ws-tls
 "
 
   [ "${H2_REALITY}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-vless://${UUID}@${SERVER_IP_1}:${PORT_H2_REALITY}?security=reality&sni=addons.mozilla.org&alpn=h2&fp=firefox&pbk=${REALITY_PUBLIC}&type=http&encryption=none#${NODE_NAME}%20h2-reality"
+vless://${UUID}@${SERVER_IP_1}:${PORT_H2_REALITY}?security=reality&sni=addons.mozilla.org&alpn=h2&fp=firefox&pbk=${REALITY_PUBLIC}&type=http&encryption=none#${NODE_NAME// /%20}%20h2-reality"
 
   [ "${GRPC_REALITY}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=addons.mozilla.org&fp=firefox&pbk=${REALITY_PUBLIC}&type=grpc&serviceName=grpc&encryption=none#${NODE_NAME}%20grpc-reality"
+vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=addons.mozilla.org&fp=firefox&pbk=${REALITY_PUBLIC}&type=grpc&serviceName=grpc&encryption=none#${NODE_NAME// /%20}%20grpc-reality"
 
   [ "${ANYTLS}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}/?insecure=1#${NODE_NAME}%20anytls"
+anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?security=tls&sni=addons.mozilla.org&insecure=1&fp=firefox#${NODE_NAME// /%20}%20anytls"
 
   echo -n "$NEKOBOX_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/neko
 
@@ -1126,12 +1113,12 @@ anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}/?insecure=1#${NODE_NAME}%20anytls
   if [ "${HYSTERIA2}" = 'true' ]; then
     local INBOUND_REPLACE+=" { \"type\": \"hysteria2\", \"tag\": \"${NODE_NAME} hysteria2\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_HYSTERIA2},"
     [[ -n "${PORT_HOPPING_START}" && -n "${PORT_HOPPING_END}" ]] && local INBOUND_REPLACE+=" \"server_ports\": [ \"${PORT_HOPPING_START}:${PORT_HOPPING_END}\" ],"
-    local INBOUND_REPLACE+=" \"up_mbps\": 200, \"down_mbps\": 1000, \"password\": \"${UUID}\", \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\": \"\", \"alpn\": [ \"h3\" ] } },"
+    local INBOUND_REPLACE+=" \"up_mbps\": 200, \"down_mbps\": 1000, \"password\": \"${UUID}\", \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\": \"addons.mozilla.org\", \"alpn\": [ \"h3\" ] } },"
     local NODE_REPLACE+="\"${NODE_NAME} hysteria2\","
   fi
 
   [ "${TUIC}" = 'true' ] &&
-  local INBOUND_REPLACE+=" { \"type\": \"tuic\", \"tag\": \"${NODE_NAME} tuic\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_TUIC}, \"uuid\": \"${UUID}\", \"password\": \"${UUID}\", \"congestion_control\": \"bbr\", \"udp_relay_mode\": \"native\", \"zero_rtt_handshake\": false, \"heartbeat\": \"10s\", \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\": \"\", \"alpn\": [ \"h3\" ] } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"tuic\", \"tag\": \"${NODE_NAME} tuic\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_TUIC}, \"uuid\": \"${UUID}\", \"password\": \"${UUID}\", \"congestion_control\": \"bbr\", \"udp_relay_mode\": \"native\", \"zero_rtt_handshake\": false, \"heartbeat\": \"10s\", \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\": \"addons.mozilla.org\", \"alpn\": [ \"h3\" ] } }," &&
   local NODE_REPLACE+="\"${NODE_NAME} tuic\","
 
   [ "${SHADOWTLS}" = 'true' ] &&
@@ -1143,7 +1130,7 @@ anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}/?insecure=1#${NODE_NAME}%20anytls
   local NODE_REPLACE+="\"${NODE_NAME} shadowsocks\","
 
   [ "${TROJAN}" = 'true' ] &&
-  local INBOUND_REPLACE+=" { \"type\": \"trojan\", \"tag\": \"${NODE_NAME} trojan\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_TROJAN, \"password\": \"${UUID}\", \"tls\": { \"enabled\":true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\":\"\", \"utls\": { \"enabled\":true, \"fingerprint\":\"firefox\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"trojan\", \"tag\": \"${NODE_NAME} trojan\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_TROJAN, \"password\": \"${UUID}\", \"tls\": { \"enabled\":true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\":\"addons.mozilla.org\", \"utls\": { \"enabled\":true, \"fingerprint\":\"firefox\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
   local NODE_REPLACE+="\"${NODE_NAME} trojan\","
 
   [ "${VMESS_WS}" = 'true' ] &&
@@ -1162,7 +1149,7 @@ anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}/?insecure=1#${NODE_NAME}%20anytls
   local NODE_REPLACE+="\"${NODE_NAME} grpc-reality\","
 
   [ "${ANYTLS}" = 'true' ] &&
-  local INBOUND_REPLACE+=" { \"type\": \"anytls\", \"tag\": \"${NODE_NAME} anytls\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_ANYTLS}, \"password\": \"${UUID}\", \"idle_session_check_interval\": \"30s\", \"idle_session_timeout\": \"30s\", \"min_idle_session\": 5, \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\": \"\" } }," &&
+  local INBOUND_REPLACE+=" { \"type\": \"anytls\", \"tag\": \"${NODE_NAME} anytls\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_ANYTLS}, \"password\": \"${UUID}\", \"idle_session_check_interval\": \"30s\", \"idle_session_timeout\": \"30s\", \"min_idle_session\": 5, \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\": \"addons.mozilla.org\", \"utls\": { \"enabled\": true, \"fingerprint\": \"firefox\" } } }," &&
   local NODE_REPLACE+="\"${NODE_NAME} anytls\","
 
   # 模板
