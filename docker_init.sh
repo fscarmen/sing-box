@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
+# 脚本更新日期 2025.12.14
+set -e
 
-# 脚本更新日期 2025.12.08
 WORK_DIR=/sing-box
 PORT=$START_PORT
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
@@ -548,7 +549,7 @@ EOF
         {
             "type":"vless",
             "tag":"${NODE_NAME} vless-ws-tls",
-            "listen":"::",
+            "listen":"127.0.0.1",
             "listen_port":${PORT_VLESS_WS},
             "tcp_fast_open":false,
             "proxy_protocol":false,
@@ -702,9 +703,135 @@ EOF
 
   # 判断 argo 隧道类型
   if [[ -n "$ARGO_DOMAIN" && -n "$ARGO_AUTH" ]]; then
+    # 根据 ARGO_AUTH 的内容，自行判断是 Json， Token 还是 API 申请
     if [[ "$ARGO_AUTH" =~ TunnelSecret ]]; then
-      ARGO_JSON=${ARGO_AUTH//[ ]/}
-      ARGO_RUNS="cloudflared tunnel --edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run"
+      # JSON 类型
+      local ARGO_JSON=${ARGO_AUTH//[ ]/}
+    elif [[ "${ARGO_AUTH}" =~ [A-Z0-9a-z=]{150,250}$ ]]; then
+      # Token 类型
+      local ARGO_TOKEN=$(awk '{print $NF}' <<< "$ARGO_AUTH")
+    elif [[ "${#ARGO_AUTH}" == 40 ]]; then
+      # API 类型 (Cloudflare API Token)
+      echo -e "\n使用 Cloudflare API 创建隧道..."
+
+      # 获取隧道名和根域名
+      local TUNNEL_NAME=${ARGO_DOMAIN%%.*}
+      local ROOT_DOMAIN=${ARGO_DOMAIN#*.}
+
+      # 获取 Zone ID 和 Account ID
+      local ZONE_RESPONSE=$(wget --no-check-certificate -qO- --content-on-error \
+        --header="Authorization: Bearer ${ARGO_AUTH}" \
+        --header="Content-Type: application/json" \
+        "https://api.cloudflare.com/client/v4/zones?name=${ROOT_DOMAIN}")
+
+      local ZONE_ID=$(sed 's/.*"result":[ ]*[{"id:[ ]*"\([^"]*\)",.*/\1/' <<< $ZONE_RESPONSE)
+      local ACCOUNT_ID=$(sed 's/.*account":[ ]*{"id":"\([^"]*\)",.*/\1/' <<< $ZONE_RESPONSE)
+
+      # 查询并处理现有 Tunnel
+      local TUNNEL_LIST=$(wget --no-check-certificate -qO- --content-on-error \
+        --header="Authorization: Bearer ${ARGO_AUTH}" \
+        --header="Content-Type: application/json" \
+        "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/cfd_tunnel?is_deleted=false" \
+        | awk 'BEGIN{RS="";FS=""}{s=substr($0,index($0,"\"result\":[")+10);d=0;b="";for(i=1;i<=length(s);i++){c=substr(s,i,1);if(c=="{")d++;if(d>0)b=b c;if(c=="}"){d--;if(d==0){print b;b=""}}}}')
+
+      if [[ "$TUNNEL_LIST" =~ \"id\":\"([^\"]+).*\"name\":\"$TUNNEL_NAME\" ]]; then
+        # 有同名 Tunnel，则获取其 ID 和 TOKEN
+        local EXISTING_TUNNEL_ID="${BASH_REMATCH[1]}"
+        local EXISTING_TUNNEL_TOKEN=$(wget -qO- --content-on-error \
+          --header="Authorization: Bearer ${ARGO_AUTH}" \
+          --header="Content-Type: application/json" \
+          "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/cfd_tunnel/${EXISTING_TUNNEL_ID}/token")
+
+        local TUNNEL_ID=$EXISTING_TUNNEL_ID
+        local ARGO_TOKEN=$(sed -n 's/.*"result":"\([^"]\+\)".*/\1/p' <<< "$EXISTING_TUNNEL_TOKEN")
+      else
+        # 生成 Tunnel Secret (至少 32 字节的 base64 编码)
+        local TUNNEL_SECRET=$(openssl rand -base64 32)
+
+        # 创建新 Tunnel
+        local CREATE_RESPONSE=$(wget --no-check-certificate -qO- --content-on-error \
+          --header="Authorization: Bearer ${ARGO_AUTH}" \
+          --header="Content-Type: application/json" \
+          --post-data="{
+            \"name\": \"$TUNNEL_NAME\",
+            \"config_src\": \"cloudflare\",
+            \"tunnel_secret\": \"$TUNNEL_SECRET\"
+          }" \
+          "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/cfd_tunnel")
+
+        local TUNNEL_ID=$(sed -n 's/.*"id":"\([^"]\+\)".*/\1/p' <<< "$CREATE_RESPONSE")
+        local ARGO_TOKEN=$(sed -n 's/.*"token":"\([^"]\+\)".*/\1/p' <<< "$CREATE_RESPONSE")
+      fi
+
+      # 配置隧道ingress规则
+      local CONFIG_RESPONSE=$(wget --no-check-certificate -qO- --content-on-error \
+        --method=PUT \
+        --header="Authorization: Bearer ${ARGO_AUTH}" \
+        --header="Content-Type: application/json" \
+        --body-data="{
+          \"config\": {
+            \"ingress\": [
+              {
+                \"service\": \"http://localhost:${START_PORT}\",
+                \"hostname\": \"${ARGO_DOMAIN}\"
+              },
+              {
+                \"service\": \"http_status:404\"
+              }
+            ],
+            \"warp-routing\": {
+              \"enabled\": false
+            }
+          }
+        }" \
+        "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/cfd_tunnel/${TUNNEL_ID}/configurations")
+
+      # 管理DNS记录
+      local DNS_PAYLOAD="{
+        \"name\": \"${ARGO_DOMAIN}\",
+        \"type\": \"CNAME\",
+        \"content\": \"${TUNNEL_ID}.cfargotunnel.com\",
+        \"proxied\": true,
+        \"settings\": {
+          \"flatten_cname\": false
+        }
+      }"
+
+      local DNS_LIST=$(wget --no-check-certificate -qO- --content-on-error \
+        --header="Authorization: Bearer ${ARGO_AUTH}" \
+        --header="Content-Type: application/json" \
+        "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records?type=CNAME&name=${ARGO_DOMAIN}")
+
+      # 如果已存在需要的 DNS 记录，就跳过
+      if [[ "$DNS_LIST" =~ \"id\":\"([^\"]+)\".*\"$ARGO_DOMAIN\".*\"content\":\"([^\"]+)\" ]]; then
+        local EXISTING_DNS_ID="${BASH_REMATCH[1]}" EXISTED_DNS_CONTENT="${BASH_REMATCH[2]}"
+
+        # DNS 记录与隧道 ID 不匹配的话，覆盖原来的 CNAME 记录
+        if ! grep -qw "$EXISTING_TUNNEL_ID" <<< "${EXISTED_DNS_CONTENT%%.*}"; then
+          local DNS_RESPONSE=$(wget --no-check-certificate -qO- --content-on-error \
+            --method=PATCH \
+            --header="Authorization: Bearer ${ARGO_AUTH}" \
+            --header="Content-Type: application/json" \
+            --body-data="$DNS_PAYLOAD" \
+            "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records/${EXISTING_DNS_ID}")
+        fi
+      else
+        # 未找到现有 DNS 记录，使用 POST 创建
+        local DNS_RESPONSE=$(wget --no-check-certificate -qO- --content-on-error \
+          --method=POST \
+          --header="Authorization: Bearer ${ARGO_AUTH}" \
+          --header="Content-Type: application/json" \
+          --body-data="$DNS_PAYLOAD" \
+          "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records")
+      fi
+
+      # 构造ARGO_JSON
+      local ARGO_JSON="{\"AccountTag\":\"$ACCOUNT_ID\",\"TunnelSecret\":\"$TUNNEL_SECRET\",\"TunnelID\":\"$TUNNEL_ID\",\"Endpoint\":\"\"}"
+    fi
+
+    # 根据ARGO_JSON或ARGO_TOKEN设置ARGO_RUNS
+    if [[ -n "$ARGO_JSON" ]]; then
+      local ARGO_RUNS="cloudflared tunnel --edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run"
       echo $ARGO_JSON > ${WORK_DIR}/tunnel.json
       cat > ${WORK_DIR}/tunnel.yml << EOF
 tunnel: $(cut -d\" -f12 <<< $ARGO_JSON)
@@ -715,15 +842,13 @@ ingress:
     service: http://localhost:${START_PORT}
   - service: http_status:404
 EOF
-
-    elif [[ "${ARGO_AUTH}" =~ [a-z0-9A-Z=]{120,250} ]]; then
-      [[ "{$ARGO_AUTH}" =~ cloudflared.*service ]] && ARGO_TOKEN=$(awk -F ' ' '{print $NF}' <<< "$ARGO_AUTH") || ARGO_TOKEN=$ARGO_AUTH
-      ARGO_RUNS="cloudflared tunnel --edge-ip-version auto run --token ${ARGO_TOKEN}"
+    elif [[ -n "$ARGO_TOKEN" ]]; then
+      local ARGO_RUNS="cloudflared tunnel --edge-ip-version auto run --token ${ARGO_TOKEN}"
     fi
   else
     ((PORT++))
     METRICS_PORT=$PORT
-    ARGO_RUNS="cloudflared tunnel --edge-ip-version auto --no-autoupdate --no-tls-verify --metrics 0.0.0.0:$METRICS_PORT --url http://localhost:$START_PORT"
+    local ARGO_RUNS="cloudflared tunnel --edge-ip-version auto --no-autoupdate --no-tls-verify --metrics 0.0.0.0:$METRICS_PORT --url http://localhost:$START_PORT"
   fi
 
   # 生成 s6-overlay 服务脚本（替代 supervisord）
@@ -775,7 +900,7 @@ EOF
   http {
     map \$http_user_agent \$path {
       default                    /;                # 默认路径
-      ~*v2rayN|Neko              /base64;          # 匹配 V2rayN / NekoBox 客户端
+      ~*v2rayN|Neko|Throne       /base64;          # 匹配 V2rayN / NekoBox / Throne 客户端
       ~*clash                    /clash;           # 匹配 Clash 客户端
       ~*ShadowRocket             /shadowrocket;    # 匹配 ShadowRocket  客户端
       ~*SFM                      /sing-box-pc;     # 匹配 Sing-box pc 客户端
@@ -789,6 +914,7 @@ EOF
       log_format  main  '\$remote_addr - \$remote_user [\$time_local] "\$request" '
                         '\$status \$body_bytes_sent "\$http_referer" '
                         '"\$http_user_agent" "\$http_x_forwarded_for"';
+
 
       access_log  /dev/null;
 
