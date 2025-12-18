@@ -3,8 +3,8 @@
 # 当前脚本版本号
 VERSION='v1.3.2 (2025.12.11)'
 
-# Github 反代加速代理
-GITHUB_PROXY=('https://v6.gh-proxy.org/' 'https://gh-proxy.com/' 'https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
+# Github 反代加速代理，第一个为空相当于直连
+GITHUB_PROXY=('' 'https://v6.gh-proxy.org/' 'https://gh-proxy.com/' 'https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/' 'https://ghproxy.lvedong.eu.org/')
 
 # 各变量默认值
 TEMP_DIR='/tmp/sing-box'
@@ -20,7 +20,7 @@ NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
 CDN_DOMAIN=("skk.moe" "ip.sb" "time.is" "cfip.xxxxxxxx.tk" "bestcf.top" "cdn.2020111.xyz" "xn--b6gac.eu.org" "cf.090227.xyz")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
-DEFAULT_NEWEST_VERSION='1.13.0-alpha.28'
+DEFAULT_NEWEST_VERSION='1.13.0-alpha.31'
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -293,19 +293,11 @@ text() { grep -q '\$' <<< "${E[$*]}" && eval echo "\$(eval echo "\${${L}[$*]}")"
 
 # 检测是否需要启用 Github CDN，如能直接连通，则不使用
 check_cdn() {
-  # 首先测试默认连接（不使用代理）
-  local DIRECT_STATUS_CODE=$(wget --server-response --spider --quiet --timeout=3 --tries=1 https://api.github.com/repos/SagerNet/sing-box/releases 2>&1 | grep "HTTP/" | awk '{print $2}')
-
-  if [ "$DIRECT_STATUS_CODE" != "200" ]; then
-    # 如果直连失败，则逐一测试各github proxy
-    for PROXY_URL in "${GITHUB_PROXY[@]}"; do
-      local PROXY_STATUS_CODE=$(wget --server-response --spider --quiet --timeout=3 --tries=1 ${PROXY_URL}https://api.github.com/repos/SagerNet/sing-box/releases 2>&1 | grep "HTTP/" | awk '{print $2}')
-      [ "$PROXY_STATUS_CODE" = "200" ] && GH_PROXY="$PROXY_URL" && break
-    done
-  else
-    # 直连成功，不使用代理
-    unset GH_PROXY
-  fi
+  # GITHUB_PROXY 数组第一个元素为空，相当于直连
+  for PROXY_URL in "${GITHUB_PROXY[@]}"; do
+    local PROXY_STATUS_CODE=$(wget --server-response --spider --quiet --timeout=3 --tries=1 ${PROXY_URL}https://api.github.com/repos/SagerNet/sing-box/releases 2>&1 | awk '/HTTP\//{last_field = $2} END {print last_field}')
+    [ "$PROXY_STATUS_CODE" = "200" ] && GH_PROXY="$PROXY_URL" && break
+  done
 }
 
 # 检测是否解锁 chatGPT，以决定是否使用 warp 链式代理或者是 direct out，此处判断改编自 https://github.com/lmc999/RegionRestrictionCheck
@@ -811,15 +803,17 @@ check_root() {
 
 # 判断处理器架构
 check_arch() {
+  [ "$SYSTEM" = 'Alpine' ] && local IS_MUSL='-musl'
+
   case "$(uname -m)" in
     aarch64|arm64 )
-      SING_BOX_ARCH=arm64; JQ_ARCH=arm64; QRENCODE_ARCH=arm64; ARGO_ARCH=arm64
+      SING_BOX_ARCH=arm64${IS_MUSL}; JQ_ARCH=arm64; QRENCODE_ARCH=arm64; ARGO_ARCH=arm64
       ;;
     x86_64|amd64 )
-      SING_BOX_ARCH=amd64; JQ_ARCH=amd64; QRENCODE_ARCH=amd64; ARGO_ARCH=amd64
+      SING_BOX_ARCH=amd64${IS_MUSL}; JQ_ARCH=amd64; QRENCODE_ARCH=amd64; ARGO_ARCH=amd64
       ;;
     armv7l )
-      SING_BOX_ARCH=armv7; JQ_ARCH=armhf; QRENCODE_ARCH=arm; ARGO_ARCH=arm
+      SING_BOX_ARCH=armv7${IS_MUSL}; JQ_ARCH=armhf; QRENCODE_ARCH=arm; ARGO_ARCH=arm
       ;;
     * )
       error " $(text 25) "
@@ -834,6 +828,8 @@ check_brutal() {
 
 # 查安装及运行状态，下标0: sing-box，下标1: argo，下标2: nginx；状态码: 26 未安装， 27 已安装未运行， 28 运行中
 check_install() {
+  local PS_LIST=$(ps -eo pid,args | grep -E "$WORK_DIR.*([s]ing-box|[c]loudflared|[n]ginx)" | sed 's/^[ ]\+//g')
+
   [[ "$IS_SUB" = 'is_sub' || -s ${WORK_DIR}/subscribe/qr ]] && IS_SUB=is_sub || IS_SUB=no_sub
   if ls ${WORK_DIR}/conf/*${NODE_TAG[1]}_inbounds.json >/dev/null 2>&1; then
     check_port_hopping_nat
@@ -905,15 +901,24 @@ check_install() {
     fi
   fi
 
+  # 如果有需要，后台静默下载 sing-box
   if [ "${STATUS[0]}" = "$(text 26)" ] && [ ! -s ${WORK_DIR}/sing-box ]; then
     {
-    # 获取需要下载的 sing-box 版本
-    local ONLINE=$(get_sing_box_version)
-    wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box >/dev/null 2>&1
-    [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
-    wget --no-check-certificate --continue -qO $TEMP_DIR/jq ${GH_PROXY}https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$JQ_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/jq >/dev/null 2>&1
-    wget --no-check-certificate --continue -qO $TEMP_DIR/qrencode ${GH_PROXY}https://github.com/fscarmen/client_template/raw/main/qrencode-go/qrencode-go-linux-$QRENCODE_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/qrencode >/dev/null 2>&1
+      # 获取需要下载的 sing-box 版本
+      local ONLINE=$(get_sing_box_version)
+      wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box >/dev/null 2>&1
+      [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box $TEMP_DIR
+      wget --no-check-certificate --continue -qO $TEMP_DIR/jq ${GH_PROXY}https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$JQ_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/jq >/dev/null 2>&1
+      wget --no-check-certificate --continue -qO $TEMP_DIR/qrencode ${GH_PROXY}https://github.com/fscarmen/client_template/raw/main/qrencode-go/qrencode-go-linux-$QRENCODE_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/qrencode >/dev/null 2>&1
     }&
+  elif [ "${STATUS[0]}" != "$(text 26)" ]; then
+    # 查 sing-box 进程号，运行时长和内存占用，占用的端口
+    SING_BOX_VERSION="Version: $(${WORK_DIR}/sing-box version | awk '/version/{print $NF}')"
+    [ "${STATUS[0]}" = "$(text 28)" ] && SING_BOX_PID=$(awk '/sing-box run/{print $1}' <<< "$PS_LIST") && [[ "$SING_BOX_PID" =~ ^[0-9]+$ ]] && SING_BOX_MEMORY_USAGE="$(text 58): $(awk '/VmRSS/{printf "%.1f\n", $2/1024}' /proc/$SING_BOX_PID/status) MB"
+
+    NOW_PORTS=$(awk -F ':|,' '/listen_port/{print $2}' ${WORK_DIR}/conf/*)
+    NOW_START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$NOW_PORTS")
+    NOW_CONSECUTIVE_PORTS=$(awk 'END { print NR }' <<< "$NOW_PORTS")
   fi
 
   if [ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' ]; then
@@ -948,18 +953,33 @@ check_install() {
     fi
   fi
 
+  # 如果有需要，后台静默下载 cloudflared
+  if [[ "${STATUS[1]}" = "$(text 26)" || "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]] && [ ! -s ${WORK_DIR}/cloudflared ]; then
+    {
+      wget --no-check-certificate -qO $TEMP_DIR/cloudflared ${GH_PROXY}https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$ARGO_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/cloudflared >/dev/null 2>&1
+    }&
+  elif [ "${STATUS[1]}" != "$(text 26)" ]; then
+    # 查 Argo 进程号，运行时长和内存占用
+    ARGO_VERSION=$(${WORK_DIR}/cloudflared -v | awk '{print $3}' | sed "s@^@Version: &@g")
+    [ "${STATUS[1]}" = "$(text 28)" ] && ARGO_PID=$(awk '/cloudflared/{print $1}' <<< "$PS_LIST") && [[ "$ARGO_PID" =~ ^[0-9]+$ ]] && ARGO_MEMORY_USAGE="$(text 58): $(awk '/VmRSS/{printf "%.1f\n", $2/1024}' /proc/$ARGO_PID/status) MB"
+  fi
+
   # 检查 Nginx 状态
   if [ ! -x "$(type -p nginx)" ]; then
     STATUS[2]=$(text 26)
-  elif [ ! -s ${WORK_DIR}/nginx.conf ]; then
-    STATUS[2]=$(text 27)
+  elif [ -s ${WORK_DIR}/nginx.conf ]; then
+    # 查 Nginx 进程号，运行时长和内存占用
+    NGINX_VERSION=$(nginx -v 2>&1 | sed "s#.*/#Version: #")
+    NGINX_PID=$(awk '/nginx/{print $1}' <<< "${PS_LIST}")
+    if [[ "$NGINX_PID" =~ ^[0-9]+$ ]]; then
+      STATUS[2]=$(text 28)
+      NGINX_MEMORY_USAGE="$(text 58): $(awk '/VmRSS/{printf "%.1f\n", $2/1024}' /proc/$NGINX_PID/status) MB"
+    else
+      STATUS[2]=$(text 27)
+    fi
   else
-    [ "$SYSTEM" = 'Alpine' ] && NGINX_PID=$(ps -ef | awk -v WORK_DIR="${WORK_DIR}" '$0 ~ WORK_DIR"/nginx.conf" {print $1; exit}') || NGINX_PID=$(ps -ef | awk -v WORK_DIR="${WORK_DIR}" '$0 ~ WORK_DIR"/nginx.conf" {print $2; exit}')
-    [[ "$NGINX_PID" =~ ^[0-9]+$ ]] && STATUS[2]=$(text 28) || STATUS[2]=$(text 27)
+    STATUS[2]=$(text 27)
   fi
-
-  # 下载 cloudflared 如果需要
-  [[ "${STATUS[1]}" = "$(text 26)" || "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]] && [ ! -s ${WORK_DIR}/cloudflared ] && { wget --no-check-certificate -qO $TEMP_DIR/cloudflared ${GH_PROXY}https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$ARGO_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/cloudflared >/dev/null 2>&1; }&
 }
 
 # 为了适配 alpine，定义 cmd_systemctl 的函数
@@ -969,7 +989,7 @@ cmd_systemctl() {
   }
 
   nginx_stop() {
-    local NGINX_PID=$(ps -ef | awk -v work_dir="$WORK_DIR" '$0 ~ "nginx -c " work_dir "/nginx.conf" {print $2; exit}')
+    local NGINX_PID=$(ps -eo pid,args | awk -v work_dir="$WORK_DIR" '$0~(work_dir"/nginx.conf"){print $1;exit}')
     ss -nltp | sed -n "/pid=$NGINX_PID,/ s/,/ /gp" | grep -oP 'pid=\K\S+' | sort -u | xargs kill -9 >/dev/null 2>&1
   }
 
@@ -2365,14 +2385,26 @@ start_pre() {
     [ -n "$PORT_NGINX" ] && OPENRC_SERVICE+="
 
 stop_post() {
-    # 查找并停止由 sing-box 启动的 nginx 进程
-    # 使用 grep 查找包含特定配置文件的 nginx 进程
-    local NGINX_PIDS=\$(ps -ef | grep \"[n]ginx -c ${WORK_DIR}/nginx.conf\" | awk '{print \$1}')
-    if [ -n \"\$NGINX_PIDS\" ]; then
-        for pid in \$NGINX_PIDS; do
-            kill \$pid 2>/dev/null
-        done
+    # 停止 nginx：优先用内置命令
+    if command -v /usr/sbin/nginx >/dev/null 2>&1; then
+        /usr/sbin/nginx -s quit -c ${WORK_DIR}/nginx.conf 2>/dev/null
+        sleep 1 # 等待优雅关闭
+        # 如果仍运行，用 SIGKILL
+        local NGINX_MASTER=\$(pgrep -f \"nginx: master process /usr/sbin/nginx -c ${WORK_DIR}/nginx.conf\")
+        if [ -n \"\$NGINX_MASTER\" ]; then
+            kill -KILL \$NGINX_MASTER 2>/dev/null
+        fi
     fi
+}
+
+stop() {
+    ebegin \"Stopping \${RC_SVCNAME}\"
+    # 先停止主进程（OpenRC 会调用）
+    start-stop-daemon --stop --pidfile \$pidfile --retry 5
+    eend \$? \"Failed to stop \${RC_SVCNAME}\"
+
+    # 然后运行 post 清理
+    stop_post
 }"
 
     echo "$OPENRC_SERVICE" > ${SINGBOX_DAEMON_FILE}
@@ -2522,7 +2554,7 @@ fetch_quicktunnel_domain() {
   unset CLOUDFLARED_PID METRICS_ADDRESS ARGO_DOMAIN
   local QUICKTUNNEL_ERROR_TIME=20
   until [ -n "$ARGO_DOMAIN" ]; do
-    [ "$SYSTEM" = 'Alpine' ] && local CLOUDFLARED_PID=$(ps -ef | awk -v WORK_DIR="${WORK_DIR}" '$0 ~ WORK_DIR"/cloudflared" {print $1; exit}') || local CLOUDFLARED_PID=$(ps -ef | awk -v WORK_DIR="${WORK_DIR}" '$0 ~ WORK_DIR"/cloudflared" {print $2; exit}')
+    local CLOUDFLARED_PID=$(ps -eo pid,args | awk -v work_dir="$WORK_DIR" '$0~(work_dir"/cloudflared"){print $1;exit}')
     [[ -z "$METRICS_ADDRESS" && "$CLOUDFLARED_PID" =~ ^[0-9]+$ ]] && local METRICS_ADDRESS=$(ss -nltp | grep "pid=$CLOUDFLARED_PID" | awk '{print $4}')
     [ -n "$METRICS_ADDRESS" ] && ARGO_DOMAIN=$(wget -qO- http://$METRICS_ADDRESS/quicktunnel | awk -F '"' '{print $4}')
     [[ ! "$ARGO_DOMAIN" =~ trycloudflare\.com$ ]] && (( QUICKTUNNEL_ERROR_TIME-- )) && sleep 2 || break
@@ -3643,7 +3675,7 @@ uninstall() {
     [ -s ${ARGO_DAEMON_FILE} ] && cmd_systemctl disable argo &>/dev/null
     [ -s ${SINGBOX_DAEMON_FILE} ] && cmd_systemctl disable sing-box &>/dev/null
     sleep 1
-    [[ -s ${WORK_DIR}/nginx.conf && $(ps -ef | grep 'nginx' | wc -l) -le 1 ]] && reading "\n $(text 83) " REMOVE_NGINX
+    [[ -s ${WORK_DIR}/nginx.conf && "$(ps -ef | grep -c '[n]ginx')" = 0 ]] && reading "\n $(text 83) " REMOVE_NGINX
     [ "${REMOVE_NGINX,,}" = 'y' ] && ${PACKAGE_UNINSTALL[int]} nginx >/dev/null 2>&1
     [ "$IS_HOPPING" = 'is_hopping' ] && del_port_hopping_nat
     [ "$SYSTEM" = 'CentOS' ] && firewall_configuration close
@@ -3708,29 +3740,6 @@ version() {
 # 判断当前 Sing-box 的运行状态，并对应的给菜单和动作赋值
 menu_setting() {
   if [[ "${STATUS[0]}" =~ $(text 27)|$(text 28) ]]; then
-    # 查 argo 进程号，运行时长和内存占用
-    if [[ "${STATUS[1]}" =~ $(text 27)|$(text 28) ]]; then
-      ARGO_VERSION=$(${WORK_DIR}/cloudflared -v | awk '{print $3}' | sed "s@^@Version: &@g")
-      if [ "${STATUS[1]}" = "$(text 28)" ]; then
-        [ "$SYSTEM" = 'Alpine' ] && ARGO_PID=$(ps -ef | awk -v WORK_DIR="${WORK_DIR}" '$0 ~ WORK_DIR"/cloudflared" {print $1}') || ARGO_PID=$(ps -ef | awk -v WORK_DIR="${WORK_DIR}" '$0 ~ WORK_DIR"/cloudflared" {print $2}')
-        [[ "$ARGO_PID" =~ ^[0-9]+$ ]] && ARGO_MEMORY_USAGE="$(text 58): $(awk '/VmRSS/{printf "%.1f\n", $2/1024}' /proc/$ARGO_PID/status) MB"
-      fi
-    fi
-
-    # 查 sing-box 进程号，运行时长和内存占用
-    if [ "${STATUS[0]}" = "$(text 28)" ]; then
-      [ "$SYSTEM" = 'Alpine' ] && SING_BOX_PID=$(ps -ef | awk -v WORK_DIR="${WORK_DIR}" '$0 ~ WORK_DIR"/sing-box" {print $1}') || SING_BOX_PID=$(ps -ef | awk -v WORK_DIR="${WORK_DIR}" '$0 ~ WORK_DIR"/sing-box" {print $2}')
-      [[ "$SING_BOX_PID" =~ ^[0-9]+$ ]] && SING_BOX_MEMORY_USAGE="$(text 58): $(awk '/VmRSS/{printf "%.1f\n", $2/1024}' /proc/$SING_BOX_PID/status) MB"
-    fi
-
-    # 查 Nginx 版本号
-    [ -x "$(type -p nginx)" ] && NGINX_VERSION=$(nginx -v 2>&1 | sed "s#.*/#Version: #")
-    [ "${STATUS[2]}" = "$(text 28)" ] && NGINX_MEMORY_USAGE="$(text 58): $(awk '/VmRSS/{printf "%.1f\n", $2/1024}' /proc/$NGINX_PID/status) MB"
-
-    NOW_PORTS=$(awk -F ':|,' '/listen_port/{print $2}' ${WORK_DIR}/conf/*)
-    NOW_START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$NOW_PORTS")
-    NOW_CONSECUTIVE_PORTS=$(awk 'END { print NR }' <<< "$NOW_PORTS")
-    [ -s ${WORK_DIR}/sing-box ] && SING_BOX_VERSION="Version: $(${WORK_DIR}/sing-box version | awk '/version/{print $NF}')"
     OPTION[1]="1 .  $(text 29)"
     [ "${STATUS[0]}" = "$(text 28)" ] && OPTION[2]="2 .  $(text 27) Sing-box (sb -s)" || OPTION[2]="2 .  $(text 28) Sing-box (sb -s)"
     [ "${STATUS[1]}" = "$(text 28)" ] && OPTION[3]="3 .  $(text 27) Argo (sb -a)" || OPTION[3]="3 .  $(text 28) Argo (sb -a)"
@@ -3904,7 +3913,7 @@ for z in ${!ALL_PARAMETER[@]}; do
       [ ! -s ${WORK_DIR}/list ] && error " Sing-box $(text 26) "; export_list; exit 0
       ;;
     -V )
-      check_arch; version; exit 0
+      check_system_info; check_arch; version; exit 0
       ;;
     -B )
       bash <(wget --no-check-certificate -qO- ${GH_PROXY}https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh); exit
@@ -3977,7 +3986,7 @@ if [ "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]; then
   # 预设默认值
   IS_SUB=${IS_SUB:-'no_sub'}
   IS_ARGO=${IS_ARGO:-'no_argo'}
-  IS_HOPPING=${IS_HOPPING:-'no_hoppinng'}
+  IS_HOPPING=${IS_HOPPING:-'no_hopping'}
 
   install_sing-box
   export_list install
@@ -3989,7 +3998,7 @@ elif [ "$IS_FAST_INSTALL" = 'is_fast_install' ]; then
   CDN=${CDN:-"${CDN_DOMAIN[0]}"}
   IS_SUB='is_sub'
   IS_ARGO='is_argo'
-  PORT_HOPPING_RANGE=${PORT_HOPPING_RANGE:-'50000:51000'}
+  [[ "$PORT_HOPPING_RANGE" =~ ^[0-9]+:[0-9]+$ ]] && IS_HOPPING='is_hopping' || IS_HOPPING='no_hopping'
 
   install_sing-box
   export_list install
