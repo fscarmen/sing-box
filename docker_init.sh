@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 脚本更新日期 2025.12.14
+# 脚本更新日期 2025.12.21
 set -e
 
 WORK_DIR=/sing-box
@@ -14,14 +14,13 @@ hint() { echo -e "\033[33m\033[01m$*\033[0m"; }   # 黄色
 # 判断系统架构，以下载相应的应用
 case "$ARCH" in
   arm64 )
-    SING_BOX_ARCH=arm64; JQ_ARCH=arm64; QRENCODE_ARCH=arm64; ARGO_ARCH=arm64
+    SING_BOX_ARCH=arm64-musl; JQ_ARCH=arm64; QRENCODE_ARCH=arm64; ARGO_ARCH=arm64
     ;;
   amd64 )
-    SING_BOX_ARCH=amd64
-    JQ_ARCH=amd64; QRENCODE_ARCH=amd64; ARGO_ARCH=amd64
+    SING_BOX_ARCH=amd64-musl; JQ_ARCH=amd64; QRENCODE_ARCH=amd64; ARGO_ARCH=amd64
     ;;
   armv7 )
-    SING_BOX_ARCH=armv7; JQ_ARCH=armhf; QRENCODE_ARCH=arm; ARGO_ARCH=arm
+    SING_BOX_ARCH=armv7-musl; JQ_ARCH=armhf; QRENCODE_ARCH=arm; ARGO_ARCH=arm
     ;;
 esac
 
@@ -35,7 +34,7 @@ check_latest_sing-box() {
 
   # 获取最终版本号
   local VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$FORCE_VERSION" '$0 ~ var {print $5; exit}')
-  VERSION=${VERSION:-'1.13.0-alpha.27'}
+  VERSION=${VERSION:-'1.13.0-alpha.33'}
 
   echo "$VERSION"
 }

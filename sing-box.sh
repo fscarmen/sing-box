@@ -20,7 +20,7 @@ NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
 CDN_DOMAIN=("skk.moe" "ip.sb" "time.is" "cfip.xxxxxxxx.tk" "bestcf.top" "cdn.2020111.xyz" "xn--b6gac.eu.org" "cf.090227.xyz")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
-DEFAULT_NEWEST_VERSION='1.13.0-alpha.31'
+DEFAULT_NEWEST_VERSION='1.13.0-alpha.33'
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -1041,15 +1041,6 @@ cmd_systemctl() {
 }
 
 check_system_info() {
-  # 判断虚拟化
-  if [ -x "$(type -p systemd-detect-virt)" ]; then
-    VIRT=$(systemd-detect-virt)
-  elif [ -x "$(type -p hostnamectl)" ]; then
-    VIRT=$(hostnamectl | awk '/Virtualization/{print $NF}')
-  elif [ -x "$(type -p virt-what)" ]; then
-    VIRT=$(virt-what)
-  fi
-
   [ -s /etc/os-release ] && SYS="$(awk -F '"' 'tolower($0) ~ /pretty_name/{print $2}' /etc/os-release)"
   [[ -z "$SYS" && -x "$(type -p hostnamectl)" ]] && SYS="$(hostnamectl | awk -F ': ' 'tolower($0) ~ /operating system/{print $2}')"
   [[ -z "$SYS" && -x "$(type -p lsb_release)" ]] && SYS="$(lsb_release -sd)"
@@ -1085,6 +1076,20 @@ check_system_info() {
     [ "$IS_CENTOS" != 'CentOS7' ] && int=5
   elif [ "$SYSTEM" = 'Alpine' ]; then
     ARGO_DAEMON_FILE='/etc/init.d/argo'; SINGBOX_DAEMON_FILE='/etc/init.d/sing-box'
+  fi
+
+  # 判断虚拟化
+  if [ -x "$(type -p systemd-detect-virt)" ]; then
+    VIRT=$(systemd-detect-virt)
+  elif grep -qa container= /proc/1/environ 2>/dev/null; then
+    VIRT=$(tr '\0' '\n' </proc/1/environ | awk -F= '/container=/{print $2; exit}')
+  elif grep -Eq '(lxc|docker|kubepods|containerd)' /proc/1/cgroup 2>/dev/null; then
+    VIRT=$(grep -Eo '(lxc|docker|kubepods|containerd)' /proc/1/cgroup | sed -n 1p)
+  elif [ -x "$(type -p hostnamectl)" ]; then
+    VIRT=$(hostnamectl | awk '/Virtualization/{print $NF}')
+  else
+    [ -x "$(type -p virt-what)" ] && ${PACKAGE_INSTALL[int]} virt-what >/dev/null 2>&1
+    [ -x "$(type -p virt-what)" ] && VIRT=$(virt-what | sed -n 1p) || VIRT=unknown
   fi
 }
 
@@ -1390,10 +1395,10 @@ sing-box_variables() {
 check_dependencies() {
   # 如果是 Alpine，先升级 wget ，安装 systemctl-py 版
   if [ "$SYSTEM" = 'Alpine' ]; then
-    local CHECK_WGET=$(wget 2>&1 | head -n 1)
+    local CHECK_WGET=$(wget 2>&1 | sed -n 1p)
     grep -qi 'busybox' <<< "$CHECK_WGET" && ${PACKAGE_INSTALL[int]} wget >/dev/null 2>&1
-    local DEPS_CHECK=("bash" "rc-update" "virt-what" "iptables" "ip6tables")
-    local DEPS_INSTALL=("bash" "openrc" "virt-what" "iptables" "ip6tables")
+    local DEPS_CHECK=("bash" "rc-update" "iptables" "ip6tables")
+    local DEPS_INSTALL=("bash" "openrc" "iptables" "ip6tables")
     for g in "${!DEPS_CHECK[@]}"; do
       [ ! -x "$(type -p ${DEPS_CHECK[g]})" ] && DEPS_ALPINE+=(${DEPS_INSTALL[g]})
     done
@@ -1401,7 +1406,6 @@ check_dependencies() {
       info "\n $(text 7) $(sed "s/ /,&/g" <<< ${DEPS_ALPINE[@]}) \n"
       ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
       ${PACKAGE_INSTALL[int]} ${DEPS_ALPINE[@]} >/dev/null 2>&1
-      [[ -z "$VIRT" && "${DEPS_ALPINE[@]}" =~ 'virt-what' ]] && VIRT=$(virt-what | tr '\n' ' ')
     fi
   fi
 
