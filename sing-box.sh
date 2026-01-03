@@ -1208,15 +1208,17 @@ check_system_ip() {
     [ -n "$DEFAULT_LOCAL_IP6" ] && local BIND_ADDRESS6="--bind-address=$DEFAULT_LOCAL_IP6"
   fi
 
-  WAN4=$(wget $BIND_ADDRESS4 -qO- --no-check-certificate --tries=2 --timeout=2 http://api-ipv4.ip.sb)
-  [ -n "$WAN4" ] && local IP4_JSON=$(wget -qO- --no-check-certificate --tries=2 --timeout=10 https://ip.forvps.gq/${WAN4}${IS_CHINESE}) &&
-  COUNTRY4=$(sed -En 's/.*"country":[ ]*"([^"]+)".*/\1/p' <<< "$IP4_JSON") &&
-  ASNORG4=$(sed -En 's/.*"(isp|asn_org)":[ ]*"([^"]+)".*/\2/p' <<< "$IP4_JSON")
+  local IP4_JSON=$(wget $BIND_ADDRESS4 -4 -qO- --no-check-certificate --tries=2 --timeout=2 https://ip.cloudflare.nyc.mn${IS_CHINESE}) &&
+  WAN4=$(awk -F '"' '/"ip"/{print $4}' <<< "$IP4_JSON") &&
+  COUNTRY4=$(awk -F '"' '/"country"/{print $4}' <<< "$IP4_JSON") &&
+  EMOJI4=$(awk -F '"' '/"emoji"/{print $4}' <<< "$IP4_JSON") &&
+  ASNORG4=$(awk -F '"' '/"isp"/{print $4}' <<< "$IP4_JSON")
 
-  WAN6=$(wget $BIND_ADDRESS6 -qO- --no-check-certificate --tries=2 --timeout=2 http://api-ipv6.ip.sb)
-  [ -n "$WAN6" ] && local IP6_JSON=$(wget -qO- --no-check-certificate --tries=2 --timeout=10 https://ip.forvps.gq/${WAN6}${IS_CHINESE}) &&
-  COUNTRY6=$(sed -En 's/.*"country":[ ]*"([^"]+)".*/\1/p' <<< "$IP6_JSON") &&
-  ASNORG6=$(sed -En 's/.*"(isp|asn_org)":[ ]*"([^"]+)".*/\2/p' <<< "$IP6_JSON")
+  local IP6_JSON=$(wget $BIND_ADDRESS6 -6 -qO- --no-check-certificate --tries=2 --timeout=2 https://ip.cloudflare.nyc.mn${IS_CHINESE}) &&
+  WAN6=$(awk -F '"' '/"ip"/{print $4}' <<< "$IP6_JSON") &&
+  COUNTRY6=$(awk -F '"' '/"country"/{print $4}' <<< "$IP6_JSON") &&
+  EMOJI6=$(awk -F '"' '/"emoji"/{print $4}' <<< "$IP6_JSON") &&
+  ASNORG6=$(awk -F '"' '/"isp"/{print $4}' <<< "$IP6_JSON")
 }
 
 # 输入起始 port 函数
@@ -1378,17 +1380,19 @@ sing-box_variables() {
   UUID_CONFIRM=${UUID_CONFIRM:-"$UUID_DEFAULT"}
 
   # 输入节点名，以系统的 hostname 作为默认
+  local EMOJI="${EMOJI4:-$EMOJI6}"
+  local EMOJI="${EMOJI}${EMOJI:+ }"
   if [ -z "$NODE_NAME_CONFIRM" ]; then
     if [ -x "$(type -p hostname)" ]; then
-      NODE_NAME_DEFAULT="$(hostname)"
+      local NODE_NAME_DEFAULT="${EMOJI}$(hostname)"
     elif [ -s /etc/hostname ]; then
-      NODE_NAME_DEFAULT="$(cat /etc/hostname)"
+      local NODE_NAME_DEFAULT="${EMOJI}$(cat /etc/hostname)"
     else
-      NODE_NAME_DEFAULT="Sing-Box"
+      local NODE_NAME_DEFAULT="${EMOJI}Sing-Box"
     fi
-    [ "$IS_FAST_INSTALL" = 'is_fast_install' ] && NODE_NAME_CONFIRM="$NODE_NAME_DEFAULT"
-    [ -z "$NODE_NAME_CONFIRM" ] && reading "\n (6/6) $(text 13) " NODE_NAME_CONFIRM
-    NODE_NAME_CONFIRM="${NODE_NAME_CONFIRM:-"$NODE_NAME_DEFAULT"}"
+    [ "$IS_FAST_INSTALL" = 'is_fast_install' ] && NODE_NAME_CONFIRM="${NODE_NAME_DEFAULT}"
+    [ -z "$NODE_NAME_CONFIRM" ] && reading "\n (6/6) $(text 13) " NODE_NAME
+    grep -q '^$' <<< "$NODE_NAME" && NODE_NAME_CONFIRM="$NODE_NAME_DEFAULT" || NODE_NAME_CONFIRM="${EMOJI}${NODE_NAME}"
   fi
 }
 
