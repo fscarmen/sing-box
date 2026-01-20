@@ -1091,7 +1091,7 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?encryption=none&flow=xtls-rp
 
   [ "${HYSTERIA2}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-hysteria2://${UUID}@${SERVER_IP_1}:${PORT_HYSTERIA2}?sni=addons.mozilla.org&alpn=h3&insecure=0&allowInsecure=0&pinSHA256=${SELF_SIGNED_FINGERPRINT_SHA256//:/}#${NODE_NAME// /%20}%20hysteria2"
+hysteria2://${UUID}@${SERVER_IP_1}:${PORT_HYSTERIA2}?sni=addons.mozilla.org&alpn=h3&insecure=1&allowInsecure=1&pinSHA256=${SELF_SIGNED_FINGERPRINT_SHA256//:/}#${NODE_NAME// /%20}%20hysteria2"
 
   [ "${TUIC}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
@@ -1154,7 +1154,7 @@ ss://$(echo -n "aes-128-gcm:${UUID}@${SERVER_IP_1}:$PORT_SHADOWSOCKS" | base64 -
 
   [ "${TROJAN}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-trojan://${UUID}@${SERVER_IP_1}:$PORT_TROJAN?security=tls&insecure=0&allowInsecure=0&pcs=${SELF_SIGNED_FINGERPRINT_SHA256//:/}&type=tcp&headerType=none#${NODE_NAME// /%20}%20trojan"
+trojan://${UUID}@${SERVER_IP_1}:$PORT_TROJAN?security=tls&insecure=1&allowInsecure=1&pcs=${SELF_SIGNED_FINGERPRINT_SHA256//:/}&type=tcp&headerType=none#${NODE_NAME// /%20}%20trojan"
 
   [ "${VMESS_WS}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
