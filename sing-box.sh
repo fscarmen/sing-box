@@ -293,11 +293,32 @@ text() { grep -q '\$' <<< "${E[$*]}" && eval echo "\$(eval echo "\${${L}[$*]}")"
 
 # 检测是否需要启用 Github CDN，如能直接连通，则不使用
 check_cdn() {
+  local gh_proxy_file="$TEMP_DIR/gh_proxy"
+  rm -f "$gh_proxy_file"
   # GITHUB_PROXY 数组第一个元素为空，相当于直连
   for PROXY_URL in "${GITHUB_PROXY[@]}"; do
-    local PROXY_STATUS_CODE=$(wget --server-response --spider --quiet --timeout=3 --tries=1 ${PROXY_URL}https://api.github.com/repos/SagerNet/sing-box/releases 2>&1 | awk '/HTTP\//{last_field = $2} END {print last_field}')
-    [ "$PROXY_STATUS_CODE" = "200" ] && GH_PROXY="$PROXY_URL" && break
+    {
+      if wget --spider --quiet --timeout=3 --tries=1 "${PROXY_URL}https://api.github.com/repos/SagerNet/sing-box/releases" &>/dev/null; then
+        if [[ ! -f "$gh_proxy_file" ]]; then
+          echo "$PROXY_URL" > "$gh_proxy_file"
+        fi
+      fi
+    } &
   done
+  wait
+  [[ -f "$gh_proxy_file" ]] && GH_PROXY=$(cat "$gh_proxy_file")
+  rm -f "$gh_proxy_file"
+}
+
+# 内部 wget openai 辅助函数
+_wget_openai() {
+  local url=$1; shift
+  local result
+  result=$(wget --timeout=2 --tries=2 --retry-connrefused --waitretry=5 "$@" "$url" 2>/dev/null)
+  if [[ -z "$result" && "$IS_CIPHERS" == "is_ciphers" ]]; then
+    result=$(wget --timeout=2 --tries=2 --retry-connrefused --waitretry=5 --ciphers=DEFAULT@SECLEVEL=1 --no-check-certificate "$@" "$url" 2>/dev/null)
+  fi
+  echo "$result"
 }
 
 # 检测是否解锁 chatGPT，以决定是否使用 warp 链式代理或者是 direct out，此处判断改编自 https://github.com/lmc999/RegionRestrictionCheck
@@ -305,26 +326,48 @@ check_chatgpt() {
   local CHECK_STACK=-$1
   local UA_BROWSER="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
   local UA_SEC_CH_UA='"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"'
-  wget --help | grep -q '\-\-ciphers' && local IS_CIPHERS=is_ciphers
+  local IS_CIPHERS
+  wget --help | grep -q '\-\-ciphers' && IS_CIPHERS=is_ciphers
+
+  local COMMON_HEADERS=(
+    --content-on-error
+    --user-agent="${UA_BROWSER}"
+    --header="sec-ch-ua: ${UA_SEC_CH_UA}"
+    --header='sec-ch-ua-mobile: ?0'
+    --header='sec-ch-ua-platform: "Windows"'
+    --header='accept-language: en-US,en;q=0.9'
+  )
 
   # 首先检查API访问
-  local CHECK_RESULT1=$(wget --timeout=2 --tries=2 --retry-connrefused --waitretry=5 ${CHECK_STACK} -qO- --content-on-error --header='authority: api.openai.com' --header='accept: */*' --header='accept-language: en-US,en;q=0.9' --header='authorization: Bearer null' --header='content-type: application/json' --header='origin: https://platform.openai.com' --header='referer: https://platform.openai.com/' --header="sec-ch-ua: ${UA_SEC_CH_UA}" --header='sec-ch-ua-mobile: ?0' --header='sec-ch-ua-platform: "Windows"' --header='sec-fetch-dest: empty' --header='sec-fetch-mode: cors' --header='sec-fetch-site: same-site' --user-agent="${UA_BROWSER}" 'https://api.openai.com/compliance/cookie_requirements')
+  local CHECK_RESULT1=$(_wget_openai 'https://api.openai.com/compliance/cookie_requirements' \
+    "${CHECK_STACK}" -qO- "${COMMON_HEADERS[@]}" \
+    --header='authority: api.openai.com' \
+    --header='accept: */*' \
+    --header='authorization: Bearer null' \
+    --header='content-type: application/json' \
+    --header='origin: https://platform.openai.com' \
+    --header='referer: https://platform.openai.com/' \
+    --header='sec-fetch-dest: empty' \
+    --header='sec-fetch-mode: cors' \
+    --header='sec-fetch-site: same-site')
 
-  [ -z "$CHECK_RESULT1" ] && grep -qw is_ciphers <<< "$IS_CIPHERS" && local CHECK_RESULT1=$(wget --timeout=2 --tries=2 --retry-connrefused --waitretry=5 ${CHECK_STACK} --ciphers=DEFAULT@SECLEVEL=1 --no-check-certificate -qO- --content-on-error --header='authority: api.openai.com' --header='accept: */*' --header='accept-language: en-US,en;q=0.9' --header='authorization: Bearer null' --header='content-type: application/json' --header='origin: https://platform.openai.com' --header='referer: https://platform.openai.com/' --header="sec-ch-ua: ${UA_SEC_CH_UA}" --header='sec-ch-ua-mobile: ?0' --header='sec-ch-ua-platform: "Windows"' --header='sec-fetch-dest: empty' --header='sec-fetch-mode: cors' --header='sec-fetch-site: same-site' --user-agent="${UA_BROWSER}" 'https://api.openai.com/compliance/cookie_requirements')
-
-  # 如果API检测失败或者检测到unsupported_country,直接返回ban
-  if [ -z "$CHECK_RESULT1" ] || grep -qi 'unsupported_country' <<< "$CHECK_RESULT1"; then
+  if [[ -z "$CHECK_RESULT1" ]] || grep -qi 'unsupported_country' <<< "$CHECK_RESULT1"; then
     echo "ban"
     return
   fi
 
   # API检测通过后,继续检查网页访问
-  local CHECK_RESULT2=$(wget --timeout=2 --tries=2 --retry-connrefused --waitretry=5 ${CHECK_STACK} -qO- --content-on-error --header='authority: ios.chat.openai.com' --header='accept: */*;q=0.8,application/signed-exchange;v=b3;q=0.7' --header='accept-language: en-US,en;q=0.9' --header="sec-ch-ua: ${UA_SEC_CH_UA}" --header='sec-ch-ua-mobile: ?0' --header='sec-ch-ua-platform: "Windows"' --header='sec-fetch-dest: document' --header='sec-fetch-mode: navigate' --header='sec-fetch-site: none' --header='sec-fetch-user: ?1' --header='upgrade-insecure-requests: 1' --user-agent="${UA_BROWSER}" https://ios.chat.openai.com/)
+  local CHECK_RESULT2=$(_wget_openai 'https://ios.chat.openai.com/' \
+    "${CHECK_STACK}" -qO- "${COMMON_HEADERS[@]}" \
+    --header='authority: ios.chat.openai.com' \
+    --header='accept: */*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
+    --header='sec-fetch-dest: document' \
+    --header='sec-fetch-mode: navigate' \
+    --header='sec-fetch-site: none' \
+    --header='sec-fetch-user: ?1' \
+    --header='upgrade-insecure-requests: 1')
 
-  [ -z "$CHECK_RESULT2" ] && grep -qw is_ciphers <<< "$IS_CIPHERS" && local CHECK_RESULT2=$(wget --timeout=2 --tries=2 --retry-connrefused --waitretry=5 ${CHECK_STACK} --ciphers=DEFAULT@SECLEVEL=1 --no-check-certificate -qO- --content-on-error --header='authority: ios.chat.openai.com' --header='accept: */*;q=0.8,application/signed-exchange;v=b3;q=0.7' --header='accept-language: en-US,en;q=0.9' --header="sec-ch-ua: ${UA_SEC_CH_UA}" --header='sec-ch-ua-mobile: ?0' --header='sec-ch-ua-platform: "Windows"' --header='sec-fetch-dest: document' --header='sec-fetch-mode: navigate' --header='sec-fetch-site: none' --header='sec-fetch-user: ?1' --header='upgrade-insecure-requests: 1' --user-agent="${UA_BROWSER}" https://ios.chat.openai.com/)
-
-  # 检查第二个结果
-  if [ -z "$CHECK_RESULT2" ] || grep -qi 'VPN' <<< "$CHECK_RESULT2"; then
+  if [[ -z "$CHECK_RESULT2" ]] || grep -qi 'VPN' <<< "$CHECK_RESULT2"; then
     echo "ban"
   else
     echo "unlock"
@@ -335,10 +378,17 @@ check_chatgpt() {
 statistics_of_run-times() {
   local UPDATE_OR_GET=$1
   local SCRIPT=$2
-  if grep -q 'update' <<< "$UPDATE_OR_GET"; then
-    { wget --no-check-certificate -qO- --timeout=3 "https://stat.cloudflare.now.cc/api/updateStats?script=${SCRIPT}" > $TEMP_DIR/statistics 2>/dev/null || true; }&
-  elif grep -q 'get' <<< "$UPDATE_OR_GET"; then
-    [ -s $TEMP_DIR/statistics ] && [[ $(cat $TEMP_DIR/statistics) =~ \"todayCount\":([0-9]+),\"totalCount\":([0-9]+) ]] && local TODAY="${BASH_REMATCH[1]}" && local TOTAL="${BASH_REMATCH[2]}" && rm -f $TEMP_DIR/statistics
+  if [[ "$UPDATE_OR_GET" == *"update"* ]]; then
+    { wget --no-check-certificate -qO- --timeout=3 "https://stat.cloudflare.now.cc/api/updateStats?script=${SCRIPT}" > "$TEMP_DIR/statistics" 2>/dev/null || true; } &
+  elif [[ "$UPDATE_OR_GET" == *"get"* ]]; then
+    if [[ -s "$TEMP_DIR/statistics" ]]; then
+      local stats_content=$(cat "$TEMP_DIR/statistics")
+      if [[ "$stats_content" =~ \"todayCount\":([0-9]+),\"totalCount\":([0-9]+) ]]; then
+        local TODAY="${BASH_REMATCH[1]}"
+        local TOTAL="${BASH_REMATCH[2]}"
+      fi
+      rm -f "$TEMP_DIR/statistics"
+    fi
     hint "\n*******************************************\n\n $(text 55) \n"
   fi
 }
@@ -609,18 +659,18 @@ input_nginx_port() {
   local PORT_ERROR_TIME=6
   # 生成 1000 - 65535 随机默认端口数
   local PORT_NGINX_DEFAULT=$(shuf -i ${MIN_PORT}-${MAX_PORT} -n 1)
-  [[ "$IS_FAST_INSTALL" = 'is_fast_install' && -z "$PORT_NGINX" ]] && PORT_NGINX="$PORT_NGINX_DEFAULT"
+  [[ "$IS_FAST_INSTALL" == "is_fast_install" && -z "$PORT_NGINX" ]] && PORT_NGINX="$PORT_NGINX_DEFAULT"
   while true; do
-    [[ "$PORT_ERROR_TIME" > 1 && "$PORT_ERROR_TIME" < 6 ]] && unset IN_USED PORT_NGINX
+    [[ "$PORT_ERROR_TIME" -gt 1 && "$PORT_ERROR_TIME" -lt 6 ]] && unset IN_USED PORT_NGINX
     (( PORT_ERROR_TIME-- )) || true
-    if [ "$PORT_ERROR_TIME" = 0 ]; then
+    if [[ "$PORT_ERROR_TIME" == 0 ]]; then
       error "\n $(text 3) \n"
     else
-      [ -z "$PORT_NGINX" ] && reading "\n (3/6) $(text 79) " PORT_NGINX
+      [[ -z "$PORT_NGINX" ]] && reading "\n (3/6) $(text 79) " PORT_NGINX
     fi
     PORT_NGINX=${PORT_NGINX:-"$PORT_NGINX_DEFAULT"}
     if [[ "$PORT_NGINX" =~ ^[1-9][0-9]{1,4}$ && "$PORT_NGINX" -ge "$MIN_PORT" && "$PORT_NGINX" -le "$MAX_PORT" ]]; then
-      ss -nltup | grep -q ":$PORT_NGINX" && warning "\n $(text 44) \n" || break
+      ss -nltup 2>/dev/null | grep -qE ":$PORT_NGINX\b" && warning "\n $(text 44) \n" || break
     fi
   done
 }
@@ -1198,27 +1248,42 @@ check_port_hopping_nat() {
 
 # 检测 IPv4 IPv6 信息
 check_system_ip() {
-  [ "$L" = 'C' ] && local IS_CHINESE='?lang=zh-CN'
-  local DEFAULT_LOCAL_INTERFACE4=$(ip -4 route show default | awk '/default/ {for (i=0; i<NF; i++) if ($i=="dev") {print $(i+1); exit}}')
-  local DEFAULT_LOCAL_INTERFACE6=$(ip -6 route show default | awk '/default/ {for (i=0; i<NF; i++) if ($i=="dev") {print $(i+1); exit}}')
-  if [ -n ""${DEFAULT_LOCAL_INTERFACE4}${DEFAULT_LOCAL_INTERFACE6}"" ]; then
-    local DEFAULT_LOCAL_IP4=$(ip -4 addr show $DEFAULT_LOCAL_INTERFACE4 | sed -n 's#.*inet \([^/]\+\)/[0-9]\+.*global.*#\1#gp')
-    local DEFAULT_LOCAL_IP6=$(ip -6 addr show $DEFAULT_LOCAL_INTERFACE6 | sed -n 's#.*inet6 \([^/]\+\)/[0-9]\+.*global.*#\1#gp')
-    [ -n "$DEFAULT_LOCAL_IP4" ] && local BIND_ADDRESS4="--bind-address=$DEFAULT_LOCAL_IP4"
-    [ -n "$DEFAULT_LOCAL_IP6" ] && local BIND_ADDRESS6="--bind-address=$DEFAULT_LOCAL_IP6"
+  local IS_CHINESE
+  [[ "$L" == "C" ]] && IS_CHINESE='?lang=zh-CN'
+  local DEFAULT_LOCAL_INTERFACE4=$(ip -4 route show default 2>/dev/null | awk '/default/ {for (i=0; i<NF; i++) if ($i=="dev") {print $(i+1); exit}}')
+  local DEFAULT_LOCAL_INTERFACE6=$(ip -6 route show default 2>/dev/null | awk '/default/ {for (i=0; i<NF; i++) if ($i=="dev") {print $(i+1); exit}}')
+  local BIND_ADDRESS4 BIND_ADDRESS6
+  if [[ -n "${DEFAULT_LOCAL_INTERFACE4}${DEFAULT_LOCAL_INTERFACE6}" ]]; then
+    local DEFAULT_LOCAL_IP4=$(ip -4 addr show $DEFAULT_LOCAL_INTERFACE4 2>/dev/null | sed -n 's#.*inet \([^/]\+\)/[0-9]\+.*global.*#\1#gp')
+    local DEFAULT_LOCAL_IP6=$(ip -6 addr show $DEFAULT_LOCAL_INTERFACE6 2>/dev/null | sed -n 's#.*inet6 \([^/]\+\)/[0-9]\+.*global.*#\1#gp')
+    [[ -n "$DEFAULT_LOCAL_IP4" ]] && BIND_ADDRESS4="--bind-address=$DEFAULT_LOCAL_IP4"
+    [[ -n "$DEFAULT_LOCAL_IP6" ]] && BIND_ADDRESS6="--bind-address=$DEFAULT_LOCAL_IP6"
   fi
 
-  local IP4_JSON=$(wget $BIND_ADDRESS4 -4 -qO- --no-check-certificate --tries=2 --timeout=2 https://ip.cloudflare.now.cc${IS_CHINESE}) &&
-  WAN4=$(awk -F '"' '/"ip"/{print $4}' <<< "$IP4_JSON") &&
-  COUNTRY4=$(awk -F '"' '/"country"/{print $4}' <<< "$IP4_JSON") &&
-  EMOJI4=$(awk -F '"' '/"emoji"/{print $4}' <<< "$IP4_JSON") &&
-  ASNORG4=$(awk -F '"' '/"isp"/{print $4}' <<< "$IP4_JSON")
+  local ip4_file="$TEMP_DIR/ip4_json"
+  local ip6_file="$TEMP_DIR/ip6_json"
+  rm -f "$ip4_file" "$ip6_file"
 
-  local IP6_JSON=$(wget $BIND_ADDRESS6 -6 -qO- --no-check-certificate --tries=2 --timeout=2 https://ip.cloudflare.now.cc${IS_CHINESE}) &&
-  WAN6=$(awk -F '"' '/"ip"/{print $4}' <<< "$IP6_JSON") &&
-  COUNTRY6=$(awk -F '"' '/"country"/{print $4}' <<< "$IP6_JSON") &&
-  EMOJI6=$(awk -F '"' '/"emoji"/{print $4}' <<< "$IP6_JSON") &&
-  ASNORG6=$(awk -F '"' '/"isp"/{print $4}' <<< "$IP6_JSON")
+  { wget $BIND_ADDRESS4 -4 -qO- --no-check-certificate --tries=2 --timeout=2 "https://ip.cloudflare.now.cc${IS_CHINESE}" > "$ip4_file" 2>/dev/null; } &
+  { wget $BIND_ADDRESS6 -6 -qO- --no-check-certificate --tries=2 --timeout=2 "https://ip.cloudflare.now.cc${IS_CHINESE}" > "$ip6_file" 2>/dev/null; } &
+  wait
+
+  local IP4_JSON=$(cat "$ip4_file" 2>/dev/null)
+  if [[ -n "$IP4_JSON" ]]; then
+    WAN4=$(awk -F '"' '/"ip"/{print $4}' <<< "$IP4_JSON")
+    COUNTRY4=$(awk -F '"' '/"country"/{print $4}' <<< "$IP4_JSON")
+    EMOJI4=$(awk -F '"' '/"emoji"/{print $4}' <<< "$IP4_JSON")
+    ASNORG4=$(awk -F '"' '/"isp"/{print $4}' <<< "$IP4_JSON")
+  fi
+
+  local IP6_JSON=$(cat "$ip6_file" 2>/dev/null)
+  if [[ -n "$IP6_JSON" ]]; then
+    WAN6=$(awk -F '"' '/"ip"/{print $4}' <<< "$IP6_JSON")
+    COUNTRY6=$(awk -F '"' '/"country"/{print $4}' <<< "$IP6_JSON")
+    EMOJI6=$(awk -F '"' '/"emoji"/{print $4}' <<< "$IP6_JSON")
+    ASNORG6=$(awk -F '"' '/"isp"/{print $4}' <<< "$IP6_JSON")
+  fi
+  rm -f "$ip4_file" "$ip6_file"
 }
 
 # 输入起始 port 函数
@@ -1226,19 +1291,20 @@ input_start_port() {
   local NUM=$1
   local PORT_ERROR_TIME=6
   while true; do
-    [ "$PORT_ERROR_TIME" -lt 6 ] && unset IN_USED START_PORT
+    [[ "$PORT_ERROR_TIME" -lt 6 ]] && unset IN_USED START_PORT
     (( PORT_ERROR_TIME-- )) || true
-    if [ "$PORT_ERROR_TIME" = 0 ]; then
+    if [[ "$PORT_ERROR_TIME" == 0 ]]; then
       error "\n $(text 3) \n"
     else
-      [ -z "$START_PORT" ] && reading "\n (2/6) $(text 11) " START_PORT
+      [[ -z "$START_PORT" ]] && reading "\n (2/6) $(text 11) " START_PORT
     fi
     START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}
     if [[ "$START_PORT" =~ ^[1-9][0-9]{2,4}$ && "$START_PORT" -ge "$MIN_PORT" && "$START_PORT" -le "$MAX_PORT" ]]; then
-      for port in $(eval echo {$START_PORT..$[START_PORT+NUM-1]}); do
-      ss -nltup | grep -q ":$port" && IN_USED+=("$port")
+      local ss_output=$(ss -nltup 2>/dev/null)
+      for port in $(eval echo "{$START_PORT..$((START_PORT+NUM-1))}"); do
+        grep -qE ":$port\b" <<< "$ss_output" && IN_USED+=("$port")
       done
-      [ "${#IN_USED[*]}" -eq 0 ] && break || warning "\n $(text 44) \n"
+      [[ "${#IN_USED[*]}" -eq 0 ]] && break || warning "\n $(text 44) \n"
     fi
   done
 }
