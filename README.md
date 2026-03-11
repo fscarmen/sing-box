@@ -681,6 +681,19 @@ SharonNetworks 为您的业务起飞保驾护航！
 
 想体验同款构建环境？欢迎 [访问 Sharon 官网](https://sharon.io) 或 [加入 Telegram 群组](https://t.me/SharonNetwork) 了解更多并申请赞助。
 
+### 感谢 vps.town 对本项目的支持和赞助
+
+<a href="https://vps.town" align="left">
+  <img src="https://vps.town/static/images/sponsor.png" alt="Sponsor" width="30%">
+</a>
+
+体验 VPS.Town 的速度、稳定性和安全性一体化云计算解决方案 - 专为推动您的业务创新而设计。
+
+#### ✨ 服务优势
+
+* 安全的记忆。您值得信赖的伙伴
+
+* 坚如磐石的数据中心。高枕无忧
 
 ## 15.免责声明
 * 本程序仅供学习了解, 非盈利目的，请于下载后 24 小时内删除, 不得用作任何商业用途, 文字、数据及图片均有所属版权, 如转载须注明来源。
