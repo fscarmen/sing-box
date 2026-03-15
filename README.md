@@ -24,16 +24,18 @@
 
 * * *
 ## 1.更新信息
+2026.03.14 v1.3.5 Performance: Optimize concurrent process execution to significantly accelerate script installation. 性能优化：优化并发进程执行，大幅提升脚本安装速度
+
 2026.02.08 v1.3.4 Chore: upgrade SS encryption method to SS-2022 spec; 新装的 Shadowsocks 协议加密方式从 aes-128-gcm 改为 2022-blake3-aes-128-gcm
-
-2026.01.20 v1.3.3 1. Security: In v2rayN, add pinnedPeerCertSha256 for Hysteria2/Trojan to prevent MITM (replaces AllowInsecure); 2. Compatibility: Refactor SFM/SFI/SFA configs for sing-box v1.13.0+; 1. 安全增强：v2rayN 的 Hysteria2/Trojan 支持 pinnedPeerCertSha256 替代 跳过证书验证，防御 MITM 攻击; 2. 适配更新：重构 SFM/SFI/SFA 配置，支持 sing-box v1.13.0+
-
-2025.12.11 v1.3.2 Argo tunnel creation via API. Suitable for users with large-scale deployments, one Token for all. Automatically completed: Create tunnel > DNS configuration > Origin settings. Thanks to [zmlu] for providing the method: https://raw.githubusercontent.com/zmlu/sba/main/tunnel.sh; Argo 隧道新增通过 API 创建，适合大量部署的用户，一个 Token 走天下。自动完成：创建隧道 > DNS 配置 > 回源设置。感谢热心网友 [zmlu] 提供的方法: https://raw.githubusercontent.com/zmlu/sba/main/tunnel.sh
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
 <br>
 
+>2026.01.20 v1.3.3 1. Security: In v2rayN, add pinnedPeerCertSha256 for Hysteria2/Trojan to prevent MITM (replaces AllowInsecure); 2. Compatibility: Refactor SFM/SFI/SFA configs for sing-box v1.13.0+; 1. 安全增强：v2rayN 的 Hysteria2/Trojan 支持 pinnedPeerCertSha256 替代 跳过证书验证，防御 MITM 攻击; 2. 适配更新：重构 SFM/SFI/SFA 配置，支持 sing-box v1.13.0+
+>
+>2025.12.11 v1.3.2 Argo tunnel creation via API. Suitable for users with large-scale deployments, one Token for all. Automatically completed: Create tunnel > DNS configuration > Origin settings. Thanks to [zmlu] for providing the method: https://raw.githubusercontent.com/zmlu/sba/main/tunnel.sh; Argo 隧道新增通过 API 创建，适合大量部署的用户，一个 Token 走天下。自动完成：创建隧道 > DNS 配置 > 回源设置。感谢热心网友 [zmlu] 提供的方法: https://raw.githubusercontent.com/zmlu/sba/main/tunnel.sh
+>
 >2025.11.12 v1.3.1 1. Reality Configuration Update: In Reality configurations, the original multiplexing (multiplex) has been replaced with xtls-rprx-vision flow control, improving transmission efficiency, reducing latency, and enhancing security. The original configuration conversion script command remains fully compatible and unchanged — `bash <(curl -sSL https://raw.githubusercontent.com/fscarmen/tools/main/vision.sh)`; 2. Quick Install Mode: Added a one-click installation feature that auto-fills all parameters, simplifying the deployment process. Chinese users can use -l or -L; English users can use -k or -K. Case-insensitive support makes operations more flexible; 3. Custom Reality Key Support: In response to user feedback, you can now specify a custom Reality private key via --REALITY_PRIVATE=<privateKey>. The script will automatically compute the corresponding public key using the integrated API. If left blank, it generates a random private-public key pair in real-time; 4. Enhanced HTTP + Reality Support in Clash Clients: Added full compatibility for HTTP + Reality transport in Clash clients, improving connection stability and performance; 1. Reality 配置变更：在 Reality 配置中，将原来的多路复用（multiplex）替换为 xtls-rprx-vision 流控，提升传输效率、降低延迟并增强安全性。原配置转换脚本命令—— `bash <(curl -sSL https://raw.githubusercontent.com/fscarmen/tools/main/vision.sh)` ; 2. 极速安装模式：新增一键安装功能，所有参数自动填充，简化部署流程。中文用户使用 -l 或 -L，英文用户使用 -k 或 -K，大小写均支持，操作更灵; 3. 自定义 Reality 密钥支持：响应用户反馈，现支持通过 --REALITY_PRIVATE=<privateKey> 指定自定义 Reality 私钥，脚本将调用相关 API 自动计算对应公钥。若留空，则实时生成随机公私钥; 4. HTTP + Reality 在 Clash 客户端的增强支持：补充了对 Clash 客户端中 HTTP + Reality 传输方式的完整兼容，提升了连接稳定性和性能
 >
 >2025.11.10 v1.3.0 Replace multiplex with xtls-rprx-vision flow control in reality configuration. The original configuration conversion script: bash <(curl -sSL https://raw.githubusercontent.com/fscarmen/tools/main/vision.sh); 在 reality 配置中将多路复用 multiplex 替换为 xtls-rprx-vision 流控。原来的配置转换脚本: bash <(curl -sSL https://raw.githubusercontent.com/fscarmen/tools/main/vision.sh)
@@ -694,6 +696,7 @@ SharonNetworks 为您的业务起飞保驾护航！
 * 安全的记忆。您值得信赖的伙伴
 
 * 坚如磐石的数据中心。高枕无忧
+
 
 ## 15.免责声明
 * 本程序仅供学习了解, 非盈利目的，请于下载后 24 小时内删除, 不得用作任何商业用途, 文字、数据及图片均有所属版权, 如转载须注明来源。
