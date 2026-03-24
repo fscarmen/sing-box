@@ -24,6 +24,8 @@
 
 * * *
 ## 1.更新信息
+2026.03.22 v1.3.6 1. Refactor: Support modification after installation (CDN, Reality SNI, node name, UUID/password, server IP); 2. Perf: Rewrite text() with bash nameref and pre-scanned TEXT_NEEDS_EVAL map to eliminate per-call grep subprocesses, significantly reducing repeated string-lookup overhead; 1. 重构：支持安装后多项修改（CDN、Reality SNI、节点名、UUID/密码、服务器 IP）；2. 性能优化：用 bash nameref 和预扫描 TEXT_NEEDS_EVAL 关联数组重写 text() 函数，消除每次调用产生的 grep 子进程，大幅降低字符串查找开销
+
 2026.03.14 v1.3.5 Performance: Optimize concurrent process execution to significantly accelerate script installation. 性能优化：优化并发进程执行，大幅提升脚本安装速度
 
 2026.02.08 v1.3.4 Chore: upgrade SS encryption method to SS-2022 spec; 新装的 Shadowsocks 协议加密方式从 aes-128-gcm 改为 2022-blake3-aes-128-gcm
