@@ -1542,8 +1542,9 @@ sing-box_variables() {
 }
 
 check_dependencies() {
-  # 如果是 Alpine，先升级 wget ，安装 systemctl-py 版
+  # 如果是 Alpine，先升级 wget
   if [ "$SYSTEM" = 'Alpine' ]; then
+    IS_PREFER_GO=true
     local CHECK_WGET=$(wget 2>&1 | sed -n 1p)
     grep -qi 'busybox' <<< "$CHECK_WGET" && ${PACKAGE_INSTALL[int]} wget >/dev/null 2>&1
     local DEPS_CHECK=("bash" "rc-update" "iptables" "ip6tables")
@@ -1556,6 +1557,9 @@ check_dependencies() {
       ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
       ${PACKAGE_INSTALL[int]} ${DEPS_ALPINE[@]} >/dev/null 2>&1
     fi
+  else
+    # 非 Alpine 系统，检查 systemd-resolved 状态，用于 DNS 配置里的 prefer_go 字段
+    [ -x "$(type -p systemctl)" ] && systemctl is-active --quiet systemd-resolved && IS_PREFER_GO=false || IS_PREFER_GO=true
   fi
 
   # 检测 Linux 系统的依赖，升级库并重新安装依赖
@@ -1941,7 +1945,8 @@ EOF
     "dns":{
         "servers":[
             {
-                "type":"local"
+                "type":"local",
+                "prefer_go": ${IS_PREFER_GO}
             }
         ],
         "strategy": "${STRATEGY}"
