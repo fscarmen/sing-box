@@ -21,6 +21,8 @@ CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
 CDN_DOMAIN=("skk.moe" "ip.sb" "time.is" "cfip.xxxxxxxx.tk" "bestcf.top" "cdn.2020111.xyz" "xn--b6gac.eu.org" "cf.090227.xyz")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
 DEFAULT_NEWEST_VERSION='1.13.0-rc.4'
+STEP_NUM=0      # 当前步骤编号（安装流程中动态递增）
+TOTAL_STEPS=''  # 总步骤数（协议确定后动态计算）
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -270,8 +272,8 @@ E[119]="Using Cloudflare API to create Tunnel and handle DNS config..."
 C[119]="使用 Cloudflare API 创建 Tunnel 和处理 DNS 配置..."
 E[120]="Found existing tunnel with the same name. Tunnel ID: \$EXISTING_TUNNEL_ID. Status: \$EXISTING_TUNNEL_STATUS. Overwrite? [y/N] (default y):"
 C[120]="发现同名隧道已创建，隧道 ID: \$EXISTING_TUNNEL_ID，状态: \$EXISTING_TUNNEL_STATUS。是否覆盖? [y/N] (默认为 y):"
-E[121]="Change preferred domain / reality SNI / node info (sb -d)"
-C[121]="更换优选域名 / reality SNI / 节点信息 (sb -d)"
+E[121]="Change preferred domain / TLS SNI / node info (sb -d)"
+C[121]="更换优选域名 / TLS SNI / 节点信息 (sb -d)"
 E[122]="Invalid access token. Please roll at https://dash.cloudflare.com/profile/api-tokens to re-generate."
 C[122]="Token 访问令牌无效。请在 https://dash.cloudflare.com/profile/api-tokens 轮转，以重新获取"
 E[123]="Token zone resource failed. The tunnel root domain and the authorized domain of the token are inconsistent. Please go to https://dash.cloudflare.com/profile/api-tokens to re-authorize."
@@ -300,6 +302,12 @@ E[134]="Please enter new value (press Enter to skip):"
 C[134]="请输入新值 (回车跳过):"
 E[135]="No change was made."
 C[135]="未做任何修改"
+E[136]="Installed protocols."
+C[136]="已安装的协议"
+E[137]="Uninstalled protocols."
+C[137]="未安装的协议"
+E[138]="Confirm all protocols for reloading."
+C[138]="确认重装的所有协议"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -325,13 +333,31 @@ text() {
   fi
 }
 
+# 根据 INSTALL_PROTOCOLS 计算安装流程总步骤数
+# sing-box 协议分类：Reality 类 (b/j/k)、Hysteria2(c)、WS 类 (h/i)
+calc_install_steps() {
+  local _total=5  # 固定步骤：协议选择、起始端口、VPS IP、UUID、节点名
+  local HAS_REALITY=false HAS_WS=false HAS_HY2=false
+  for _P in "${INSTALL_PROTOCOLS[@]}"; do
+    [[ "$_P" =~ ^[bjk]$ ]] && HAS_REALITY=true
+    [[ "$_P" =~ ^[hi]$ ]] && HAS_WS=true
+    [[ "$_P" == 'c' ]] && HAS_HY2=true
+  done
+  [[ "$IS_SUB" = 'is_sub' || "$IS_ARGO" = 'is_argo' ]] && (( _total++ ))  # nginx 端口
+  $HAS_REALITY && (( _total++ ))                # Reality 私钥
+  $HAS_WS && (( _total++ ))                     # CDN / 域名
+  $HAS_HY2 && (( _total++ ))                    # 端口跳跃
+  [ "$IS_ARGO" = 'is_argo' ] && (( _total++ ))  # Argo 域名
+  TOTAL_STEPS=$_total
+}
+
 # 检测是否需要启用 Github CDN，如能直接连通，则不使用
 check_cdn() {
   local PROXY
 
   for PROXY in "" "${GITHUB_PROXY[@]}"; do
     {
-      local CODE=$(wget -qT3 --spider --server-response "${PROXY}https://raw.githubusercontent.com/" 2>&1 | awk '/HTTP\//{code=$2} END{print code}')
+      local CODE=$(wget -qT5 -O /dev/null --server-response "${PROXY}https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh" 2>&1 | awk '/HTTP\//{code=$2} END{print code}')
       [ "$CODE" = "200" ] && [ ! -s "${TEMP_DIR}/cdn_proxy" ] && echo "$PROXY" > "${TEMP_DIR}/cdn_proxy"
     } &
   done
@@ -419,7 +445,7 @@ input_cdn() {
     hint " $(( c+1 )). ${CDN_DOMAIN[c]} "
   done
 
-  reading "\n $(text 53) " CUSTOM_CDN
+  reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 53) " CUSTOM_CDN
   case "$CUSTOM_CDN" in
     [1-${#CDN_DOMAIN[@]}] )
       CDN="${CDN_DOMAIN[$((CUSTOM_CDN-1))]}"
@@ -719,7 +745,7 @@ input_nginx_port() {
     if [ "$PORT_ERROR_TIME" = 0 ]; then
       error "\n $(text 3) \n"
     else
-      [ -z "$PORT_NGINX" ] && reading "\n (3/6) $(text 79) " PORT_NGINX
+      [ -z "$PORT_NGINX" ] && reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 79) " PORT_NGINX
     fi
     PORT_NGINX=${PORT_NGINX:-"$PORT_NGINX_DEFAULT"}
     if [[ "$PORT_NGINX" =~ ^[1-9][0-9]{1,4}$ && "$PORT_NGINX" -ge "$MIN_PORT" && "$PORT_NGINX" -le "$MAX_PORT" ]]; then
@@ -739,10 +765,10 @@ input_hopping_port() {
           error "\n $(text 3) \n"
           ;;
         5 )
-          hint "\n $(text 97) \n" && reading " $(text 98) " PORT_HOPPING_RANGE
+          hint "\n $(text 97) \n" && reading " (${STEP_NUM}/${TOTAL_STEPS}) $(text 98) " PORT_HOPPING_RANGE
           ;;
         * )
-          reading " $(text 98) " PORT_HOPPING_RANGE
+          reading " (${STEP_NUM}/${TOTAL_STEPS}) $(text 98) " PORT_HOPPING_RANGE
       esac
     fi
     if [[ "${PORT_HOPPING_RANGE//-/:}" =~ ^[1-6][0-9]{4}:[1-6][0-9]{4}$ ]]; then
@@ -761,7 +787,7 @@ input_hopping_port() {
 
 # 输入 Reality 密钥
 input_reality_key() {
-  [[ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' && "$IS_FAST_INSTALL" != 'is_fast_install' ]] && [ -z "$REALITY_PRIVATE" ] && reading "\n $(text 70) " REALITY_PRIVATE
+  [[ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' && "$IS_FAST_INSTALL" != 'is_fast_install' ]] && [ -z "$REALITY_PRIVATE" ] && reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 70) " REALITY_PRIVATE
   [ -z "$REALITY_PRIVATE" ] && unset REALITY_PRIVATE && return
 
   local PRIVATEKEY_ERROR_TIME=5
@@ -790,7 +816,7 @@ input_argo_auth() {
       [ -n "$IS_CHANGE_ARGO" ] && ARGO_DOMAIN=$(sed 's/[ ]*//g; s/:[ ]*//' <<< "$ARGO_DOMAIN")
     done
   elif [[ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' && "$IS_FAST_INSTALL" != 'is_fast_install' ]]; then
-    [ -z "$ARGO_DOMAIN" ] && reading "\n $(text 87) " ARGO_DOMAIN
+    [ -z "$ARGO_DOMAIN" ] && reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 87) " ARGO_DOMAIN
     ARGO_DOMAIN=$(sed 's/[ ]*//g; s/:[ ]*//' <<< "$ARGO_DOMAIN")
   fi
 
@@ -1097,7 +1123,7 @@ check_install() {
     STATUS[2]=$(text 26)
   elif [ -s ${WORK_DIR}/nginx.conf ]; then
     # 查 Nginx 进程号，运行时长和内存占用
-    NGINX_VERSION=$(nginx -v 2>&1 | sed "s#.*/#Version: #")
+    NGINX_VERSION=$(nginx -v 2>&1 | sed "s#.*/##; s/ ([^)]*)//" | sed "s@^@Version: &@g")
     NGINX_PID=$(awk '/nginx/{print $1}' <<< "${PS_LIST}")
     if [[ "$NGINX_PID" =~ ^[0-9]+$ ]]; then
       STATUS[2]=$(text 28)
@@ -1376,7 +1402,7 @@ input_start_port() {
     if [ "$PORT_ERROR_TIME" = 0 ]; then
       error "\n $(text 3) \n"
     else
-      [ -z "$START_PORT" ] && reading "\n (2/6) $(text 11) " START_PORT
+      [ -z "$START_PORT" ] && reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 11) " START_PORT
     fi
     START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}
     if [[ "$START_PORT" =~ ^[1-9][0-9]{2,4}$ && "$START_PORT" -ge "$MIN_PORT" && "$START_PORT" -le "$MAX_PORT" ]]; then
@@ -1390,6 +1416,13 @@ input_start_port() {
 
 # 定义 Sing-box 变量
 sing-box_variables() {
+  STEP_NUM=0
+  # 预先用全选协议计算最大总步骤数，用于协议选择提示时显示 (1/?)
+  local _saved_protocols=("${INSTALL_PROTOCOLS[@]}")
+  INSTALL_PROTOCOLS=(b c d e f g h i j k l)
+  calc_install_steps
+  INSTALL_PROTOCOLS=("${_saved_protocols[@]}")
+
   if grep -qi 'cloudflare' <<< "$ASNORG4$ASNORG6"; then
     if grep -qi 'cloudflare' <<< "$ASNORG6" && [ -n "$WAN4" ] && ! grep -qi 'cloudflare' <<< "$ASNORG4"; then
       SERVER_IP_DEFAULT=$WAN4
@@ -1411,8 +1444,9 @@ sing-box_variables() {
 
   # 选择安装的协议，由于选项 a 为全部协议，所以选项数不是从 a 开始，而是从 b 开始，处理输入：把大写全部变为小写，把不符合的选项去掉，把重复的选项合并
   MAX_CHOOSE_PROTOCOLS=$(asc $(( CONSECUTIVE_PORTS+96+1 )))
+  (( STEP_NUM++ )) || true
   if [ -z "$CHOOSE_PROTOCOLS" ]; then
-    hint "\n (1/6) $(text 49) "
+    hint "\n (${STEP_NUM}/${TOTAL_STEPS:-?}) $(text 49) "
     for e in "${!PROTOCOL_LIST[@]}"; do
       hint " $(asc $(( e+98 ))). ${PROTOCOL_LIST[e]} "
     done
@@ -1422,8 +1456,12 @@ sing-box_variables() {
   # 对选择协议的输入处理逻辑：先把所有的大写转为小写，并把所有没有去选项剔除掉，最后按输入的次序排序。如果选项为 a(all) 和其他选项并存，将会忽略 a，如 abc 则会处理为 bc
   [[ ! "${CHOOSE_PROTOCOLS,,}" =~ [b-$MAX_CHOOSE_PROTOCOLS] ]] && INSTALL_PROTOCOLS=($(eval echo {b..$MAX_CHOOSE_PROTOCOLS})) || INSTALL_PROTOCOLS=($(grep -o . <<< "$CHOOSE_PROTOCOLS" | sed "/[^b-$MAX_CHOOSE_PROTOCOLS]/d" | awk '!seen[$0]++'))
 
+  # 协议已确定，按实际选择重新计算总步骤数
+  calc_install_steps
+
   # 显示选择协议及其次序，输入开始端口号
   if [ -z "$START_PORT" ]; then
+    (( STEP_NUM++ )) || true
     hint "\n $(text 60) "
     for w in "${!INSTALL_PROTOCOLS[@]}"; do
       [ "$w" -ge 9 ] && hint " $(( w+1 )). ${PROTOCOL_LIST[$(($(asc ${INSTALL_PROTOCOLS[w]}) - 98))]} " || hint " $(( w+1 )) . ${PROTOCOL_LIST[$(($(asc ${INSTALL_PROTOCOLS[w]}) - 98))]} "
@@ -1432,14 +1470,20 @@ sing-box_variables() {
   fi
 
   # 输出模式选择，输入用于订阅的 Nginx 服务端口号， 后台根据选择安装依赖
-  [[ "$IS_SUB" = 'is_sub' || "$IS_ARGO" = 'is_argo' ]] && input_nginx_port
+  if [[ "$IS_SUB" = 'is_sub' || "$IS_ARGO" = 'is_argo' ]]; then
+    (( STEP_NUM++ )) || true
+    input_nginx_port
+  fi
 
   # 输入服务器 IP,默认为检测到的服务器 IP，如果全部为空，则提示并退出脚本
   if [ "$IS_FAST_INSTALL" = 'is_fast_install' ]; then
     grep -q '^$' <<< "$SERVER_IP" && grep -q '.' <<< "$WAN4" && SERVER_IP=$WAN4
     grep -q '^$' <<< "$SERVER_IP" && grep -q '.' <<< "$WAN6" && SERVER_IP=$WAN6
   fi
-  [ -z "$SERVER_IP" ] && reading "\n (4/6) $(text 10) " SERVER_IP
+  if [ -z "$SERVER_IP" ]; then
+    (( STEP_NUM++ )) || true
+    reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 10) " SERVER_IP
+  fi
   SERVER_IP=${SERVER_IP:-"$SERVER_IP_DEFAULT"} && WS_SERVER_IP_SHOW=$SERVER_IP
   [ -z "$SERVER_IP" ] && error " $(text 47) "
 
@@ -1478,15 +1522,24 @@ sing-box_variables() {
   [ "$(check_chatgpt $(grep -oE '[46]' <<< "$STRATEGY"))" = 'unlock' ] && CHATGPT_OUT=direct
 
   # 如果选择有 b j k 这些 reality 协议，自定义 reality 公私钥，如果没有则自动生成
-  [ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' ] && [[ "${INSTALL_PROTOCOLS[@]}" =~ 'b'|'j'|'k' ]] && input_reality_key
+  if [ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' ] && [[ "${INSTALL_PROTOCOLS[@]}" =~ 'b'|'j'|'k' ]]; then
+    (( STEP_NUM++ )) || true
+    input_reality_key
+  fi
 
   # 如选择有 c. hysteria2 时，选择是否使用端口跳跃
-  [[ "${INSTALL_PROTOCOLS[@]}" =~ 'c' ]] && input_hopping_port
+  if [[ "${INSTALL_PROTOCOLS[@]}" =~ 'c' ]]; then
+    (( STEP_NUM++ )) || true
+    input_hopping_port
+  fi
 
   # 如选择有 h. vmess + ws 或 i. vless + ws 时，先检测是否有支持的 http 端口可用，如有则要求输入域名和 cdn
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ 'h' ]]; then
     if [ "$IS_ARGO" = 'is_argo' ]; then
-      [ "$ARGO_READY" != 'argo_ready' ] && input_argo_auth is_install
+      if [ "$ARGO_READY" != 'argo_ready' ]; then
+        (( STEP_NUM++ )) || true
+        input_argo_auth is_install
+      fi
       local ARGO_READY=argo_ready
     else
       local DOMAIN_ERROR_TIME=5
@@ -1499,7 +1552,10 @@ sing-box_variables() {
 
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ 'i' ]]; then
     if [ "$IS_ARGO" = 'is_argo' ]; then
-      [ "$ARGO_READY" != 'argo_ready' ] && input_argo_auth is_install
+      if [ "$ARGO_READY" != 'argo_ready' ]; then
+        (( STEP_NUM++ )) || true
+        input_argo_auth is_install
+      fi
       local ARGO_READY=argo_ready
     else
       local DOMAIN_ERROR_TIME=5
@@ -1511,12 +1567,18 @@ sing-box_variables() {
   fi
 
   # 选择或者输入 cdn
-  [[ -z "$CDN" && -n "${VMESS_HOST_DOMAIN}${VLESS_HOST_DOMAIN}${ARGO_READY}" ]] && input_cdn
+  if [[ -z "$CDN" && -n "${VMESS_HOST_DOMAIN}${VLESS_HOST_DOMAIN}${ARGO_READY}" ]]; then
+    (( STEP_NUM++ )) || true
+    input_cdn
+  fi
 
   # 输入 UUID ，错误超过 5 次将会退出
   UUID_DEFAULT=$(cat /proc/sys/kernel/random/uuid)
   [ "$IS_FAST_INSTALL" = 'is_fast_install' ] && UUID_CONFIRM="$UUID_DEFAULT"
-  [ -z "$UUID_CONFIRM" ] && reading "\n (5/6) $(text 12) " UUID_CONFIRM
+  if [ -z "$UUID_CONFIRM" ]; then
+    (( STEP_NUM++ )) || true
+    reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 12) " UUID_CONFIRM
+  fi
   local UUID_ERROR_TIME=5
   until [[ -z "$UUID_CONFIRM" || "${UUID_CONFIRM,,}" =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ ]]; do
     (( UUID_ERROR_TIME-- )) || true
@@ -1536,7 +1598,10 @@ sing-box_variables() {
       local NODE_NAME_DEFAULT="${EMOJI}Sing-Box"
     fi
     [ "$IS_FAST_INSTALL" = 'is_fast_install' ] && NODE_NAME_CONFIRM="${NODE_NAME_DEFAULT}"
-    [ -z "$NODE_NAME_CONFIRM" ] && reading "\n (6/6) $(text 13) " NODE_NAME
+    if [ -z "$NODE_NAME_CONFIRM" ]; then
+      (( STEP_NUM++ )) || true
+      reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 13) " NODE_NAME
+    fi
     grep -q '^$' <<< "$NODE_NAME" && NODE_NAME_CONFIRM="$NODE_NAME_DEFAULT" || NODE_NAME_CONFIRM="${EMOJI}${NODE_NAME}"
   fi
 }
@@ -3476,7 +3541,7 @@ change_protocols() {
   for f in ${!NODE_TAG[@]}; do [[ $INSTALLED_PROTOCOLS_LIST =~ "${NODE_TAG[f]}" ]] && EXISTED_PROTOCOLS+=("${PROTOCOL_LIST[f]}") || NOT_EXISTED_PROTOCOLS+=("${PROTOCOL_LIST[f]}"); done
 
   # 列出已安装协议
-  hint "\n $(text 63) (${#EXISTED_PROTOCOLS[@]})"
+  hint "\n $(text 136) (${#EXISTED_PROTOCOLS[@]})"
   for h in "${!EXISTED_PROTOCOLS[@]}"; do
     hint " $(asc $(( h+97 ))). ${EXISTED_PROTOCOLS[h]} "
   done
@@ -3496,7 +3561,7 @@ change_protocols() {
 
   # 如有未安装的协议，列表显示并选择安装，把增加的协议存在放在 ADD_PROTOCOLS
   if [ "${#NOT_EXISTED_PROTOCOLS[@]}" -gt 0 ]; then
-    hint "\n $(text 65) (${#NOT_EXISTED_PROTOCOLS[@]}) "
+    hint "\n $(text 137) (${#NOT_EXISTED_PROTOCOLS[@]}) "
     for i in "${!NOT_EXISTED_PROTOCOLS[@]}"; do
       hint " $(asc $(( i+97 ))). ${NOT_EXISTED_PROTOCOLS[i]} "
     done
@@ -3514,7 +3579,7 @@ change_protocols() {
   [ "${#REINSTALL_PROTOCOLS[@]}" = 0 ] && error "\n $(text 73) "
 
   # 显示重新安装的协议列表，并确认是否正确
-  hint "\n $(text 67) (${#REINSTALL_PROTOCOLS[@]}) "
+  hint "\n $(text 138) (${#REINSTALL_PROTOCOLS[@]}) "
   [ "${#KEEP_PROTOCOLS[@]}" -gt 0 ] && hint "\n $(text 74) (${#KEEP_PROTOCOLS[@]}) "
   for r in "${!KEEP_PROTOCOLS[@]}"; do
     hint " $[r+1]. ${KEEP_PROTOCOLS[r]} "
@@ -3988,7 +4053,19 @@ menu() {
   info " $(text 17): $VERSION\n $(text 18): $(text 1)\n $(text 19):\n\t $(text 20): $SYS\n\t $(text 21): $(uname -r)\n\t $(text 22): $SING_BOX_ARCH\n\t $(text 23): $VIRT "
   info "\t IPv4: $WAN4 $WARPSTATUS4 $COUNTRY4  $ASNORG4 "
   info "\t IPv6: $WAN6 $WARPSTATUS6 $COUNTRY6  $ASNORG6 "
-  info "\t Sing-box: ${STATUS[0]}\t $SING_BOX_VERSION\t\t $SING_BOX_MEMORY_USAGE\n\t Argo: ${STATUS[1]}\t $ARGO_VERSION\t\t $ARGO_MEMORY_USAGE\n \t Nginx: ${STATUS[2]}\t $NGINX_VERSION\t $NGINX_MEMORY_USAGE "
+  # 对齐显示：中文双宽字符按字符数补空格，英文按最长状态词 "Not install"(11字符) 定宽
+  _sv() {
+    local s="$1"
+    if [ "$L" = 'C' ]; then
+      [ "${#s}" -le 2 ] && printf '%s  ' "$s" || printf '%s' "$s"
+    else
+      printf '%-11s' "$s"
+    fi
+  }
+  local _SBV; printf -v _SBV '%-26s' "$SING_BOX_VERSION"
+  local _AV;  printf -v _AV  '%-26s' "$ARGO_VERSION"
+  local _NV;  printf -v _NV  '%-26s' "$NGINX_VERSION"
+  info "\t Sing-box: $(_sv "${STATUS[0]}")  ${_SBV}${SING_BOX_MEMORY_USAGE}\n\t Argo:     $(_sv "${STATUS[1]}")  ${_AV}${ARGO_MEMORY_USAGE}\n\t Nginx:    $(_sv "${STATUS[2]}")  ${_NV}${NGINX_MEMORY_USAGE}"
   echo -e "\n======================================================================================================================\n"
   for ((b=1;b<=${#OPTION[*]};b++)); do [ "$b" = "${#OPTION[*]}" ] && hint " ${OPTION[0]} " || hint " ${OPTION[b]} "; done
   reading "\n $(text 24) " CHOOSE

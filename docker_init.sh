@@ -632,8 +632,6 @@ EOF
     "inbounds":[
         {
             "type":"vless",
-            "sniff":true,
-            "sniff_override_destination":true,
             "tag":"${NODE_NAME} grpc-reality",
             "listen":"::",
             "listen_port":${PORT_GRPC_REALITY},

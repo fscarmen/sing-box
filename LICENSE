@@ -632,7 +632,7 @@ state the exclusion of warranty; and each file should have at least
 the "copyright" line and a pointer to where the full notice is found.
 
     sing-box script - Deploy and manage Sing-box's multi-protocol stack (Reality, Hysteria2, etc.) with integrated Cloudflare Argo Tunnel.
-    Copyright (C) 2023–2025  fscarmen
+    Copyright (C) 2023–2026  fscarmen
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
