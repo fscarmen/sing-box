@@ -4,7 +4,7 @@
 VERSION='v1.3.6 (2026.03.22)'
 
 # Github 反代加速代理
-GITHUB_PROXY=('https://v6.gh-proxy.org/' 'https://gh-proxy.com/' 'https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/' 'https://ghproxy.lvedong.eu.org/')
+GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
 
 # 各变量默认值
 TEMP_DIR='/tmp/sing-box'
@@ -26,9 +26,20 @@ TOTAL_STEPS=''  # 总步骤数（协议确定后动态计算）
 
 export DEBIAN_FRONTEND=noninteractive
 
-trap "wait 2>/dev/null; rm -rf $TEMP_DIR >/dev/null 2>&1; echo -e '\n'; exit" INT QUIT TERM EXIT
+cleanup_temp() {
+  rm -rf "$TEMP_DIR"
+}
 
-mkdir -p $TEMP_DIR
+on_interrupt_exit() {
+  cleanup_temp
+  echo -e '\n'
+  exit 1
+}
+
+trap cleanup_temp EXIT
+trap on_interrupt_exit INT QUIT TERM
+
+mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
@@ -351,27 +362,44 @@ calc_install_steps() {
   TOTAL_STEPS=$_total
 }
 
-# 检测是否需要启用 Github CDN，如能直接连通，则不使用
+# 检测是否需要启用 Github CDN，如能直接连通 api.github.com，则不使用
 check_cdn() {
-  local PROXY
+  local PROXY CODE PID
+  local _WAIT_COUNT=120
+  local PIDS=()
+  local API_URL='https://api.github.com/repos/SagerNet/sing-box/releases'
 
-  for PROXY in "" "${GITHUB_PROXY[@]}"; do
+  CODE=$(wget --no-check-certificate -qT3 -O /dev/null --server-response "$API_URL" 2>&1 | awk '/HTTP\//{code=$2} END{print code}')
+  if [ "$CODE" = '200' ]; then
+    GH_PROXY=''
+    return
+  fi
+
+  for PROXY in "${GITHUB_PROXY[@]}"; do
     {
-      local CODE=$(wget -qT5 -O /dev/null --server-response "${PROXY}https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh" 2>&1 | awk '/HTTP\//{code=$2} END{print code}')
-      [ "$CODE" = "200" ] && [ ! -s "${TEMP_DIR}/cdn_proxy" ] && echo "$PROXY" > "${TEMP_DIR}/cdn_proxy"
+      CODE=$(wget --no-check-certificate -qT3 -O /dev/null --server-response "${PROXY}${API_URL}" 2>&1 | awk '/HTTP\//{code=$2} END{print code}')
+      [ "$CODE" = '200' ] && [ ! -e "${TEMP_DIR}/cdn_proxy" ] && printf '%s' "$PROXY" > "${TEMP_DIR}/cdn_proxy"
     } &
+    PIDS+=("$!")
   done
 
-  # 等第一个成功
-  while [ ! -s "${TEMP_DIR}/cdn_proxy" ]; do
+  # 等第一个返回 200 的代理，超时则回退为直连，避免无限等待卡死
+  while [ ! -e "${TEMP_DIR}/cdn_proxy" ] && [ "$_WAIT_COUNT" -gt 0 ]; do
     sleep 0.05
+    (( _WAIT_COUNT-- )) || true
   done
 
-  GH_PROXY=$(cat "${TEMP_DIR}/cdn_proxy")
+  if [ -e "${TEMP_DIR}/cdn_proxy" ]; then
+    GH_PROXY=$(cat "${TEMP_DIR}/cdn_proxy")
+  else
+    GH_PROXY=''
+  fi
 
-  # 清理后台任务和临时文件
-  rm -rf "${TEMP_DIR}/cdn_proxy"
-  wait 2>/dev/null
+  # 清理后台任务和临时文件，避免 wait 被慢连接拖住
+  for PID in "${PIDS[@]}"; do
+    kill "$PID" >/dev/null 2>&1 || true
+  done
+  rm -f "${TEMP_DIR}/cdn_proxy"
 }
 
 # 检测是否解锁 chatGPT，以决定是否使用 warp 链式代理或者是 direct out，此处判断改编自 https://github.com/lmc999/RegionRestrictionCheck
@@ -1407,7 +1435,7 @@ input_start_port() {
     START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}
     if [[ "$START_PORT" =~ ^[1-9][0-9]{2,4}$ && "$START_PORT" -ge "$MIN_PORT" && "$START_PORT" -le "$MAX_PORT" ]]; then
       for port in $(eval echo {$START_PORT..$[START_PORT+NUM-1]}); do
-      ss -nltup | grep -q ":$port" && IN_USED+=("$port")
+        ss -nltup | grep -q ":$port" && IN_USED+=("$port")
       done
       [ "${#IN_USED[*]}" -eq 0 ] && break || warning "\n $(text 44) \n"
     fi
