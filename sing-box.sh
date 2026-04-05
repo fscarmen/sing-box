@@ -364,20 +364,42 @@ calc_install_steps() {
 
 # 检测是否需要启用 Github CDN，如能直接连通 api.github.com，则不使用
 check_cdn() {
-  local PROXY CODE PID
+  local PROXY CODE PID CMD
   local _WAIT_COUNT=120
   local PIDS=()
   local API_URL='https://api.github.com/repos/SagerNet/sing-box/releases'
 
-  CODE=$(wget --no-check-certificate -qT3 -O /dev/null --server-response "$API_URL" 2>&1 | awk '/HTTP\//{code=$2} END{print code}')
+  # 确定下载工具：优先 wget，次选 curl
+  if command -v wget >/dev/null 2>&1; then
+    CMD='wget'
+  elif command -v curl >/dev/null 2>&1; then
+    CMD='curl'
+  else
+    GH_PROXY=''
+    return
+  fi
+
+  # 获取 HTTP 状态码
+  get_code() {
+    local url=$1
+    if [ "$CMD" = 'wget' ]; then
+      wget -qT5 -O /dev/null --server-response "$url" 2>&1 | awk '/HTTP\//{code=$2} END{print code}'
+    else
+      curl -skL -w "%{http_code}" "$url" -o /dev/null
+    fi
+  }
+
+  # 直连检测
+  CODE=$(get_code "$API_URL")
   if [ "$CODE" = '200' ]; then
     GH_PROXY=''
     return
   fi
 
+  # 并发探测代理
   for PROXY in "${GITHUB_PROXY[@]}"; do
     {
-      CODE=$(wget --no-check-certificate -qT3 -O /dev/null --server-response "${PROXY}${API_URL}" 2>&1 | awk '/HTTP\//{code=$2} END{print code}')
+      CODE=$(get_code "${PROXY}${API_URL}")
       [ "$CODE" = '200' ] && [ ! -e "${TEMP_DIR}/cdn_proxy" ] && printf '%s' "$PROXY" > "${TEMP_DIR}/cdn_proxy"
     } &
     PIDS+=("$!")
@@ -389,16 +411,11 @@ check_cdn() {
     (( _WAIT_COUNT-- )) || true
   done
 
-  if [ -e "${TEMP_DIR}/cdn_proxy" ]; then
-    GH_PROXY=$(cat "${TEMP_DIR}/cdn_proxy")
-  else
-    GH_PROXY=''
-  fi
+  [ -e "${TEMP_DIR}/cdn_proxy" ] && GH_PROXY=$(cat "${TEMP_DIR}/cdn_proxy") || GH_PROXY=''
 
-  # 清理后台任务和临时文件，避免 wait 被慢连接拖住
-  for PID in "${PIDS[@]}"; do
-    kill "$PID" >/dev/null 2>&1 || true
-  done
+  # 清理后台任务和临时文件
+  for PID in "${PIDS[@]}"; do kill "$PID" >/dev/null 2>&1 || true; done
+  for PID in "${PIDS[@]}"; do wait "$PID" 2>/dev/null || true; done
   rm -f "${TEMP_DIR}/cdn_proxy"
 }
 
@@ -979,8 +996,8 @@ check_arch() {
 
 # 检查系统是否已经安装 tcp-brutal
 check_brutal() {
-  IS_BRUTAL=false && [ -x "$(type -p lsmod)" ] && lsmod 2>/dev/null | grep -q 'brutal' && IS_BRUTAL=true
-  [ "$IS_BRUTAL" = 'false' ] && [ -x "$(type -p modprobe)" ] && modprobe brutal 2>/dev/null && IS_BRUTAL=true
+  IS_BRUTAL=false && command -v lsmod >/dev/null 2>&1 && lsmod 2>/dev/null | grep -q 'brutal' && IS_BRUTAL=true
+  [ "$IS_BRUTAL" = 'false' ] && command -v modprobe >/dev/null 2>&1 && modprobe brutal 2>/dev/null && IS_BRUTAL=true
 }
 
 # 查安装及运行状态，下标0: sing-box，下标1: argo，下标2: nginx；状态码: 26 未安装， 27 已安装未运行， 28 运行中
@@ -1147,7 +1164,7 @@ check_install() {
   fi
 
   # 检查 Nginx 状态
-  if [ ! -x "$(type -p nginx)" ]; then
+  if ! command -v nginx >/dev/null 2>&1; then
     STATUS[2]=$(text 26)
   elif [ -s ${WORK_DIR}/nginx.conf ]; then
     # 查 Nginx 进程号，运行时长和内存占用
@@ -1167,7 +1184,7 @@ check_install() {
 # 为了适配 alpine，定义 cmd_systemctl 的函数
 cmd_systemctl() {
   nginx_run() {
-    $(type -p nginx) -c $WORK_DIR/nginx.conf
+    $(command -v nginx) -c $WORK_DIR/nginx.conf
   }
 
   nginx_stop() {
@@ -1200,17 +1217,15 @@ cmd_systemctl() {
         if [ "$IS_CENTOS" = 'CentOS7' ] && [ "$2" = 'sing-box' ] && [ -s $WORK_DIR/nginx.conf ]; then
           if [ "$1" = 'enable' ]; then
             nginx_run
-            firewall_configuration open
           else
             nginx_stop
-            firewall_configuration close
           fi
         fi
         ;;
       restart )
-        [ "$IS_CENTOS" = 'CentOS7' ] && [ "$2" = 'sing-box' ] && [ -s $WORK_DIR/nginx.conf ] && { nginx_stop; firewall_configuration close; }
+        [ "$IS_CENTOS" = 'CentOS7' ] && [ "$2" = 'sing-box' ] && [ -s $WORK_DIR/nginx.conf ] && nginx_stop
         systemctl restart "$2" >/dev/null 2>&1
-        [ "$IS_CENTOS" = 'CentOS7' ] && [ "$2" = 'sing-box' ] && [ -s $WORK_DIR/nginx.conf ] && { nginx_run; firewall_configuration open; }
+        [ "$IS_CENTOS" = 'CentOS7' ] && [ "$2" = 'sing-box' ] && [ -s $WORK_DIR/nginx.conf ] && nginx_run
         ;;
       status )
         systemctl is-active "$2"
@@ -1224,8 +1239,8 @@ cmd_systemctl() {
 
 check_system_info() {
   [ -s /etc/os-release ] && SYS="$(awk -F '"' 'tolower($0) ~ /pretty_name/{print $2}' /etc/os-release)"
-  [[ -z "$SYS" && -x "$(type -p hostnamectl)" ]] && SYS="$(hostnamectl | awk -F ': ' 'tolower($0) ~ /operating system/{print $2}')"
-  [[ -z "$SYS" && -x "$(type -p lsb_release)" ]] && SYS="$(lsb_release -sd)"
+  [[ -z "$SYS" ]] && command -v hostnamectl >/dev/null 2>&1 && SYS="$(hostnamectl | awk -F ': ' 'tolower($0) ~ /operating system/{print $2}')"
+  [[ -z "$SYS" ]] && command -v lsb_release >/dev/null 2>&1 && SYS="$(lsb_release -sd)"
   [[ -z "$SYS" && -s /etc/lsb-release ]] && SYS="$(awk -F '"' 'tolower($0) ~ /distrib_description/{print $2}' /etc/lsb-release)"
   [[ -z "$SYS" && -s /etc/redhat-release ]] && SYS="$(cat /etc/redhat-release)"
   [[ -z "$SYS" && -s /etc/issue ]] && SYS="$(sed -E '/^$|^\\/d' /etc/issue | awk -F '\\' '{print $1}' | sed 's/[ ]*$//g')"
@@ -1244,7 +1259,7 @@ check_system_info() {
 
   # 针对各厂商的订制系统
   if [ -z "$SYSTEM" ]; then
-    [ -x "$(type -p yum)" ] && int=2 && SYSTEM='CentOS' || error " $(text 5) "
+    command -v yum >/dev/null 2>&1 && int=2 && SYSTEM='CentOS' || error " $(text 5) "
   fi
 
   # 先排除 EXCLUDE 里包括的特定系统，其他系统需要作大发行版本的比较
@@ -1261,17 +1276,17 @@ check_system_info() {
   fi
 
   # 判断虚拟化
-  if [ -x "$(type -p systemd-detect-virt)" ]; then
+  if command -v systemd-detect-virt >/dev/null 2>&1; then
     VIRT=$(systemd-detect-virt)
   elif grep -qa container= /proc/1/environ 2>/dev/null; then
     VIRT=$(tr '\0' '\n' </proc/1/environ | awk -F= '/container=/{print $2; exit}')
   elif grep -Eq '(lxc|docker|kubepods|containerd)' /proc/1/cgroup 2>/dev/null; then
     VIRT=$(grep -Eo '(lxc|docker|kubepods|containerd)' /proc/1/cgroup | sed -n 1p)
-  elif [ -x "$(type -p hostnamectl)" ]; then
+  elif command -v hostnamectl >/dev/null 2>&1; then
     VIRT=$(hostnamectl | awk '/Virtualization/{print $NF}')
   else
-    [ -x "$(type -p virt-what)" ] && ${PACKAGE_INSTALL[int]} virt-what >/dev/null 2>&1
-    [ -x "$(type -p virt-what)" ] && VIRT=$(virt-what | sed -n 1p) || VIRT=unknown
+    command -v virt-what >/dev/null 2>&1 && ${PACKAGE_INSTALL[int]} virt-what >/dev/null 2>&1
+    command -v virt-what >/dev/null 2>&1 && VIRT=$(virt-what | sed -n 1p) || VIRT=unknown
   fi
 }
 
@@ -1299,44 +1314,39 @@ add_port_hopping_nat() {
   local PORT_HOPPING_START=$1
   local PORT_HOPPING_END=$2
   local PORT_HOPPING_TARGET=$3
+  local COMMENT="NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)"
 
-  # 检测防火墙依赖和状态
+  install_firewall_deps
+
   if [ "$SYSTEM" = 'Alpine' ]; then
     # 添加防火墙规则
-    iptables --table nat -A PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
-    ip6tables --table nat -A PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    iptables  --table nat -A PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "$COMMENT" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    ip6tables --table nat -A PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "$COMMENT" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
 
     # 将 iptables, ip6tables 添加到默认运行级别
-    rc-update show default | grep -q 'iptables' || rc-update add iptables >/dev/null 2>&1
+    rc-update show default | grep -q 'iptables'  || rc-update add iptables  >/dev/null 2>&1
     rc-update show default | grep -q 'ip6tables' || rc-update add ip6tables >/dev/null 2>&1
     rc-update show default | grep -q 'iptables' && rc-update show default | grep -q 'ip6tables' || warning "\n $(text 96) \n"
 
     # 保存当前的 iptables, ip6tables 规则集，以便在开机时恢复
-    rc-service iptables save >/dev/null 2>&1
+    rc-service iptables  save >/dev/null 2>&1
     rc-service ip6tables save >/dev/null 2>&1
 
-  elif [ -x "$(type -p firewalld)" ]; then
-    [ "$(systemctl is-active firewalld)" != 'active' ] && systemctl enable --now firewalld >/dev/null 2>&1
-    if [ "$(firewall-cmd --query-masquerade --permanent)" != 'yes' ] ; then
-      firewall-cmd --add-masquerade --permanent >/dev/null 2>&1
+  elif command -v firewalld >/dev/null 2>&1 || [ "$SYSTEM" = 'CentOS' ]; then
+    if [ "$(firewall-cmd --zone=public --query-masquerade --permanent 2>/dev/null)" != 'yes' ]; then
+      firewall-cmd --zone=public --add-masquerade --permanent >/dev/null 2>&1
       firewall-cmd --reload >/dev/null 2>&1
-      [ "$(firewall-cmd --query-masquerade --permanent)" = 'yes' ] && info "\n firewalld masquerade $(text 28) $(text 37) \n" || warning "\n firewalld masquerade $(text 28) $(text 38) \n"
+      [ "$(firewall-cmd --zone=public --query-masquerade --permanent 2>/dev/null)" = 'yes' ] && info "\n firewalld masquerade $(text 28) $(text 37) \n" || warning "\n firewalld masquerade $(text 28) $(text 38) \n"
     fi
 
     # 添加防火墙规则
-    firewall-cmd --add-forward-port=port=$PORT_HOPPING_START-$PORT_HOPPING_END:proto=udp:toport=${PORT_HOPPING_TARGET} --permanent >/dev/null 2>&1
+    firewall-cmd --zone=public --add-forward-port=port=${PORT_HOPPING_START}-${PORT_HOPPING_END}:proto=udp:toport=${PORT_HOPPING_TARGET} --permanent >/dev/null 2>&1
     firewall-cmd --reload >/dev/null 2>&1
 
   else
-    if [ ! -x "$(type -p netfilter-persistent)" ]; then
-      info "\n $(text 7) iptables-persistent"
-      ${PACKAGE_INSTALL[int]} iptables-persistent >/dev/null 2>&1
-    fi
-    [ -x "$(type -p netfilter-persistent)" ] || warning "\n $(text 95) \n"
-
     # 添加防火墙规则
-    iptables --table nat -A PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
-    ip6tables --table nat -A PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    iptables  --table nat -A PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "$COMMENT" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    ip6tables --table nat -A PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "$COMMENT" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
 
     # 保存当前的 iptables, ip6tables 规则集，以便在开机时恢复
     [ "$(systemctl is-active netfilter-persistent)" != 'active' ] && warning "\n $(text 96) \n" || netfilter-persistent save 2>/dev/null
@@ -1344,36 +1354,45 @@ add_port_hopping_nat() {
 }
 
 # 删除端口跳跃
-del_port_hopping_nat(){
+del_port_hopping_nat() {
   check_port_hopping_nat
+  [ -z "$PORT_HOPPING_START" ] && return
   if [ "$SYSTEM" = 'Alpine' ]; then
-    iptables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
-    ip6tables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
-  elif [ "$(systemctl is-active firewalld)" = 'active' ]; then
-    firewall-cmd --permanent --remove-forward-port=port=${PORT_HOPPING_START}-${PORT_HOPPING_END}:proto=udp:toport=${PORT_HOPPING_TARGET} >/dev/null 2>&1
+    local COMMENT="NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)"
+    iptables  --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "$COMMENT" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    ip6tables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "$COMMENT" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+  elif command -v firewalld >/dev/null 2>&1 || [ "$SYSTEM" = 'CentOS' ]; then
+    firewall-cmd --zone=public --permanent --remove-forward-port=port=${PORT_HOPPING_START}-${PORT_HOPPING_END}:proto=udp:toport=${PORT_HOPPING_TARGET} >/dev/null 2>&1
     firewall-cmd --reload >/dev/null 2>&1
   else
-    iptables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
-    ip6tables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    local COMMENT="NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)"
+    iptables  --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "$COMMENT" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    ip6tables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "$COMMENT" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
     [ "$(systemctl is-active netfilter-persistent)" = 'active' ] && netfilter-persistent save 2>/dev/null
   fi
 }
 
 # 查端口跳跃的 dnat 端口
 check_port_hopping_nat() {
-  PORT_HOPPING_TARGET=$(awk -F [:,] '/"listen_port"/{print $2}' ${WORK_DIR}/conf/*${NODE_TAG[1]}_inbounds.json)
+  unset PORT_HOPPING_START PORT_HOPPING_END PORT_HOPPING_RANGE
+  PORT_HOPPING_TARGET=$(awk -F '[:,]' '/"listen_port"/{print $2}' ${WORK_DIR}/conf/*${NODE_TAG[1]}_inbounds.json 2>/dev/null)
   if [ "$SYSTEM" = 'Alpine' ]; then
     local IPTABLES_PREROUTING_LIST=$(iptables --table nat --list-rules PREROUTING 2>/dev/null | grep 'Sing-box Family Bucket')
-    [ -n "$IPTABLES_PREROUTING_LIST" ] && PORT_HOPPING_RANGE=$(awk '{for (i=0; i<NF; i++) if ($i=="--dport") {print $(i+1); exit}}' <<< "$IPTABLES_PREROUTING_LIST") && PORT_HOPPING_TARGET=$(awk '{for (i=0; i<NF; i++) if ($i=="to") {print $(i+1); exit}}' <<< "$IPTABLES_PREROUTING_LIST")
+    [ -n "$IPTABLES_PREROUTING_LIST" ] && \
+      PORT_HOPPING_RANGE=$(awk '{for (i=0; i<NF; i++) if ($i=="--dport") {print $(i+1); exit}}' <<< "$IPTABLES_PREROUTING_LIST") && \
+      PORT_HOPPING_TARGET=$(awk '{for (i=0; i<NF; i++) if ($i=="to") {print $(i+1); exit}}' <<< "$IPTABLES_PREROUTING_LIST")
     [ -n "$PORT_HOPPING_RANGE" ] && PORT_HOPPING_START=${PORT_HOPPING_RANGE%:*} && PORT_HOPPING_END=${PORT_HOPPING_RANGE#*:}
-  elif [ "$(systemctl is-active firewalld)" = 'active' ]; then
-    local FIREWALL_LIST=$(firewall-cmd --list-all --permanent | grep "toport=${PORT_HOPPING_TARGET}")
-    [ -n "$FIREWALL_LIST" ] && PORT_HOPPING_START=$(sed "s/.*port=\([^-]\+\)-.*toport.*/\1/" <<< "$FIREWALL_LIST") &&
-    PORT_HOPPING_END=$(sed "s/.*port=$PORT_HOPPING_START-\([^:]\+\):.*toport.*/\1/" <<< "$FIREWALL_LIST") &&
-    PORT_HOPPING_TARGET=$(sed "s/.*toport=\([^:]\+\):.*/\1/" <<< "$FIREWALL_LIST")
+  elif command -v firewalld >/dev/null 2>&1 || [ "$SYSTEM" = 'CentOS' ]; then
+    local FIREWALL_LIST=$(firewall-cmd --zone=public --list-all --permanent 2>/dev/null | grep "toport=${PORT_HOPPING_TARGET}")
+    [ -n "$FIREWALL_LIST" ] && \
+      PORT_HOPPING_START=$(sed "s/.*port=\([^-]\+\)-.*toport.*/\1/" <<< "$FIREWALL_LIST") && \
+      PORT_HOPPING_END=$(sed "s/.*port=${PORT_HOPPING_START}-\([^:]\+\):.*toport.*/\1/" <<< "$FIREWALL_LIST") && \
+      PORT_HOPPING_TARGET=$(sed "s/.*toport=\([^:]\+\):.*/\1/" <<< "$FIREWALL_LIST")
   else
     local IPTABLES_PREROUTING_LIST=$(iptables --table nat --list-rules PREROUTING 2>/dev/null | grep 'Sing-box Family Bucket')
-    [ -n "$IPTABLES_PREROUTING_LIST" ] && PORT_HOPPING_RANGE=$(awk '{for (i=0; i<NF; i++) if ($i=="--dport") {print $(i+1); exit}}' <<< "$IPTABLES_PREROUTING_LIST") && PORT_HOPPING_TARGET=$(awk '{for (i=0; i<NF; i++) if ($i=="to") {print $(i+1); exit}}' <<< "$IPTABLES_PREROUTING_LIST")
+    [ -n "$IPTABLES_PREROUTING_LIST" ] && \
+      PORT_HOPPING_RANGE=$(awk '{for (i=0; i<NF; i++) if ($i=="--dport") {print $(i+1); exit}}' <<< "$IPTABLES_PREROUTING_LIST") && \
+      PORT_HOPPING_TARGET=$(awk '{for (i=0; i<NF; i++) if ($i=="to") {print $(i+1); exit}}' <<< "$IPTABLES_PREROUTING_LIST")
     [ -n "$PORT_HOPPING_RANGE" ] && PORT_HOPPING_START=${PORT_HOPPING_RANGE%:*} && PORT_HOPPING_END=${PORT_HOPPING_RANGE#*:}
   fi
 }
@@ -1516,15 +1535,15 @@ sing-box_variables() {
   [ -z "$SERVER_IP" ] && error " $(text 47) "
 
   # 根据 IPv4 和 IPv6 的网络状态，使不同的 DNS 策略
-  [ -x "$(type -p ping)" ] && for i in {1..3}; do
+  command -v ping >/dev/null 2>&1 && for i in {1..3}; do
     ping -c 1 -W 1 "151.101.1.91" &>/dev/null && local IS_IPV4=is_ipv4 && break
   done
 
-  if [ -x "$(type -p ping6)" ]; then
+  if command -v ping6 >/dev/null 2>&1; then
     for i in {1..3}; do
       ping6 -c 1 -W 1 "2a04:4e42:200::347" &>/dev/null && local IS_IPV6=is_ipv6 && break
     done
-  elif [ -x "$(type -p ping)" ]; then
+  elif command -v ping >/dev/null 2>&1; then
     for i in {1..3}; do
       ping -c 1 -W 1 "2a04:4e42:200::347" &>/dev/null && local IS_IPV6=is_ipv6 && break
     done
@@ -1618,7 +1637,7 @@ sing-box_variables() {
   local EMOJI="${EMOJI4:-$EMOJI6}"
   local EMOJI="${EMOJI}${EMOJI:+ }"
   if [ -z "$NODE_NAME_CONFIRM" ]; then
-    if [ -x "$(type -p hostname)" ]; then
+    if command -v hostname >/dev/null 2>&1; then
       local NODE_NAME_DEFAULT="${EMOJI}$(hostname)"
     elif [ -s /etc/hostname ]; then
       local NODE_NAME_DEFAULT="${EMOJI}$(cat /etc/hostname)"
@@ -1635,61 +1654,46 @@ sing-box_variables() {
 }
 
 check_dependencies() {
-  # 如果是 Alpine，先升级 wget
+  local DEPS=() DEPS_CHECK=() DEPS_INSTALL=()
+
+  # 1. Alpine 特有处理：检查 BusyBox wget，设置 IS_PREFER_GO
   if [ "$SYSTEM" = 'Alpine' ]; then
     IS_PREFER_GO=true
     local CHECK_WGET=$(wget 2>&1 | sed -n 1p)
-    grep -qi 'busybox' <<< "$CHECK_WGET" && ${PACKAGE_INSTALL[int]} wget >/dev/null 2>&1
-    local DEPS_CHECK=("bash" "rc-update" "iptables" "ip6tables")
-    local DEPS_INSTALL=("bash" "openrc" "iptables" "ip6tables")
-    for g in "${!DEPS_CHECK[@]}"; do
-      [ ! -x "$(type -p ${DEPS_CHECK[g]})" ] && DEPS_ALPINE+=(${DEPS_INSTALL[g]})
-    done
-    if [ "${#DEPS_ALPINE[@]}" -ge 1 ]; then
-      info "\n $(text 7) $(sed "s/ /,&/g" <<< ${DEPS_ALPINE[@]}) \n"
-      ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
-      ${PACKAGE_INSTALL[int]} ${DEPS_ALPINE[@]} >/dev/null 2>&1
-    fi
+    grep -qi 'busybox' <<< "$CHECK_WGET" && DEPS+=("wget")
+
+    DEPS_CHECK+=("bash" "rc-update")
+    DEPS_INSTALL+=("bash" "openrc")
   else
     # 非 Alpine 系统，检查 systemd-resolved 状态，用于 DNS 配置里的 prefer_go 字段
-    [ -x "$(type -p systemctl)" ] && systemctl is-active --quiet systemd-resolved && IS_PREFER_GO=false || IS_PREFER_GO=true
+    command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet systemd-resolved && IS_PREFER_GO=false || IS_PREFER_GO=true
   fi
 
-  # 检测 Linux 系统的依赖，升级库并重新安装依赖
-  local DEPS_INSTALL=("wget" "tar" "iproute2" "iproute2" "bash" "openssl" "iputils-ping")
-  local DEPS_CHECK=("wget" "tar" "ss" "ip" "bash" "openssl" "ping")
+  # 2. 基础通用依赖（不含防火墙，防火墙仅端口跳跃时按需安装）
+  DEPS_CHECK+=("wget" "tar" "ss"  "ip"        "bash" "openssl" "ping")
+  DEPS_INSTALL+=("wget" "tar" "iproute2" "iproute2" "bash" "openssl" "iputils-ping")
 
   [ "$SYSTEM" != 'Alpine' ] && DEPS_CHECK+=("systemctl") && DEPS_INSTALL+=("systemctl")
+
+  # CentOS7 需要 epel-release
+  [ "$SYSTEM" = 'CentOS' ] && [ "$IS_CENTOS" = 'CentOS7' ] && \
+    yum repolist 2>/dev/null | grep -q epel || { [ "$SYSTEM" = 'CentOS' ] && [ "$IS_CENTOS" = 'CentOS7' ] && DEPS+=("epel-release"); }
+
   for g in "${!DEPS_CHECK[@]}"; do
-    [ ! -x "$(type -p ${DEPS_CHECK[g]})" ] && DEPS+=(${DEPS_INSTALL[g]})
+    ! command -v "${DEPS_CHECK[g]}" >/dev/null 2>&1 && DEPS+=("${DEPS_INSTALL[g]}")
   done
 
-  if [ "$SYSTEM" = 'CentOS' ]; then
-    if [ "$IS_CENTOS" = 'CentOS7' ]; then
-      yum repolist 2>/dev/null | grep -q epel || DEPS+=(epel-release)
-    fi
-    [ ! -x "$(type -p firewalld)" ] && DEPS+=(firewalld)
-  else
-    [ ! -x "$(type -p iptables)" ] && DEPS+=(iptables)
-    [ ! -x "$(type -p ip6tables)" ] && DEPS+=(ip6tables)
-  fi
-
-  # 先 DEPS 去重，如需要安装的依赖大于0，就更新库并安装
-  DEPS=($(echo "${DEPS[@]}" | tr ' ' '\n' | awk '!a[$0]++'))
-  if [[ "${#DEPS[@]}" > 0 ]]; then
+  # 3. 去重并安装
+  DEPS=($(printf "%s\n" "${DEPS[@]}" | sort -u))
+  if [ "${#DEPS[@]}" -gt 0 ]; then
+    info "\n $(text 7) $(sed "s/ /,&/g" <<< "${DEPS[*]}") \n"
     [[ ! "$SYSTEM" =~ Alpine|CentOS ]] && ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
-    ${PACKAGE_INSTALL[int]} ${DEPS[@]} >/dev/null 2>&1
-    # 如新安装 firewalld，设置允许所有端口的 TCP 和 UDP 入站连接
-    if [[ "${DEPS[@]}" =~ 'firewalld' ]]; then
-      firewall-cmd --add-port=0-65535/tcp --permanent >/dev/null 2>&1
-      firewall-cmd --add-port=0-65535/udp --permanent >/dev/null 2>&1
-      firewall-cmd --reload >/dev/null 2>&1
-    fi
+    ${PACKAGE_INSTALL[int]} "${DEPS[@]}" >/dev/null 2>&1
   else
     info "\n $(text 8) \n"
   fi
 
-  # 对于 Alpine 系统，确保 OpenRC 服务已启动
+  # 4. 对于 Alpine 系统，确保 OpenRC 服务已启动
   if [ "$SYSTEM" = 'Alpine' ]; then
     if ! rc-service --list | grep -q "^openrc"; then
       rc-update add openrc boot >/dev/null 2>&1
@@ -1698,9 +1702,39 @@ check_dependencies() {
   fi
 }
 
+# 按需安装端口跳跃所需的防火墙依赖，安装完后确保 firewalld 已启动
+# 策略：Alpine → iptables；CentOS 或已装 firewalld → firewalld；其他 → iptables + netfilter-persistent
+install_firewall_deps() {
+  local FW_CHECK=() FW_INSTALL=() FW_TO_INSTALL=()
+  if [ "$SYSTEM" = 'Alpine' ]; then
+    FW_CHECK=("iptables")
+    FW_INSTALL=("iptables")
+  elif command -v firewalld >/dev/null 2>&1 || [ "$SYSTEM" = 'CentOS' ]; then
+    FW_CHECK=("firewall-cmd")
+    FW_INSTALL=("firewalld")
+  else
+    FW_CHECK=("iptables" "netfilter-persistent")
+    FW_INSTALL=("iptables" "netfilter-persistent")
+  fi
+  for i in "${!FW_CHECK[@]}"; do
+    ! command -v "${FW_CHECK[i]}" >/dev/null 2>&1 && FW_TO_INSTALL+=("${FW_INSTALL[i]}")
+  done
+  if [ "${#FW_TO_INSTALL[@]}" -gt 0 ]; then
+    FW_TO_INSTALL=($(printf "%s\n" "${FW_TO_INSTALL[@]}" | sort -u))
+    [ "$SYSTEM" != 'CentOS' ] && ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
+    ${PACKAGE_INSTALL[int]} "${FW_TO_INSTALL[@]}" >/dev/null 2>&1
+  fi
+  # 安装后确保 firewalld 已启动（CentOS 或已装 firewalld 的系统）
+  if command -v firewalld >/dev/null 2>&1 || [ "$SYSTEM" = 'CentOS' ]; then
+    [ "$(systemctl is-active firewalld 2>/dev/null)" != 'active' ] && cmd_systemctl enable firewalld >/dev/null 2>&1
+    [ "$(firewall-cmd --zone=public --get-target 2>/dev/null)" != 'ACCEPT' ] && firewall-cmd --zone=public --set-target=ACCEPT --permanent >/dev/null 2>&1
+    firewall-cmd --reload >/dev/null 2>&1
+  fi
+}
+
 # 检查并安装 nginx
 check_nginx() {
-  if [ ! -x "$(type -p nginx)" ]; then
+  if ! command -v nginx >/dev/null 2>&1; then
     info "\n $(text 7) nginx \n"
     ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
     ${PACKAGE_INSTALL[int]} nginx >/dev/null 2>&1
@@ -1754,33 +1788,11 @@ EOF
 }
 
 # 处理防火墙规则
-firewall_configuration() {
-  local LISTEN_PORT=$(sed -n "/listen_port/ s#.*:\([0-9]\+\),#\1#gp" /etc/sing-box/conf/*)
-  [ -s ${WORK_DIR}/nginx.conf ] && local PORT_NGINX=$(awk '/listen/{print $2; exit}' ${WORK_DIR}/nginx.conf)
-  if grep -q "open" <<< "$1"; then
-    local LISTEN_PORT_TCP=$(sed -n "s#\([0-9]\+\)#--add-port=\1/tcp#gp" <<< "$LISTEN_PORT")
-    local LISTEN_PORT_UDP=$(sed -n "s#\([0-9]\+\)#--add-port=\1/udp#gp" <<< "$LISTEN_PORT")
-    firewall-cmd --zone=public --add-port=${PORT_NGINX}/tcp --permanent >/dev/null 2>&1
-  elif grep -q "close" <<< "$1"; then
-    local LISTEN_PORT_TCP=$(sed -n "s#\([0-9]\+\)#--remove-port=\1/tcp#gp" <<< "$LISTEN_PORT")
-    local LISTEN_PORT_UDP=$(sed -n "s#\([0-9]\+\)#--remove-port=\1/udp#gp" <<< "$LISTEN_PORT")
-    firewall-cmd --zone=public --remove-port=${PORT_NGINX}/tcp --permanent >/dev/null 2>&1
-  fi
-  firewall-cmd --zone=public ${LISTEN_PORT_TCP} --permanent >/dev/null 2>&1
-  firewall-cmd --zone=public ${LISTEN_PORT_UDP} --permanent >/dev/null 2>&1
-  firewall-cmd --reload >/dev/null 2>&1
-
-  if [[ -s /etc/selinux/config && -x "$(type -p getenforce)" && $(getenforce) = 'Enforcing' ]]; then
-    hint "\n $(text 84) "
-    setenforce 0
-    grep -qs '^SELINUX=disabled$' /etc/selinux/config || sed -i 's/^SELINUX=[epd].*/# &/; /SELINUX=[epd]/a\SELINUX=disabled' /etc/selinux/config
-  fi
-}
 
 # Nginx 配置文件
 export_nginx_conf_file() {
   # 在添加协议，需要用到 nginx 的时候，先检测是否已经安装
-  if [ ! -x "$(type -p nginx)" ]; then
+  if ! command -v nginx >/dev/null 2>&1; then
     info "\n $(text 7) nginx"
     ${PACKAGE_INSTALL[int]} nginx >/dev/null 2>&1
   fi
@@ -2067,7 +2079,7 @@ EOF
   }
 
   if [[ "${#REALITY_PRIVATE}" = 43 && "${#REALITY_PUBLIC}" = 0 ]]; then
-    if [ "$(type -p xxd)" ]; then
+    if command -v xxd >/dev/null 2>&1; then
       until [ -n "$REALITY_PUBLIC" ]; do
         # convert base64url -> base64 (standard), add padding
         local B64=$(printf '%s' "$REALITY_PRIVATE" | tr '_-' '/+')
@@ -2628,7 +2640,7 @@ start_pre() {
 
     # 如果配置了 Nginx，启动 Nginx
     [ -n "$PORT_NGINX" ] && OPENRC_SERVICE+="
-    $(type -p nginx) -c ${WORK_DIR}/nginx.conf"
+    $(command -v nginx) -c ${WORK_DIR}/nginx.conf"
 
     OPENRC_SERVICE+="
     # 确保 PID 文件不存在，避免启动失败
@@ -2677,7 +2689,7 @@ NoNewPrivileges=yes
 TimeoutStartSec=0
 WorkingDirectory=${WORK_DIR}
 "
-    [[ -n "$PORT_NGINX" && "$IS_CENTOS" != 'CentOS7' ]] && SING_BOX_SERVICE+="ExecStartPre=$(type -p nginx) -c ${WORK_DIR}/nginx.conf
+    [[ -n "$PORT_NGINX" && "$IS_CENTOS" != 'CentOS7' ]] && SING_BOX_SERVICE+="ExecStartPre=$(command -v nginx) -c ${WORK_DIR}/nginx.conf
 "
     SING_BOX_SERVICE+="ExecStart=${WORK_DIR}/sing-box run -C ${WORK_DIR}/conf
 ExecReload=/bin/kill -HUP \$MAINPID
@@ -2858,7 +2870,6 @@ install_sing-box() {
   sleep 2
 
   # 处理防火墙相关端口
-  [ "$SYSTEM" = 'CentOS' ] && firewall_configuration open
 
   # 检查服务是否成功启动
   if cmd_systemctl status sing-box &>/dev/null; then
@@ -3876,7 +3887,6 @@ change_protocols() {
   cmd_systemctl disable sing-box
 
   # 关闭防火墙相关端口
-  [ "$SYSTEM" = 'CentOS' ] && firewall_configuration close
 
   # 生成 Nginx 配置文件
   [ -n "$PORT_NGINX" ] && export_nginx_conf_file
@@ -3906,7 +3916,6 @@ change_protocols() {
   cmd_systemctl enable sing-box
 
   # 打开防火墙相关端口
-  [ "$SYSTEM" = 'CentOS' ] && firewall_configuration open
 
   # 等待服务启动
   sleep 3
@@ -3938,7 +3947,6 @@ uninstall() {
     [[ -s ${WORK_DIR}/nginx.conf && "$(ps -ef | grep -c '[n]ginx')" = 0 ]] && reading "\n $(text 83) " REMOVE_NGINX
     [ "${REMOVE_NGINX,,}" = 'y' ] && ${PACKAGE_UNINSTALL[int]} nginx >/dev/null 2>&1
     [ "$IS_HOPPING" = 'is_hopping' ] && del_port_hopping_nat
-    [ "$SYSTEM" = 'CentOS' ] && firewall_configuration close
     rm -rf ${WORK_DIR} ${TEMP_DIR} ${ARGO_DAEMON_FILE} ${SINGBOX_DAEMON_FILE} /usr/bin/sb
     info "\n $(text 16) \n"
   else
