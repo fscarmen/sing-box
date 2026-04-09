@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.6 (2026.03.22)'
+VERSION='v1.3.7 (2026.04.09)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -43,8 +43,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Refactor: Support modification after installation (CDN, Reality SNI, node name, UUID/password, server IP); 2. Perf: Rewrite text(), significantly reducing repeated string-lookup overhead"
-C[1]="1. 重构：支持安装后多项修改（CDN、Reality SNI、节点名、UUID/密码、服务器 IP）；2. 性能优化：重写 text() 函数，大幅降低字符串查找开销"
+E[1]="1. Add support for enabling/disabling Hysteria2 port hopping and modifying port ranges after installation (sb -d); 2. Allow customization of Hysteria2 upload/download bandwidth without reinstalling; 3. Enhance client configuration with proper Hysteria2 bandwidth (up/down) and port hopping parameters"
+C[1]="1. 支持安装后启用/禁用 Hysteria2 端口跳跃，并可修改端口范围 (sb -d); 2. 支持自定义 Hysteria2 上下行带宽，无需重新安装; 3. 完善客户端配置，补充 Hysteria2 上传/下载速率及端口跳跃参数"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -283,8 +283,8 @@ E[119]="Using Cloudflare API to create Tunnel and handle DNS config..."
 C[119]="使用 Cloudflare API 创建 Tunnel 和处理 DNS 配置..."
 E[120]="Found existing tunnel with the same name. Tunnel ID: \$EXISTING_TUNNEL_ID. Status: \$EXISTING_TUNNEL_STATUS. Overwrite? [y/N] (default y):"
 C[120]="发现同名隧道已创建，隧道 ID: \$EXISTING_TUNNEL_ID，状态: \$EXISTING_TUNNEL_STATUS。是否覆盖? [y/N] (默认为 y):"
-E[121]="Change preferred domain / TLS SNI / node info (sb -d)"
-C[121]="更换优选域名 / TLS SNI / 节点信息 (sb -d)"
+E[121]="Change node configuration (sb -d)"
+C[121]="修改节点配置 (sb -d)"
 E[122]="Invalid access token. Please roll at https://dash.cloudflare.com/profile/api-tokens to re-generate."
 C[122]="Token 访问令牌无效。请在 https://dash.cloudflare.com/profile/api-tokens 轮转，以重新获取"
 E[123]="Token zone resource failed. The tunnel root domain and the authorized domain of the token are inconsistent. Please go to https://dash.cloudflare.com/profile/api-tokens to re-authorize."
@@ -319,6 +319,16 @@ E[137]="Uninstalled protocols."
 C[137]="未安装的协议"
 E[138]="Confirm all protocols for reloading."
 C[138]="确认重装的所有协议"
+E[139]="Hysteria2 Port Hopping  (current: \${PORT_HOPPING_RANGE:-disabled}) [leave blank to disable]"
+C[139]="Hysteria2 端口跳跃  (当前: \${PORT_HOPPING_RANGE:-禁用}) [留空则禁用]"
+E[140]="Hysteria2 bandwidth  (current: up \${HY2_UP_NOW} Mbps, down \${HY2_DOWN_NOW} Mbps)"
+C[140]="Hysteria2 带宽  (当前: 上行 \${HY2_UP_NOW} Mbps, 下行 \${HY2_DOWN_NOW} Mbps)"
+E[141]="Please enter Hysteria2 client upload speed in Mbps (e.g. 200):"
+C[141]="请输入 Hysteria2 客户端上行速率 Mbps（纯数字，如 200）:"
+E[142]="Please enter Hysteria2 client download speed in Mbps (e.g. 1000):"
+C[142]="请输入 Hysteria2 客户端下行速率 Mbps（纯数字，如 1000）:"
+E[143]="Invalid input, please enter a positive integer."
+C[143]="输入无效，请输入正整数。"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -326,6 +336,7 @@ error() { echo -e "\033[31m\033[01m$*\033[0m" && exit 1; } # 红色
 info() { echo -e "\033[32m\033[01m$*\033[0m"; }   # 绿色
 hint() { echo -e "\033[33m\033[01m$*\033[0m"; }   # 黄色
 reading() { read -rp "$(info "$1")" "$2"; }
+
 # 预处理：扫描 E/C 数组，把含 $ 的条目下标记录到关联数组，避免 text() 每次调用都启动 grep 子进程
 declare -A TEXT_NEEDS_EVAL
 for _text_i in "${!E[@]}"; do
@@ -490,7 +501,7 @@ input_cdn() {
     hint " $(( c+1 )). ${CDN_DOMAIN[c]} "
   done
 
-  reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 53) " CUSTOM_CDN
+  reading "\n ${TOTAL_STEPS:+(${STEP_NUM}/${TOTAL_STEPS}) }$(text 53) " CUSTOM_CDN
   case "$CUSTOM_CDN" in
     [1-${#CDN_DOMAIN[@]}] )
       CDN="${CDN_DOMAIN[$((CUSTOM_CDN-1))]}"
@@ -527,6 +538,25 @@ change_config() {
   ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && local SERVER_IP_NOW=$(awk -F '"' '/"WS_SERVER_IP_SHOW"/{print $4; exit}' ${WORK_DIR}/conf/*-ws*inbounds.json) || local SERVER_IP_NOW=$(grep -A1 '"tag"' ${WORK_DIR}/list | sed -E '/-ws(-tls)*",$/{N;d}' | awk -F '"' '/"server"/{count++; if (count == 1) {print $4; exit}}')
   [ -n "$SERVER_IP_NOW" ] && MENU_IDX+=(132) && MENU_KEY+=(serverip) && MENU_VAL+=("$SERVER_IP_NOW")
 
+  # Hysteria2 带宽和端口跳跃（仅在 Hysteria2 已安装时显示）
+  if ls ${WORK_DIR}/conf/*_${NODE_TAG[1]}_inbounds.json 2>&1; then
+    local HY2_LINE=$(grep 'type: hysteria2' ${WORK_DIR}/subscribe/proxies)
+    if [[ "$HY2_LINE" =~ up:[[:space:]]*\"([0-9]+)[[:space:]]*Mbps\".*down:[[:space:]]*\"([0-9]+)[[:space:]]*Mbps\" ]]; then
+      HY2_UP_NOW="${BASH_REMATCH[1]}"
+      HY2_DOWN_NOW="${BASH_REMATCH[2]}"
+    elif [[ "$HY2_LINE" =~ down:[[:space:]]*\"([0-9]+)[[:space:]]*Mbps\".*up:[[:space:]]*\"([0-9]+)[[:space:]]*Mbps\" ]]; then
+      HY2_DOWN_NOW="${BASH_REMATCH[1]}"
+      HY2_UP_NOW="${BASH_REMATCH[2]}"
+    fi
+    HY2_UP_NOW=${HY2_UP_NOW:-200}
+    HY2_DOWN_NOW=${HY2_DOWN_NOW:-1000}
+
+    MENU_IDX+=(140) && MENU_KEY+=(hy2bw) && MENU_VAL+=("${HY2_UP_NOW}/${HY2_DOWN_NOW}")
+
+    check_port_hopping_nat
+    MENU_IDX+=(139) && MENU_KEY+=(hy2hopping) && MENU_VAL+=("${PORT_HOPPING_RANGE}")
+  fi
+
   [ "${#MENU_IDX[@]}" -eq 0 ] && error " $(text 110) "
 
   # 显示动态菜单
@@ -549,6 +579,76 @@ change_config() {
   local IDX=$(( CHOOSE_NODE_INFO - 1 ))
   local KEY="${MENU_KEY[IDX]}"
   local OLD="${MENU_VAL[IDX]}"
+
+  # 特殊操作路由（不走通用替换逻辑）
+  if [ "$KEY" = "hy2bw" ]; then
+    # 修改 Hysteria2 带宽 - 内联实现
+    local HY2_UP HY2_DOWN
+    while true; do
+      reading " $(text 141) " HY2_UP
+      [[ "$HY2_UP" =~ ^[1-9][0-9]*$ ]] && break
+      warning " $(text 143) "
+    done
+    while true; do
+      reading " $(text 142) " HY2_DOWN
+      [[ "$HY2_DOWN" =~ ^[1-9][0-9]*$ ]] && break
+      warning " $(text 143) "
+    done
+    sed -i -E "s/(up: \")([0-9]+)( Mbps\")/\1${HY2_UP}\3/g; s/(down: \")([0-9]+)( Mbps\")/\1${HY2_DOWN}\3/g" ${WORK_DIR}/subscribe/proxies
+    hint " $(text 112) "
+    export_list
+    return
+  elif [ "$KEY" = "hy2hopping" ]; then
+    # 修改 Hysteria2 端口跳跃 - 内联实现
+    check_port_hopping_nat
+    local OLD_START="$PORT_HOPPING_START" OLD_END="$PORT_HOPPING_END"
+    hint "\n $(text 97) \n"
+
+    local HOPPING_ERROR_TIME=6
+    local NEW_RANGE=""
+    until [ -n "$IS_HOPPING_SET" ]; do
+      if [ -z "$NEW_RANGE" ]; then
+        (( HOPPING_ERROR_TIME-- )) || true
+        case "$HOPPING_ERROR_TIME" in
+          0 ) error "\n $(text 3) \n" ;;
+          5 ) reading " $(text 98) " NEW_RANGE ;;
+          * ) reading " $(text 98) " NEW_RANGE ;;
+        esac
+      fi
+
+      # 预处理：将所有分隔符统一为冒号，过滤非法字符
+      NEW_RANGE=$(sed 's/[-－—：]/:/g' <<< "$NEW_RANGE" | tr -cd '0-9:')
+
+      if [[ -z "$NEW_RANGE" || "${NEW_RANGE,,}" =~ ^(n|no)$ ]]; then
+        # 禁用端口跳跃
+        [ -n "$OLD_START" ] && [ -n "$OLD_END" ] && del_port_hopping_nat
+        unset PORT_HOPPING_START PORT_HOPPING_END PORT_HOPPING_RANGE
+        IS_HOPPING_SET=true
+      elif [[ "$NEW_RANGE" =~ ^[0-9]{4,5}:[0-9]{4,5}$ ]]; then
+        local NEW_START=${NEW_RANGE%:*} NEW_END=${NEW_RANGE#*:}
+        if [[ "$NEW_START" -lt "$NEW_END" && "$NEW_START" -ge "$MIN_HOPPING_PORT" && "$NEW_END" -le "$MAX_HOPPING_PORT" ]]; then
+          # 删除旧规则，添加新规则
+          [ -n "$OLD_START" ] && [ -n "$OLD_END" ] && del_port_hopping_nat
+          PORT_HOPPING_START=$NEW_START
+          PORT_HOPPING_END=$NEW_END
+          PORT_HOPPING_RANGE="$NEW_RANGE"
+          local HOPPING_TARGET="$PORT_HOPPING_TARGET"
+          [ -z "$HOPPING_TARGET" ] && HOPPING_TARGET=$(awk -F '[:,]' '/"listen_port"/{print $2; exit}' ${WORK_DIR}/conf/*_${NODE_TAG[1]}_inbounds.json 2>/dev/null)
+          add_port_hopping_nat "$PORT_HOPPING_START" "$PORT_HOPPING_END" "$HOPPING_TARGET"
+          IS_HOPPING_SET=true
+        else
+          warning "\n $(text 36) " && unset NEW_RANGE
+        fi
+      else
+        warning "\n $(text 36) " && unset NEW_RANGE
+      fi
+    done
+
+    hint " $(text 112) "
+    export_list
+    info " $(text 37) "
+    return
+  fi
 
   hint ""
   reading " $(text 134) " NEW_VAL
@@ -790,7 +890,7 @@ input_nginx_port() {
     if [ "$PORT_ERROR_TIME" = 0 ]; then
       error "\n $(text 3) \n"
     else
-      [ -z "$PORT_NGINX" ] && reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 79) " PORT_NGINX
+      [ -z "$PORT_NGINX" ] && reading "\n ${TOTAL_STEPS:+(${STEP_NUM}/${TOTAL_STEPS}) }$(text 79) " PORT_NGINX
     fi
     PORT_NGINX=${PORT_NGINX:-"$PORT_NGINX_DEFAULT"}
     if [[ "$PORT_NGINX" =~ ^[1-9][0-9]{1,4}$ && "$PORT_NGINX" -ge "$MIN_PORT" && "$PORT_NGINX" -le "$MAX_PORT" ]]; then
@@ -810,29 +910,37 @@ input_hopping_port() {
           error "\n $(text 3) \n"
           ;;
         5 )
-          hint "\n $(text 97) \n" && reading " (${STEP_NUM}/${TOTAL_STEPS}) $(text 98) " PORT_HOPPING_RANGE
+          hint "\n $(text 97) \n" && reading " ${TOTAL_STEPS:+(${STEP_NUM}/${TOTAL_STEPS}) }$(text 98) " PORT_HOPPING_RANGE
           ;;
         * )
-          reading " (${STEP_NUM}/${TOTAL_STEPS}) $(text 98) " PORT_HOPPING_RANGE
+          reading " ${TOTAL_STEPS:+(${STEP_NUM}/${TOTAL_STEPS}) }$(text 98) " PORT_HOPPING_RANGE
       esac
     fi
-    if [[ "${PORT_HOPPING_RANGE//-/:}" =~ ^[1-6][0-9]{4}:[1-6][0-9]{4}$ ]]; then
-      # 为防止输入错误，把 - 改为 : ，比如  10000-11000 改为 10000:11000
-      PORT_HOPPING_RANGE=${PORT_HOPPING_RANGE//-/:}
+
+    # 预处理：全角冒号/破折号统一换半角，过滤非法字符
+    PORT_HOPPING_RANGE=$(sed 's/[-－—：]/:/g' <<< "$PORT_HOPPING_RANGE" | tr -cd '0-9:')
+
+    if [[ "$PORT_HOPPING_RANGE" =~ ^[0-9]{4,5}:[0-9]{4,5}$ ]]; then
       PORT_HOPPING_START=${PORT_HOPPING_RANGE%:*}
       PORT_HOPPING_END=${PORT_HOPPING_RANGE#*:}
-      [[ "$PORT_HOPPING_START" -lt "$PORT_HOPPING_END" && "$PORT_HOPPING_START" -ge "$MIN_HOPPING_PORT" && "$PORT_HOPPING_END" -le "$MAX_HOPPING_PORT" ]] && IS_HOPPING=is_hopping || warning "\n $(text 36) "
+      if [[ "$PORT_HOPPING_START" -lt "$PORT_HOPPING_END" && \
+            "$PORT_HOPPING_START" -ge "$MIN_HOPPING_PORT" && \
+            "$PORT_HOPPING_END" -le "$MAX_HOPPING_PORT" ]]; then
+        IS_HOPPING=is_hopping
+      else
+        warning "\n $(text 114) " && unset PORT_HOPPING_RANGE
+      fi
     elif [[ -z "$PORT_HOPPING_RANGE" || "${PORT_HOPPING_RANGE,,}" =~ ^(n|no)$ ]]; then
       IS_HOPPING=no_hopping
     else
-      warning "\n $(text 36) "
+      warning "\n $(text 36) " && unset PORT_HOPPING_RANGE
     fi
   done
 }
 
 # 输入 Reality 密钥
 input_reality_key() {
-  [[ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' && "$IS_FAST_INSTALL" != 'is_fast_install' ]] && [ -z "$REALITY_PRIVATE" ] && reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 70) " REALITY_PRIVATE
+  [[ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' && "$IS_FAST_INSTALL" != 'is_fast_install' ]] && [ -z "$REALITY_PRIVATE" ] && reading "\n ${TOTAL_STEPS:+(${STEP_NUM}/${TOTAL_STEPS}) }$(text 70) " REALITY_PRIVATE
   [ -z "$REALITY_PRIVATE" ] && unset REALITY_PRIVATE && return
 
   local PRIVATEKEY_ERROR_TIME=5
@@ -861,7 +969,7 @@ input_argo_auth() {
       [ -n "$IS_CHANGE_ARGO" ] && ARGO_DOMAIN=$(sed 's/[ ]*//g; s/:[ ]*//' <<< "$ARGO_DOMAIN")
     done
   elif [[ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' && "$IS_FAST_INSTALL" != 'is_fast_install' ]]; then
-    [ -z "$ARGO_DOMAIN" ] && reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 87) " ARGO_DOMAIN
+    [ -z "$ARGO_DOMAIN" ] && reading "\n ${TOTAL_STEPS:+(${STEP_NUM}/${TOTAL_STEPS}) }$(text 87) " ARGO_DOMAIN
     ARGO_DOMAIN=$(sed 's/[ ]*//g; s/:[ ]*//' <<< "$ARGO_DOMAIN")
   fi
 
@@ -2950,8 +3058,10 @@ export_list() {
   $CLASH_XTLS_REALITY
 "
   if [ -n "$PORT_HYSTERIA2" ]; then
-    [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && local CLASH_HOPPING=" ports: ${PORT_HOPPING_START}-${PORT_HOPPING_END}, HopInterval: 60,"
-    local CLASH_HYSTERIA2="- {name: \"${NODE_NAME[12]} ${NODE_TAG[1]}\", type: hysteria2, server: ${SERVER_IP}, port: ${PORT_HYSTERIA2},${CLASH_HOPPING} up: \"200 Mbps\", down: \"1000 Mbps\", password: ${UUID[12]}, sni: ${TLS_SERVER}, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256}}" &&
+    [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && local CLASH_HOPPING=" ports: ${PORT_HOPPING_START}-${PORT_HOPPING_END}, hop-interval: 30,"
+    local HY2_UP=${HY2_UP:-200}
+    local HY2_DOWN=${HY2_DOWN:-1000}
+    local CLASH_HYSTERIA2="- {name: \"${NODE_NAME[12]} ${NODE_TAG[1]}\", type: hysteria2, server: ${SERVER_IP}, port: ${PORT_HYSTERIA2},${CLASH_HOPPING} up: \"${HY2_UP} Mbps\", down: \"${HY2_DOWN} Mbps\", password: ${UUID[12]}, sni: ${TLS_SERVER}, skip-cert-verify: false, fingerprint: ${SELF_SIGNED_FINGERPRINT_SHA256}}" &&
     local CLASH_SUBSCRIBE+="
   $CLASH_HYSTERIA2
 "
@@ -3055,9 +3165,10 @@ export_list() {
 vless://$(echo -n "auto:${UUID[11]}@${SERVER_IP_2}:${PORT_XTLS_REALITY}" | base64 -w0)?remarks=${NODE_NAME[11]// /%20}%20${NODE_TAG[0]}&tls=1&peer=${TLS_SERVER}&${VISION_OR_MUX_SHADOWROCKET}&pbk=${REALITY_PUBLIC[11]}
 "
   if [ -n "$PORT_HYSTERIA2" ]; then
-    [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && local SHADOWROCKET_HOPPING="&mport=${PORT_HYSTERIA2},${PORT_HOPPING_START}-${PORT_HOPPING_END}"
+    local SHADOWROCKET_PARAMS="peer=${TLS_SERVER}&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}&obfs=none&upmbps=${HY2_UP}&downmbps=${HY2_DOWN}"
+    [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && SHADOWROCKET_PARAMS+="&keepalive=30&mport=${PORT_HYSTERIA2},${PORT_HOPPING_START}-${PORT_HOPPING_END}"
     local SHADOWROCKET_SUBSCRIBE+="
-hysteria2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}?peer=${TLS_SERVER}&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}&obfs=none${SHADOWROCKET_HOPPING}#${NODE_NAME[12]// /%20}%20${NODE_TAG[1]}
+hysteria2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}?${SHADOWROCKET_PARAMS}#${NODE_NAME[12]// /%20}%20${NODE_TAG[1]}
 "
   fi
   [ -n "$PORT_TUIC" ] && local SHADOWROCKET_SUBSCRIBE+="
@@ -3127,9 +3238,13 @@ anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}?peer=${TLS_SERVER}&udp=1&hpkp
 ----------------------------
 vless://${UUID[11]}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?encryption=none${VISION_FLOW}&security=reality&sni=${TLS_SERVER}&fp=firefox&pbk=${REALITY_PUBLIC[11]}&type=tcp&headerType=none#${NODE_NAME[11]// /%20}%20${NODE_TAG[0]}"
 
-  [ -n "$PORT_HYSTERIA2" ] && local V2RAYN_SUBSCRIBE+="
+  if [ -n "$PORT_HYSTERIA2" ]; then
+    local V2RAYN_PARAMS="sni=${TLS_SERVER}&alpn=h3&insecure=1&allowInsecure=1&pinSHA256=${SELF_SIGNED_FINGERPRINT_SHA256//:/}"
+    [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && V2RAYN_PARAMS+="&mport=${PORT_HOPPING_START}-${PORT_HOPPING_END}"
+    local V2RAYN_SUBSCRIBE+="
 ----------------------------
-hysteria2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}?sni=${TLS_SERVER}&alpn=h3&insecure=1&allowInsecure=1&pinSHA256=${SELF_SIGNED_FINGERPRINT_SHA256//:/}#${NODE_NAME[12]// /%20}%20${NODE_TAG[1]}"
+hysteria2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}?${V2RAYN_PARAMS}#${NODE_NAME[12]// /%20}%20${NODE_TAG[1]}"
+  fi
 
   [ -n "$PORT_TUIC" ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
@@ -3250,10 +3365,13 @@ anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}?security=tls&sni=${TLS_SERVER
 vless://${UUID[11]}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?security=reality&sni=${TLS_SERVER}&fp=firefox&pbk=${REALITY_PUBLIC[11]}&type=tcp${VISION_FLOW}&encryption=none#${NODE_NAME[11]// /%20}%20${NODE_TAG[0]}"
 
   if [ -n "$PORT_HYSTERIA2" ]; then
-    [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && NEKOBOX_HOPPING="mport=${PORT_HOPPING_START}-${PORT_HOPPING_END}&"
+    local NEKOBOX_PARAMS="insecure=1&sni=${TLS_SERVER}&upmbps=${HY2_UP}&downmbps=${HY2_DOWN}"
+    if [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]]; then
+      NEKOBOX_PARAMS+="&mport=${PORT_HOPPING_START}-${PORT_HOPPING_END}&hop_interval=30"
+    fi
     local NEKOBOX_SUBSCRIBE+="
 ----------------------------
-hy2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}?${NEKOBOX_HOPPING}insecure=1&sni=${TLS_SERVER}#${NODE_NAME[12]// /%20}%20${NODE_TAG[1]}"
+hy2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}?${NEKOBOX_PARAMS}#${NODE_NAME[12]// /%20}%20${NODE_TAG[1]}"
   fi
 
   [ -n "$PORT_TUIC" ] && local NEKOBOX_SUBSCRIBE+="
@@ -3329,9 +3447,11 @@ anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}?security=tls&sni=${TLS_SERVER
   local NODE_REPLACE+="\"${NODE_NAME[11]} ${NODE_TAG[0]}\","
 
   if [ -n "$PORT_HYSTERIA2" ]; then
-    local OUTBOUND_REPLACE+=" { \"type\": \"hysteria2\", \"tag\": \"${NODE_NAME[12]} ${NODE_TAG[1]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_HYSTERIA2},"
-    [[ -n "${PORT_HOPPING_START}" && -n "${PORT_HOPPING_END}" ]] && local OUTBOUND_REPLACE+=" \"server_ports\": [ \"${PORT_HOPPING_START}:${PORT_HOPPING_END}\" ],"
-    local OUTBOUND_REPLACE+=" \"up_mbps\": 200, \"down_mbps\": 1000, \"password\": \"${UUID[12]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER}\", \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"alpn\": [ \"h3\" ] } },"
+    local HYSTERIA2_CONFIG=" { \"type\": \"hysteria2\", \"tag\": \"${NODE_NAME[12]} ${NODE_TAG[1]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_HYSTERIA2}, \"up_mbps\": ${HY2_UP}, \"down_mbps\": ${HY2_DOWN}, \"password\": \"${UUID[12]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER}\", \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"alpn\": [ \"h3\" ] } },"
+    if [[ -n "${PORT_HOPPING_START}" && -n "${PORT_HOPPING_END}" ]]; then
+      HYSTERIA2_CONFIG="${HYSTERIA2_CONFIG/\"server_port\": ${PORT_HYSTERIA2},/\"server_port\": ${PORT_HYSTERIA2}, \"server_ports\": [ \"${PORT_HOPPING_START}:${PORT_HOPPING_END}\" ], \"hop_interval\": \"30s\", \"hop_interval_max\": \"60s\",}"
+    fi
+    local OUTBOUND_REPLACE+="${HYSTERIA2_CONFIG}"
     local NODE_REPLACE+="\"${NODE_NAME[12]} ${NODE_TAG[1]}\","
   fi
 
