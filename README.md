@@ -24,7 +24,9 @@
 
 * * *
 ## 1.更新信息
-2026.04.09 v1.3.6 1. Add support for enabling/disabling Hysteria2 port hopping and modifying port ranges after installation (sb -d); 2. Allow customization of Hysteria2 upload/download bandwidth without reinstalling; 3. Enhance client configuration with proper Hysteria2 bandwidth (up/down) and port hopping parameters; 1. 支持安装后启用/禁用 Hysteria2 端口跳跃，并可修改端口范围 (sb -d); 2. 支持自定义 Hysteria2 上下行带宽，无需重新安装; 3. 完善客户端配置，补充 Hysteria2 上传/下载速率及端口跳跃参数
+2026.04.10 v1.3.8 1. Automatically detect UFW and switch rule management accordingly; 2. Merge the old -p (port change) functionality into -d (config editor), simplifying usage; 3. Remove the standalone -p / -P entry points entirely; 1. 自动检测 UFW 并切换规则管理方式; 2. 将原有 -p（修改端口）功能合并到 -d（配置修改），简化使用方式; 3. 完全移除独立的 -p / -P 入口
+
+2026.04.09 v1.3.7 1. Add support for enabling/disabling Hysteria2 port hopping and modifying port ranges after installation (sb -d); 2. Allow customization of Hysteria2 upload/download bandwidth without reinstalling; 3. Enhance client configuration with proper Hysteria2 bandwidth (up/down) and port hopping parameters; 1. 支持安装后启用/禁用 Hysteria2 端口跳跃，并可修改端口范围 (sb -d); 2. 支持自定义 Hysteria2 上下行带宽，无需重新安装; 3. 完善客户端配置，补充 Hysteria2 上传/下载速率及端口跳跃参数
 
 2026.03.22 v1.3.6 1. Refactor: Support modification after installation (CDN, Reality SNI, node name, UUID/password, server IP); 2. Perf: Rewrite text() with bash nameref and pre-scanned TEXT_NEEDS_EVAL map to eliminate per-call grep subprocesses, significantly reducing repeated string-lookup overhead; 1. 重构：支持安装后多项修改（CDN、Reality SNI、节点名、UUID/密码、服务器 IP）；2. 性能优化：用 bash nameref 和预扫描 TEXT_NEEDS_EVAL 关联数组重写 text() 函数，消除每次调用产生的 grep 子进程，大幅降低字符串查找开销
 
