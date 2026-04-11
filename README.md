@@ -24,20 +24,22 @@
 
 * * *
 ## 1.更新信息
+2026.04.11 v1.3.9 1. remove pre-install UFW blocking logic, fallback to iptables when inactive; 2. avoid unnecessary sing-box restart for CDN / bandwidth / port hopping changes; 3. reduce redundant single-use functions; 1. 移除安装前 UFW 强制校验，inactive 自动回退 iptables; 2. 优选地址 / 带宽 / 端口跳跃修改不再重启 sing-box; 3. 清理单次调用函数，提升结构可读性
+
 2026.04.10 v1.3.8 1. Automatically detect UFW and switch rule management accordingly; 2. Merge the old -p (port change) functionality into -d (config editor), simplifying usage; 3. Remove the standalone -p / -P entry points entirely; 1. 自动检测 UFW 并切换规则管理方式; 2. 将原有 -p（修改端口）功能合并到 -d（配置修改），简化使用方式; 3. 完全移除独立的 -p / -P 入口
 
 2026.04.09 v1.3.7 1. Add support for enabling/disabling Hysteria2 port hopping and modifying port ranges after installation (sb -d); 2. Allow customization of Hysteria2 upload/download bandwidth without reinstalling; 3. Enhance client configuration with proper Hysteria2 bandwidth (up/down) and port hopping parameters; 1. 支持安装后启用/禁用 Hysteria2 端口跳跃，并可修改端口范围 (sb -d); 2. 支持自定义 Hysteria2 上下行带宽，无需重新安装; 3. 完善客户端配置，补充 Hysteria2 上传/下载速率及端口跳跃参数
-
-2026.03.22 v1.3.6 1. Refactor: Support modification after installation (CDN, Reality SNI, node name, UUID/password, server IP); 2. Perf: Rewrite text() with bash nameref and pre-scanned TEXT_NEEDS_EVAL map to eliminate per-call grep subprocesses, significantly reducing repeated string-lookup overhead; 1. 重构：支持安装后多项修改（CDN、Reality SNI、节点名、UUID/密码、服务器 IP）；2. 性能优化：用 bash nameref 和预扫描 TEXT_NEEDS_EVAL 关联数组重写 text() 函数，消除每次调用产生的 grep 子进程，大幅降低字符串查找开销
-
-2026.03.14 v1.3.5 Performance: Optimize concurrent process execution to significantly accelerate script installation. 性能优化：优化并发进程执行，大幅提升脚本安装速度
-
-2026.02.08 v1.3.4 Chore: upgrade SS encryption method to SS-2022 spec; 新装的 Shadowsocks 协议加密方式从 aes-128-gcm 改为 2022-blake3-aes-128-gcm
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
 <br>
 
+>2026.03.22 v1.3.6 1. Refactor: Support modification after installation (CDN, Reality SNI, node name, UUID/password, server IP); 2. Perf: Rewrite text() with bash nameref and pre-scanned TEXT_NEEDS_EVAL map to eliminate per-call grep subprocesses, significantly reducing repeated string-lookup overhead; 1. 重构：支持安装后多项修改（CDN、Reality SNI、节点名、UUID/密码、服务器 IP）；2. 性能优化：用 bash nameref 和预扫描 TEXT_NEEDS_EVAL 关联数组重写 text() 函数，消除每次调用产生的 grep 子进程，大幅降低字符串查找开销
+>
+>2026.03.14 v1.3.5 Performance: Optimize concurrent process execution to significantly accelerate script installation. 性能优化：优化并发进程执行，大幅提升脚本安装速度
+>
+>2026.02.08 v1.3.4 Chore: upgrade SS encryption method to SS-2022 spec; 新装的 Shadowsocks 协议加密方式从 aes-128-gcm 改为 2022-blake3-aes-128-gcm
+>
 >2026.01.20 v1.3.3 1. Security: In v2rayN, add pinnedPeerCertSha256 for Hysteria2/Trojan to prevent MITM (replaces AllowInsecure); 2. Compatibility: Refactor SFM/SFI/SFA configs for sing-box v1.13.0+; 1. 安全增强：v2rayN 的 Hysteria2/Trojan 支持 pinnedPeerCertSha256 替代 跳过证书验证，防御 MITM 攻击; 2. 适配更新：重构 SFM/SFI/SFA 配置，支持 sing-box v1.13.0+
 >
 >2025.12.11 v1.3.2 Argo tunnel creation via API. Suitable for users with large-scale deployments, one Token for all. Automatically completed: Create tunnel > DNS configuration > Origin settings. Thanks to [zmlu] for providing the method: https://raw.githubusercontent.com/zmlu/sba/main/tunnel.sh; Argo 隧道新增通过 API 创建，适合大量部署的用户，一个 Token 走天下。自动完成：创建隧道 > DNS 配置 > 回源设置。感谢热心网友 [zmlu] 提供的方法: https://raw.githubusercontent.com/zmlu/sba/main/tunnel.sh
@@ -164,8 +166,7 @@ sb
   | -k              | Quick deploy (English version) 使用英文快速安装 |
   | -u              | Uninstall 卸载 |
   | -n              | Export Nodes list 显示节点信息 |
-  | -p <start port> | Change the nodes start port 更改节点的起始端口 |
-  | -d              | Change CDN 更换 CDN |
+  | -d              | Change config 修改参数 |
   | -s              | Stop / Start the Sing-box service 停止/开启 Sing-box 服务 |
   | -a              | Stop / Start the Argo Tunnel service 停止/开启 Argo Tunnel 服务 |
   | -v              | Sync Argo Xray to the newest 同步 Argo Xray 到最新版本 |

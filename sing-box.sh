@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.8 (2026.04.10)'
+VERSION='v1.3.9 (2026.04.11)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -32,21 +32,15 @@ cleanup_temp() {
   rm -rf "$TEMP_DIR"
 }
 
-on_interrupt_exit() {
-  cleanup_temp
-  echo -e '\n'
-  exit 1
-}
-
 trap cleanup_temp EXIT
-trap on_interrupt_exit INT QUIT TERM
+trap 'cleanup_temp; printf "\n"; exit 1' INT QUIT TERM
 
 mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Automatically detect UFW and switch rule management accordingly; 2. Merge the old -p (port change) functionality into -d (config editor), simplifying usage; 3. Remove the standalone -p / -P entry points entirely"
-C[1]="1. 自动检测 UFW 并切换规则管理方式; 2. 将原有 -p（修改端口）功能合并到 -d（配置修改），简化使用方式; 3. 完全移除独立的 -p / -P 入口"
+E[1]="1. remove pre-install UFW blocking logic, fallback to iptables when inactive; 2. avoid unnecessary sing-box restart for CDN / bandwidth / port hopping changes; 3. reduce redundant single-use functions"
+C[1]="1. 移除安装前 UFW 强制校验，inactive 自动回退 iptables; 2. 优选地址 / 带宽 / 端口跳跃修改不再重启 sing-box; 3. 清理单次调用函数，提升结构可读性"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -337,8 +331,6 @@ E[145]="UFW is not active. PortHopping forwarding rules were written, but you sh
 C[145]="UFW 未处于激活状态。PortHopping 转发规则已写入，但建议手动启用 UFW 以确保策略生效"
 E[146]="Failed to update UFW PortHopping forwarding rules. Please check UFW configuration files manually."
 C[146]="更新 UFW 的 PortHopping 转发规则失败，请手动检查 UFW 配置文件"
-E[147]="\n[WARN] UFW is detected, but its current status is: \${UFW_STATUS:-unknown}\nBecause UFW rules can affect SSH and port forwarding, please enable and verify UFW manually before running this installer again.\nRecommended first step: ufw allow ssh\nThen enable UFW manually, confirm your SSH session still works, and rerun the script.\nInstaller will now exit.\n"
-C[147]="\n[警告] 检测到系统已安装 UFW，但当前状态为: \${UFW_STATUS:-unknown}\n由于 UFW 与 SSH 及端口转发规则关系较复杂，建议先手动启用并确认 UFW 配置正确后，再重新运行本安装脚本。\n建议先执行: ufw allow ssh\n然后手动启用 UFW，确认 SSH 连接正常后，再重新运行脚本。\n安装程序现在退出。\n"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -1105,18 +1097,6 @@ check_root() {
   [ "$(id -u)" != 0 ] && error "\n $(text 43) \n"
 }
 
-check_ufw_active_preinstall() {
-  command -v ufw >/dev/null 2>&1 && IS_UFW=is_ufw || return 0
-
-  local UFW_STATUS
-  UFW_STATUS=$(ufw status 2>/dev/null | awk '/^Status/{print $NF; exit}')
-  [ "$UFW_STATUS" = 'active' ] && return 0
-
-  eval "echo -e \"\033[31m\033[01m${E[147]}\033[0m\""
-  eval "echo -e \"\033[31m\033[01m${C[147]}\033[0m\""
-  exit 1
-}
-
 # 判断处理器架构
 check_arch() {
   [ "$SYSTEM" = 'Alpine' ] && local IS_MUSL='-musl'
@@ -1458,9 +1438,43 @@ add_port_hopping_nat() {
   local PORT_HOPPING_TARGET=$3
   local COMMENT="NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)"
   local FW_BACKEND
+  local FW_CHECK=() FW_INSTALL=() FW_TO_INSTALL=()
 
-  install_firewall_deps
   FW_BACKEND=$(check_port_hopping_firewall)
+
+  case "$FW_BACKEND" in
+    ufw )
+      info "\n $(text 144) \n"
+      ;;
+    alpine-iptables )
+      FW_CHECK=("iptables")
+      FW_INSTALL=("iptables")
+      ;;
+    firewalld )
+      FW_CHECK=("firewall-cmd")
+      FW_INSTALL=("firewalld")
+      ;;
+    * )
+      FW_CHECK=("iptables" "netfilter-persistent")
+      FW_INSTALL=("iptables" "netfilter-persistent")
+      ;;
+  esac
+
+  for i in "${!FW_CHECK[@]}"; do
+    ! command -v "${FW_CHECK[i]}" >/dev/null 2>&1 && FW_TO_INSTALL+=("${FW_INSTALL[i]}")
+  done
+
+  if [ "${#FW_TO_INSTALL[@]}" -gt 0 ]; then
+    FW_TO_INSTALL=($(printf "%s\n" "${FW_TO_INSTALL[@]}" | sort -u))
+    [ "$SYSTEM" != 'CentOS' ] && ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
+    ${PACKAGE_INSTALL[int]} "${FW_TO_INSTALL[@]}" >/dev/null 2>&1
+  fi
+
+  if [ "$FW_BACKEND" = 'firewalld' ]; then
+    [ "$(systemctl is-active firewalld 2>/dev/null)" != 'active' ] && cmd_systemctl enable firewalld >/dev/null 2>&1
+    [ "$(firewall-cmd --zone=public --get-target 2>/dev/null)" != 'ACCEPT' ] && firewall-cmd --zone=public --set-target=ACCEPT --permanent >/dev/null 2>&1
+    firewall-cmd --reload >/dev/null 2>&1
+  fi
 
   if [ "$FW_BACKEND" = 'ufw' ]; then
     add_port_hopping_ufw_rules "$PORT_HOPPING_START" "$PORT_HOPPING_END" "$PORT_HOPPING_TARGET" || warning "\n $(text 146) \n"
@@ -1870,21 +1884,12 @@ check_dependencies() {
 }
 
 # 生成 UFW PortHopping 备注
-port_hopping_ufw_comment() {
-  local PORT_HOPPING_START=$1
-  local PORT_HOPPING_END=$2
-  local PORT_HOPPING_TARGET=$3
-  echo "Sing-box Family Bucket UFW NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} -> ${PORT_HOPPING_TARGET}"
-}
-
-# 写入 UFW PortHopping NAT 规则
 add_port_hopping_ufw_rules() {
   local PORT_HOPPING_START=$1
   local PORT_HOPPING_END=$2
   local PORT_HOPPING_TARGET=$3
   local TARGET_PORT="$3"
-  local COMMENT
-  COMMENT=$(port_hopping_ufw_comment "$PORT_HOPPING_START" "$PORT_HOPPING_END" "$TARGET_PORT")
+  local COMMENT="Sing-box Family Bucket UFW NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} -> ${TARGET_PORT}"
 
   [ -z "$PORT_HOPPING_START" ] && return 1
   [ -z "$PORT_HOPPING_END" ] && return 1
@@ -2041,9 +2046,17 @@ check_port_hopping_ufw_rules() {
 
 # 检测防火墙后端
 check_firewall_backend() {
-  if [ "$IS_UFW" = 'is_ufw' ]; then
-    echo 'ufw'
-  elif [ "$SYSTEM" = 'Alpine' ]; then
+  local UFW_STATUS
+
+  if command -v ufw >/dev/null 2>&1; then
+    UFW_STATUS=$(ufw status 2>/dev/null | awk '/^Status/{print $NF; exit}')
+    [ "$UFW_STATUS" = 'active' ] && {
+      echo 'ufw'
+      return
+    }
+  fi
+
+  if [ "$SYSTEM" = 'Alpine' ]; then
     echo 'alpine-iptables'
   elif command -v firewall-cmd >/dev/null 2>&1 || [ "$SYSTEM" = 'CentOS' ]; then
     echo 'firewalld'
@@ -2063,35 +2076,6 @@ init_firewall_state_dir() {
 }
 
 # 读取上一次由脚本管理的普通端口规则
-read_service_firewall_state() {
-  MANAGED_TCP_PORTS=()
-  MANAGED_UDP_PORTS=()
-
-  [ ! -s "$SERVICE_FIREWALL_STATE_FILE" ] && return 0
-
-  while read -r PROTO PORT; do
-    case "$PROTO" in
-      tcp ) MANAGED_TCP_PORTS+=("$PORT") ;;
-      udp ) MANAGED_UDP_PORTS+=("$PORT") ;;
-    esac
-  done < "$SERVICE_FIREWALL_STATE_FILE"
-}
-
-# 写入本次由脚本管理的普通端口规则
-write_service_firewall_state() {
-  init_firewall_state_dir
-  : > "$SERVICE_FIREWALL_STATE_FILE"
-
-  for PORT in "${EXPOSED_TCP_PORTS[@]}"; do
-    [ -n "$PORT" ] && echo "tcp $PORT" >> "$SERVICE_FIREWALL_STATE_FILE"
-  done
-
-  for PORT in "${EXPOSED_UDP_PORTS[@]}"; do
-    [ -n "$PORT" ] && echo "udp $PORT" >> "$SERVICE_FIREWALL_STATE_FILE"
-  done
-}
-
-# 端口数组去重追加
 append_unique_port() {
   local ARRAY_NAME=$1
   local PORT=$2
@@ -2218,18 +2202,10 @@ del_service_port_rule_firewalld() {
 }
 
 # iptables 普通端口规则备注
-service_port_iptables_comment() {
-  local PROTO=$1
-  local PORT=$2
-  echo "Sing-box Family Bucket PORT ${PROTO} ${PORT}"
-}
-
-# 添加 iptables 普通端口规则
 add_service_port_rule_iptables() {
   local PROTO=$1
   local PORT=$2
-  local COMMENT
-  COMMENT=$(service_port_iptables_comment "$PROTO" "$PORT")
+  local COMMENT="Sing-box Family Bucket PORT ${PROTO} ${PORT}"
 
   [ -z "$PROTO" ] || [ -z "$PORT" ] && return 1
 
@@ -2244,8 +2220,7 @@ add_service_port_rule_iptables() {
 del_service_port_rule_iptables() {
   local PROTO=$1
   local PORT=$2
-  local COMMENT
-  COMMENT=$(service_port_iptables_comment "$PROTO" "$PORT")
+  local COMMENT="Sing-box Family Bucket PORT ${PROTO} ${PORT}"
 
   [ -z "$PROTO" ] || [ -z "$PORT" ] && return 0
 
@@ -2281,7 +2256,15 @@ purge_service_firewall_rules() {
   FW_BACKEND=$(check_firewall_backend)
 
   init_firewall_state_dir
-  read_service_firewall_state
+  MANAGED_TCP_PORTS=()
+  MANAGED_UDP_PORTS=()
+
+  [ ! -s "$SERVICE_FIREWALL_STATE_FILE" ] || while read -r PROTO PORT; do
+    case "$PROTO" in
+      tcp ) MANAGED_TCP_PORTS+=("$PORT") ;;
+      udp ) MANAGED_UDP_PORTS+=("$PORT") ;;
+    esac
+  done < "$SERVICE_FIREWALL_STATE_FILE"
 
   case "$FW_BACKEND" in
     ufw )
@@ -2312,14 +2295,87 @@ purge_service_firewall_rules() {
 }
 
 # 同步普通服务端口规则
-sync_service_firewall_rules() {
+# 同步所有防火墙规则
+sync_firewall_rules() {
   local FW_BACKEND
   local PORT
+  local HY2_FILE="${WORK_DIR}/conf/*${NODE_TAG[1]}_inbounds.json"
+  local HY2_TARGET DESIRED_START DESIRED_END
+  local EXISTING_START EXISTING_END EXISTING_TARGET
+  local FILE BASENAME NGINX_PORT HAS_NGINX=false
 
-  collect_exposed_ports
+  EXPOSED_TCP_PORTS=()
+  EXPOSED_UDP_PORTS=()
+
+  if [ -s "${WORK_DIR}/nginx.conf" ]; then
+    HAS_NGINX=true
+    NGINX_PORT=$(awk '
+      /listen[[:space:]]+[0-9]+[[:space:]]*;/ && $2 !~ /^\[/ {
+        gsub(/;/, "", $2)
+        print $2
+        exit
+      }
+    ' "${WORK_DIR}/nginx.conf")
+    append_unique_port EXPOSED_TCP_PORTS "$NGINX_PORT"
+  fi
+
+  for FILE in ${WORK_DIR}/conf/*_inbounds.json; do
+    [ ! -s "$FILE" ] && continue
+    BASENAME=$(basename "$FILE")
+    PORT=$(awk -F '[:,]' '/"listen_port"/{gsub(/[[:space:]]/, "", $2); print $2; exit}' "$FILE")
+    [ -z "$PORT" ] && continue
+
+    case "$BASENAME" in
+      *hysteria2_inbounds.json|*tuic_inbounds.json )
+        append_unique_port EXPOSED_UDP_PORTS "$PORT"
+        ;;
+      *vmess-ws_inbounds.json|*vless-ws-tls_inbounds.json )
+        [ "$HAS_NGINX" = false ] && append_unique_port EXPOSED_TCP_PORTS "$PORT"
+        ;;
+      * )
+        append_unique_port EXPOSED_TCP_PORTS "$PORT"
+        ;;
+    esac
+  done
+
   FW_BACKEND=$(check_firewall_backend)
 
-  purge_service_firewall_rules
+  init_firewall_state_dir
+  MANAGED_TCP_PORTS=()
+  MANAGED_UDP_PORTS=()
+  if [ -s "$SERVICE_FIREWALL_STATE_FILE" ]; then
+    while read -r PROTO PORT; do
+      case "$PROTO" in
+        tcp ) MANAGED_TCP_PORTS+=("$PORT") ;;
+        udp ) MANAGED_UDP_PORTS+=("$PORT") ;;
+      esac
+    done < "$SERVICE_FIREWALL_STATE_FILE"
+  fi
+
+  case "$FW_BACKEND" in
+    ufw )
+      purge_service_port_rules_ufw
+      ;;
+    firewalld )
+      for PORT in "${MANAGED_TCP_PORTS[@]}"; do
+        del_service_port_rule_firewalld tcp "$PORT"
+      done
+      for PORT in "${MANAGED_UDP_PORTS[@]}"; do
+        del_service_port_rule_firewalld udp "$PORT"
+      done
+      ;;
+    alpine-iptables|iptables )
+      for PORT in "${MANAGED_TCP_PORTS[@]}"; do
+        del_service_port_rule_iptables tcp "$PORT"
+      done
+      for PORT in "${MANAGED_UDP_PORTS[@]}"; do
+        del_service_port_rule_iptables udp "$PORT"
+      done
+      ;;
+  esac
+
+  : > "$SERVICE_FIREWALL_STATE_FILE"
+  reload_or_save_firewall_rules
 
   case "$FW_BACKEND" in
     ufw )
@@ -2348,15 +2404,14 @@ sync_service_firewall_rules() {
       ;;
   esac
 
-  write_service_firewall_state
+  : > "$SERVICE_FIREWALL_STATE_FILE"
+  for PORT in "${EXPOSED_TCP_PORTS[@]}"; do
+    [ -n "$PORT" ] && echo "tcp $PORT" >> "$SERVICE_FIREWALL_STATE_FILE"
+  done
+  for PORT in "${EXPOSED_UDP_PORTS[@]}"; do
+    [ -n "$PORT" ] && echo "udp $PORT" >> "$SERVICE_FIREWALL_STATE_FILE"
+  done
   reload_or_save_firewall_rules
-}
-
-# 同步 Hysteria2 端口跳跃规则
-sync_port_hopping_firewall_rules() {
-  local HY2_FILE="${WORK_DIR}/conf/*${NODE_TAG[1]}_inbounds.json"
-  local HY2_TARGET DESIRED_START DESIRED_END
-  local EXISTING_START EXISTING_END EXISTING_TARGET
 
   HY2_TARGET=$(awk -F '[:,]' '/"listen_port"/{gsub(/[[:space:]]/, "", $2); print $2; exit}' ${HY2_FILE} 2>/dev/null)
 
@@ -2381,9 +2436,7 @@ sync_port_hopping_firewall_rules() {
     return 0
   fi
 
-  if [ "$EXISTING_START" != "$DESIRED_START" ] || \
-     [ "$EXISTING_END" != "$DESIRED_END" ] || \
-     [ "$EXISTING_TARGET" != "$HY2_TARGET" ]; then
+  if [ "$EXISTING_START" != "$DESIRED_START" ] ||      [ "$EXISTING_END" != "$DESIRED_END" ] ||      [ "$EXISTING_TARGET" != "$HY2_TARGET" ]; then
     [ -n "$EXISTING_START" ] && [ -n "$EXISTING_END" ] && del_port_hopping_nat
     PORT_HOPPING_START="$DESIRED_START"
     PORT_HOPPING_END="$DESIRED_END"
@@ -2392,77 +2445,6 @@ sync_port_hopping_firewall_rules() {
     add_port_hopping_nat "$PORT_HOPPING_START" "$PORT_HOPPING_END" "$PORT_HOPPING_TARGET"
   fi
 }
-
-# 同步所有防火墙规则
-sync_firewall_rules() {
-  sync_service_firewall_rules
-  sync_port_hopping_firewall_rules
-}
-
-# 清理所有由脚本管理的防火墙规则
-purge_managed_firewall_rules() {
-  purge_service_firewall_rules
-  del_port_hopping_nat >/dev/null 2>&1 || true
-}
-
-# 按需安装端口跳跃所需的防火墙依赖
-# 策略：UFW → 不安装 iptables / netfilter-persistent；Alpine → iptables；CentOS 或已装 firewalld → firewalld；其他 → iptables + netfilter-persistent
-install_firewall_deps() {
-  local FW_BACKEND
-  FW_BACKEND=$(check_port_hopping_firewall)
-
-  local FW_CHECK=() FW_INSTALL=() FW_TO_INSTALL=()
-
-  case "$FW_BACKEND" in
-    ufw )
-      info "\n $(text 144) \n"
-      return 0
-      ;;
-    alpine-iptables )
-      FW_CHECK=("iptables")
-      FW_INSTALL=("iptables")
-      ;;
-    firewalld )
-      FW_CHECK=("firewall-cmd")
-      FW_INSTALL=("firewalld")
-      ;;
-    * )
-      FW_CHECK=("iptables" "netfilter-persistent")
-      FW_INSTALL=("iptables" "netfilter-persistent")
-      ;;
-  esac
-
-  for i in "${!FW_CHECK[@]}"; do
-    ! command -v "${FW_CHECK[i]}" >/dev/null 2>&1 && FW_TO_INSTALL+=("${FW_INSTALL[i]}")
-  done
-
-  if [ "${#FW_TO_INSTALL[@]}" -gt 0 ]; then
-    FW_TO_INSTALL=($(printf "%s\n" "${FW_TO_INSTALL[@]}" | sort -u))
-    [ "$SYSTEM" != 'CentOS' ] && ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
-    ${PACKAGE_INSTALL[int]} "${FW_TO_INSTALL[@]}" >/dev/null 2>&1
-  fi
-
-  # 安装后确保 firewalld 已启动（CentOS 或已装 firewalld 的系统）
-  if [ "$FW_BACKEND" = 'firewalld' ]; then
-    [ "$(systemctl is-active firewalld 2>/dev/null)" != 'active' ] && cmd_systemctl enable firewalld >/dev/null 2>&1
-    [ "$(firewall-cmd --zone=public --get-target 2>/dev/null)" != 'ACCEPT' ] && firewall-cmd --zone=public --set-target=ACCEPT --permanent >/dev/null 2>&1
-    firewall-cmd --reload >/dev/null 2>&1
-  fi
-}
-
-# 检查并安装 nginx
-check_nginx() {
-  if ! command -v nginx >/dev/null 2>&1; then
-    info "\n $(text 7) nginx \n"
-    ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
-    ${PACKAGE_INSTALL[int]} nginx >/dev/null 2>&1
-
-    # 如果新安装的 Nginx，使用 cmd_systemctl 停止服务
-    cmd_systemctl disable nginx
-  fi
-}
-
-# Json 生成两个配置文件
 export_argo_json_file() {
   local FILE_PATH=$1
   [[ -z "$PORT_NGINX" && -s ${WORK_DIR}/nginx.conf ]] && local PORT_NGINX=$(awk '/listen/{print $2; exit}' ${WORK_DIR}/nginx.conf)
@@ -3558,7 +3540,12 @@ fetch_quicktunnel_domain() {
 # 安装 sing-box 全家桶
 install_sing-box() {
   sing-box_variables
-  [ -n "$PORT_NGINX" ] && check_nginx
+  if [ -n "$PORT_NGINX" ] && ! command -v nginx >/dev/null 2>&1; then
+    info "\n $(text 7) nginx \n"
+    ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
+    ${PACKAGE_INSTALL[int]} nginx >/dev/null 2>&1
+    cmd_systemctl disable nginx
+  fi
   [ ! -d ${WORK_DIR}/logs ] && mkdir -p ${WORK_DIR}/logs
   [ ! -d ${TEMP_DIR} ] && mkdir -p $TEMP_DIR
   ssl_certificate $TLS_SERVER_DEFAULT
@@ -4679,7 +4666,8 @@ uninstall() {
     sleep 1
     [[ -s ${WORK_DIR}/nginx.conf && "$(ps -ef | grep -c '[n]ginx')" = 0 ]] && reading "\n $(text 83) " REMOVE_NGINX
     [ "${REMOVE_NGINX,,}" = 'y' ] && ${PACKAGE_UNINSTALL[int]} nginx >/dev/null 2>&1
-    purge_managed_firewall_rules
+    purge_service_firewall_rules
+    del_port_hopping_nat >/dev/null 2>&1 || true
     rm -rf ${WORK_DIR} ${TEMP_DIR} ${ARGO_DAEMON_FILE} ${SINGBOX_DAEMON_FILE} /usr/bin/sb
     info "\n $(text 16) \n"
   else
@@ -4863,7 +4851,6 @@ if [[ -n "$CONFIG_FILE" && -s "$CONFIG_FILE" ]]; then
 fi
 
 check_root
-check_ufw_active_preinstall
 select_language
 check_system_info
 check_brutal
