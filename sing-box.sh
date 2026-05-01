@@ -45,8 +45,8 @@ E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
 C[3]="输入错误达5次,脚本退出"
-E[4]="UUID should be 36 characters, please re-enter \(\${UUID_ERROR_TIME} times remaining\):"
-C[4]="UUID 应为36位字符,请重新输入 \(剩余\${UUID_ERROR_TIME}次\):"
+E[4]="UUID should be 36 characters, please re-enter (\${UUID_ERROR_TIME} times remaining):"
+C[4]="UUID 应为36位字符,请重新输入 (剩余\${UUID_ERROR_TIME}次):"
 E[5]="The script supports Debian, Ubuntu, CentOS, Alpine, Fedora or Arch systems only. Feedback: [https://github.com/fscarmen/sing-box/issues]"
 C[5]="本脚本只支持 Debian、Ubuntu、CentOS、Alpine、Fedora 或 Arch 系统,问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 E[6]="Curren operating system is \$SYS.\\\n The system lower than \$SYSTEM \${MAJOR[int]} is not supported. Feedback: [https://github.com/fscarmen/sing-box/issues]"
@@ -65,8 +65,8 @@ E[12]="Please enter UUID (Default: \${UUID_DEFAULT}):"
 C[12]="请输入 UUID (默认为: \${UUID_DEFAULT}):"
 E[13]="Please enter the node name. (Default: \${NODE_NAME_DEFAULT}):"
 C[13]="请输入节点名称 (默认为: \${NODE_NAME_DEFAULT}):"
-E[14]="Node name only allow uppercase and lowercase letters, numeric characters, hyphens, underscores, dots and @, please re-enter \(\${a} times remaining\):"
-C[14]="节点名称只允许英文大小写、数字、连字符、下划线、点和@字符，请重新输入 \(剩余\${a}次\):"
+E[14]="Node name only allow uppercase and lowercase letters, numeric characters, hyphens, underscores, dots and @, please re-enter (\${a} times remaining):"
+C[14]="节点名称只允许英文大小写、数字、连字符、下划线、点和@字符，请重新输入 (剩余\${a}次):"
 E[15]="Sing-box script has not been installed yet."
 C[15]="Sing-box 脚本还没有安装"
 E[16]="Sing-box is completely uninstalled."
@@ -468,7 +468,7 @@ statistics_of_run_times() {
   local UPDATE_OR_GET=$1
   local SCRIPT=$2
   if grep -q 'update' <<< "$UPDATE_OR_GET"; then
-    { wget --no-check-certificate -qO- --timeout=3 "https://stat.cloudflare.now.cc/api/updateStats?script=${SCRIPT}" > $TEMP_DIR/statistics 2>/dev/null || true; }&
+    { wget --no-check-certificate -qO- --timeout=3 "https://stat.cloudflare.now.cc/updateStats?script=${SCRIPT}" > $TEMP_DIR/statistics 2>/dev/null || true; }&
   elif grep -q 'get' <<< "$UPDATE_OR_GET"; then
     [ -s $TEMP_DIR/statistics ] && [[ $(cat $TEMP_DIR/statistics) =~ \"todayCount\":([0-9]+),\"totalCount\":([0-9]+) ]] && local TODAY="${BASH_REMATCH[1]}" && local TOTAL="${BASH_REMATCH[2]}" && rm -f $TEMP_DIR/statistics
     hint "\n*******************************************\n\n $(text 55) \n"
