@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.10 (2026.04.25)'
+VERSION='v1.3.10 (2026.05.05)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -1447,25 +1447,23 @@ add_port_hopping_nat() {
       info "\n $(text 144) \n"
       ;;
     alpine-iptables )
-      FW_CHECK=("iptables")
-      FW_INSTALL=("iptables")
+      command -v iptables >/dev/null 2>&1 || FW_TO_INSTALL+=("iptables")
       ;;
     firewalld )
-      FW_CHECK=("firewall-cmd")
-      FW_INSTALL=("firewalld")
+      command -v firewall-cmd >/dev/null 2>&1 || FW_TO_INSTALL+=("firewalld")
       ;;
     * )
-      FW_CHECK=("iptables" "netfilter-persistent")
-      FW_INSTALL=("iptables" "netfilter-persistent")
+      command -v iptables >/dev/null 2>&1 || FW_TO_INSTALL+=("iptables")
+      if ! command -v netfilter-persistent >/dev/null 2>&1 ||
+         ! dpkg -s iptables-persistent >/dev/null 2>&1; then
+        FW_TO_INSTALL+=("iptables-persistent")
+      fi
       ;;
   esac
 
-  for i in "${!FW_CHECK[@]}"; do
-    ! command -v "${FW_CHECK[i]}" >/dev/null 2>&1 && FW_TO_INSTALL+=("${FW_INSTALL[i]}")
-  done
-
   if [ "${#FW_TO_INSTALL[@]}" -gt 0 ]; then
     FW_TO_INSTALL=($(printf "%s\n" "${FW_TO_INSTALL[@]}" | sort -u))
+    info "\n $(text 7) $(sed "s/ /,&/g" <<< "${FW_TO_INSTALL[*]}") \n"
     [ "$SYSTEM" != 'CentOS' ] && ${PACKAGE_UPDATE[int]} >/dev/null 2>&1
     ${PACKAGE_INSTALL[int]} "${FW_TO_INSTALL[@]}" >/dev/null 2>&1
   fi
@@ -3726,7 +3724,7 @@ export_list() {
   local SELF_SIGNED_FINGERPRINT_BASE64=$(openssl x509 -in ${WORK_DIR}/cert/cert.pem -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64)
 
   local CERT_URL=$(awk '{printf "%s,", $0}' ${WORK_DIR}/cert/cert.pem | sed 's/,$//')
-  local CERT_200_URL=$(awk '{printf "%s,", $0}' ${WORK_DIR}/cert/cert_200.pem | sed 's/,$//')
+  [ -s ${WORK_DIR}/cert/cert_200.pem ] && local CERT_200_URL=$(awk '{printf "%s,", $0}' ${WORK_DIR}/cert/cert_200.pem | sed 's/,$//')
 
   # 从自签证书的 SAN 中读取当前使用的 SNI，优先取 SAN，退回到 CN
   local TLS_SERVER=$(openssl x509 -noout -ext subjectAltName -in ${WORK_DIR}/cert/cert.pem 2>/dev/null | awk -F 'DNS:' '/DNS:/{gsub(/,.*/, "", $2); print $2}')
