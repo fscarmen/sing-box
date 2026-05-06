@@ -881,6 +881,7 @@ EOF
   # 获取自签证书指纹。argo 回源的是由 Google Trust Services（谷歌信任服务）作为中间 CA（CN=WE1）签发，受信任的证书（非自签名）
   local SELF_SIGNED_FINGERPRINT_SHA256=$(openssl x509 -fingerprint -noout -sha256 -in ${WORK_DIR}/cert/cert.pem | awk -F '=' '{print $NF}')
   local SELF_SIGNED_FINGERPRINT_BASE64=$(openssl x509 -in ${WORK_DIR}/cert/cert.pem -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64)
+  local CERT_URL=$(awk '{printf "%s,", $0}' ${WORK_DIR}/cert/cert.pem)
 
   # 生成 nginx 配置文件
   local NGINX_CONF="user root;
@@ -1172,7 +1173,7 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?encryption=none&security=rea
 
   [ "${ANYTLS}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?security=tls&sni=addons.mozilla.org&fp=firefox&insecure=1&allowInsecure=1&type=tcp#${NODE_NAME// /%20}%20anytls"
+v2rayn://anytls/$(echo -n "{\"ConfigType\":11,\"CoreType\":24,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME} anytls\",\"Address\":\"${SERVER_IP_1}\",\"Port\":${PORT_ANYTLS},\"Password\":\"${UUID}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"addons.mozilla.org\",\"Fingerprint\":\"firefox\",\"Cert\":\"${CERT_URL}\"}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
 
   echo -n "$V2RAYN_SUBSCRIBE" | sed -E '/^[ ]*#|^[ ]+|^--|^\{|^\}/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/v2rayn
 

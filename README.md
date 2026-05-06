@@ -24,6 +24,8 @@
 
 * * *
 ## 1.更新信息
+2026.05.06 v1.3.11 1. Generate v2rayn:// dedicated links for AnyTLS subscriptions; 2. Generate v2rayn:// dedicated links for naive http2 and quic modes. Thanks to @DHR60 1. 为 AnyTLS 订阅生成 v2rayn:// 专属链接; 2. 为 naive http2 和 quic 模式生成 v2rayn:// 专属链接，感谢 @DHR60
+
 2026.04.25 v1.3.10 Added native protocol, but client support is extremely limited, with Shadowrocket offering the best compatibility. For the sing-box core, you must use the -glibc or -musl version according to the requirements; refer to the official documentation for details: https://sing-box.sagernet.org/configuration/outbound/naive/; 增加 native 协议，支持该协议的客户端极少，Shadowrocket 支持最好。sing-box 内核需要按说明使用-glibc 或者 -musl 版本，详见官方说明 https://sing-box.sagernet.org/zh/configuration/outbound/naive/
 
 2026.04.11 v1.3.9 1. remove pre-install UFW blocking logic, fallback to iptables when inactive; 2. avoid unnecessary sing-box restart for CDN / bandwidth / port hopping changes; 3. reduce redundant single-use functions; 1. 移除安装前 UFW 强制校验，inactive 自动回退 iptables; 2. 优选地址 / 带宽 / 端口跳跃修改不再重启 sing-box; 3. 清理单次调用函数，提升结构可读性
