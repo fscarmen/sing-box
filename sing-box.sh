@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.12 (2026.05.14)'
+VERSION='v1.3.13 (2026.05.18)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -39,8 +39,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Added Hysteria2 Realm support for machines without public inbound access, with optional WARP-assisted hole punching; 2. Realm is exported for Clash/Mihomo and sing-box clients; 3. Hysteria2 Realm can be toggled directly in node configuration changes; 4. Unified the fixed STUN server list for Hysteria2 Realm."
-C[1]="1. 增加 Hysteria2 Realm 支持，适用于没有公网入口的机器，并可选 WARP 辅助打洞; 2. Realm 已支持导出 Clash/Mihomo 和 sing-box 客户端配置; 3. 修改节点配置时可直接开启或关闭 Hysteria2 Realm; 4. 统一 Hysteria2 Realm 固定 STUN 服务器列表。"
+E[1]="1. Added Hysteria2 Realm support for machines without public inbound access, with optional WARP-assisted hole punching; 2. Realm is exported for Clash/Mihomo and sing-box clients; 3. Hysteria2 Realm can be toggled directly in node configuration changes; 4. Unified the fixed STUN server list for Hysteria2 Realm; 5. Added top-level http_clients configuration"
+C[1]="1. 增加 Hysteria2 Realm 支持，适用于没有公网入口的机器，并可选 WARP 辅助打洞; 2. Realm 已支持导出 Clash/Mihomo 和 sing-box 客户端配置; 3. 修改节点配置时可直接开启或关闭 Hysteria2 Realm; 4. 统一 Hysteria2 Realm 固定 STUN 服务器列表。 5. 增加顶层的 http_clients 配置"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -1164,7 +1164,7 @@ input_reality_key() {
 input_argo_auth() {
   local IS_CHANGE_ARGO=$1
   [ -n "$IS_CHANGE_ARGO" ] && local EMPTY_ERROR_TIME=5
-  local DOMAIN_ERROR_TIME=6 ARGO_AUTH_LENGTH=40
+  local DOMAIN_ERROR_TIME=6
 
   # 处理可能输入的错误，去掉开头和结尾的空格，去掉最后的 :
   if [ "$IS_CHANGE_ARGO" = 'is_change_argo' ]; then
@@ -1183,7 +1183,7 @@ input_argo_auth() {
     ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --no-autoupdate --url http://localhost:$PORT_NGINX"
   elif [ -n "${ARGO_DOMAIN}" ]; then
     if [ -z "${ARGO_AUTH}" ]; then
-      until [[ "$ARGO_AUTH" =~ TunnelSecret || "$ARGO_AUTH" =~ [A-Z0-9a-z=]{150,250}$ || "${#ARGO_AUTH}" = $ARGO_AUTH_LENGTH ]]; do
+      until [[ "$ARGO_AUTH" =~ TunnelSecret || "$ARGO_AUTH" =~ [A-Z0-9a-z=]{120,250}$ || "${#ARGO_AUTH}" =~ ^[3-6][0-9]$ ]]; do
         [ "$DOMAIN_ERROR_TIME" != 6 ] && warning "\n $(text 86) \n"
       (( DOMAIN_ERROR_TIME-- )) || true
         [ "$DOMAIN_ERROR_TIME" != 0 ] && hint "\n $(text 85) \n " && reading "\n $(text 118) " ARGO_AUTH || error "\n $(text 3) \n"
@@ -1196,18 +1196,18 @@ input_argo_auth() {
       ARGO_JSON=${ARGO_AUTH//[ ]/}
       [ "$IS_CHANGE_ARGO" = 'is_install' ] && export_argo_json_file $TEMP_DIR || export_argo_json_file ${WORK_DIR}
       ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run"
-    elif [[ "${ARGO_AUTH}" =~ [A-Z0-9a-z=]{150,250}$ ]]; then
+    elif [[ "${ARGO_AUTH}" =~ [A-Z0-9a-z=]{120,250}$ ]]; then
       ARGO_TYPE=is_token_argo
       ARGO_TOKEN=$(awk '{print $NF}' <<< "$ARGO_AUTH")
       ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto run --token ${ARGO_TOKEN}"
-    elif [[ "${#ARGO_AUTH}" = $ARGO_AUTH_LENGTH ]]; then
+    elif [[ "${#ARGO_AUTH}" =~ ^[3-6][0-9]$ ]]; then
       hint "\n $(text 119) \n "
       create_argo_tunnel "${ARGO_AUTH}" "${ARGO_DOMAIN}" "${PORT_NGINX}"
       if [[ "$ARGO_JSON" =~ TunnelSecret ]]; then
         ARGO_TYPE=is_json_argo
         [ "$IS_CHANGE_ARGO" = 'is_install' ] && export_argo_json_file $TEMP_DIR || export_argo_json_file ${WORK_DIR}
         ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run"
-      elif [ "${#ARGO_TOKEN}" = 180 ]; then
+      elif [[ "${#ARGO_TOKEN}" =~ ^[0-9]+$ && "${#ARGO_TOKEN}" -ge 120 && "${#ARGO_TOKEN}" -le 250 ]]; then
         ARGO_TYPE=is_token_argo
         ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto run --token ${ARGO_TOKEN}"
       else
@@ -2942,6 +2942,7 @@ EOF
     cat > ${WORK_DIR}/conf/03_route.json << EOF
 {
     "route":{
+        "default_http_client": "http-client-direct",
         "rule_set":[
             {
                 "tag":"geosite-openai",
@@ -3018,6 +3019,17 @@ EOF
         "server_port": 123,
         "interval": "60m"
     }
+}
+EOF
+
+    # 专门给 sing-box 内部组件发 HTTP 请求用，比如这些场景会用到它：下载远程 rule_set：.srs 规则文件，ACME 申请证书，Cloudflare Origin CA 证书提供器，DERP / Tailscale 相关 HTTP 请求
+    cat > ${WORK_DIR}/conf/07_http_clients.json << EOF
+{
+    "http_clients": [
+        {
+            "tag": "http-client-direct"
+        }
+    ]
 }
 EOF
   fi

@@ -218,6 +218,7 @@ EOF
   cat > ${WORK_DIR}/conf/03_route.json << EOF
 {
     "route":{
+        "default_http_client": "http-client-direct",
         "rule_set":[
             {
                 "tag":"geosite-openai",
@@ -293,6 +294,17 @@ EOF
         "server_port": 123,
         "interval": "60m"
     }
+}
+EOF
+
+  # 专门给 sing-box 内部组件发 HTTP 请求用，比如这些场景会用到它：下载远程 rule_set：.srs 规则文件，ACME 申请证书，Cloudflare Origin CA 证书提供器，DERP / Tailscale 相关 HTTP 请求
+  cat > ${WORK_DIR}/conf/07_http_clients.json << EOF
+{
+    "http_clients": [
+        {
+            "tag": "http-client-direct"
+        }
+    ]
 }
 EOF
 
