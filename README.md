@@ -25,6 +25,8 @@
 * * *
 ## 1.更新信息
 
+2026.05.29 v1.3.14 Added optional custom warp route rule management, available after installation via [sb -d] without affecting the main installation flow; 增加可选的自定义 warp 路由规则管理，不影响主程序安装流程，安装后可通过 [sb -d] 按需管理
+
 2026.05.18 v1.3.13 Added top-level http_clients configuration; 增加顶层的 http_clients 配置
 
 2026.05.14 v1.3.12 1. Add Hysteria2 Realm support for machines without public inbound access, with optional WARP-assisted hole punching for strict NAT environments; 2. Realm configuration export is supported for Clash/Mihomo and sing-box clients; 3. Hysteria2 Realm can be enabled or disabled directly via sb -d; 4. Non-interactive installs support --HY2_REALM and --HY2_WARP parameters; 1. 增加 Hysteria2 Realm 支持，适用于没有公网入口的机器，并可选 WARP 辅助打洞; 2. Realm 已支持导出 Clash/Mihomo 和 sing-box 客户端配置; 3. 修改节点配置时可直接开启或关闭 Hysteria2 Realm; 4. 无交互安装支持 --HY2_REALM 与 --HY2_WARP 参数
@@ -600,6 +602,7 @@ services:
 |   |-- 05_dns.json                          # DNS 规则文件
 |   |-- 06_ntp.json                          # 服务端时间同步配置文件
 |   |-- 07_http_clients.json                 # 专门给 sing-box 内部组件发 HTTP 请求配置文件
+|   |-- 08_custom_route.json                 # 用户自定义 warp-ep 出站路由规则文件，支持 domain_suffix / rule_set 分流
 |   |-- 11_xtls-reality_inbounds.json        # Reality vision 协议配置文件
 |   |-- 12_hysteria2_inbounds.json           # Hysteria2 协议配置文件
 |   |-- 13_tuic_inbounds.json                # Tuic V5 协议配置文件 # Hysteria2 协议配置文件
