@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.14 (2026.05.29)'
+VERSION='v1.3.14 (2026.06.02)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -566,6 +566,7 @@ format_uri_host() {
   fi
 }
 
+# 输入优选 CDN
 input_cdn() {
   echo ""
   unset CUSTOM_CDN PARSED_HOST PARSED_PORT
@@ -596,6 +597,23 @@ input_cdn() {
         break
     esac
   done
+}
+
+# 输入 UUID
+input_uuid() {
+  # 输入 UUID ，错误超过 5 次将会退出
+  UUID_DEFAULT=$(cat /proc/sys/kernel/random/uuid)
+  [[ "$IS_FAST_INSTALL" = 'is_fast_install' || "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]] && UUID_CONFIRM=${UUID_CONFIRM:-"$UUID_DEFAULT"}
+  if [ -z "$UUID_CONFIRM" ]; then
+    (( STEP_NUM++ )) || true
+    reading "\n ${TOTAL_STEPS:+(${STEP_NUM}/${TOTAL_STEPS}) } $(text 12) " UUID_CONFIRM
+  fi
+  local UUID_ERROR_TIME=5
+  until [[ -z "$UUID_CONFIRM" || "${UUID_CONFIRM,,}" =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ ]]; do
+    (( UUID_ERROR_TIME-- )) || true
+    [ "$UUID_ERROR_TIME" = 0 ] && error "\n $(text 3) \n" || reading "\n $(text 4) \n" UUID_CONFIRM
+  done
+  UUID_CONFIRM=${UUID_CONFIRM:-"$UUID_DEFAULT"}
 }
 
 # 更换优选域名 / reality SNI / 节点名 / UUID
@@ -2448,19 +2466,8 @@ sing-box_variables() {
     input_cdn
   fi
 
-  # 输入 UUID ，错误超过 5 次将会退出
-  UUID_DEFAULT=$(cat /proc/sys/kernel/random/uuid)
-  [[ "$IS_FAST_INSTALL" = 'is_fast_install' || "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]] && UUID_CONFIRM=${UUID_CONFIRM:-"$UUID_DEFAULT"}
-  if [ -z "$UUID_CONFIRM" ]; then
-    (( STEP_NUM++ )) || true
-    reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 12) " UUID_CONFIRM
-  fi
-  local UUID_ERROR_TIME=5
-  until [[ -z "$UUID_CONFIRM" || "${UUID_CONFIRM,,}" =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ ]]; do
-    (( UUID_ERROR_TIME-- )) || true
-    [ "$UUID_ERROR_TIME" = 0 ] && error "\n $(text 3) \n" || reading "\n $(text 4) \n" UUID_CONFIRM
-  done
-  UUID_CONFIRM=${UUID_CONFIRM:-"$UUID_DEFAULT"}
+  # 确认 UUID
+  input_uuid
 
   # 输入节点名，以系统的 hostname 作为默认
   local EMOJI="${EMOJI4:-$EMOJI6}"
@@ -5129,7 +5136,7 @@ change_start_port() {
     [ -s ${WORK_DIR}/conf/${CONF_FILES[a]} ] && sed -i "s/\(.*listen_port.*:\)$((OLD_START_PORT+a))/\1$((START_PORT+a))/" ${WORK_DIR}/conf/*
   done
   fetch_nodes_value
-  [ -n "$PORT_NGINX" ] && UUID_CONFIRM=$(sed -n 's#.*location[ ]\+\/\(.*\)-v[ml]ess.*#\1#gp' /etc/sing-box/nginx.conf | sed -n '1p') && export_nginx_conf_file
+  [ -n "$PORT_NGINX" ] && UUID_CONFIRM=$(awk '/location/ && /\// {match($0, /\/([^ \/]+)/, arr); p=arr[1]; sub(/-(vmess|vless|auto2|auto).*/, "", p); print p; exit}' ${WORK_DIR}/nginx.conf) && export_nginx_conf_file
   cmd_systemctl enable sing-box
   [ -n "$ARGO_DOMAIN" ] && export_argo_json_file
   sync_firewall_rules
@@ -5216,7 +5223,14 @@ change_protocols() {
   fetch_nodes_value
 
   # 用于新节点的配置信息
-  UUID_CONFIRM=$(awk '{print $1}' <<< "${UUID[@]} $TROJAN_PASSWORD")
+  if [ "${#UUID[@]}" -gt 0 ]; then 
+    UUID_CONFIRM="${UUID[0]}"
+  elif grep -q '.' <<< "${TROJAN_PASSWORD}"; then
+    UUID_CONFIRM="${TROJAN_PASSWORD}"
+  else
+    input_uuid
+  fi
+
   for v in "${NODE_NAME[@]}"; do
     [ -n "$v" ] && NODE_NAME_CONFIRM="$v" && break
   done
@@ -5468,8 +5482,6 @@ change_protocols() {
 
   # 停止 sing-box 服务
   cmd_systemctl disable sing-box
-
-  # 关闭防火墙相关端口
 
   # 生成 Nginx 配置文件
   [ -n "$PORT_NGINX" ] && export_nginx_conf_file
