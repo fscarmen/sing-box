@@ -3221,7 +3221,7 @@ http {
     default                    /;               # 默认路径
     ~*v2rayN                   /v2rayn;         # 匹配 V2rayN 客户端
     ~*clash                    /clash;          # 匹配 Clash 客户端
-    ~*Neko|Throne              /neko;           # 匹配 Neko / Throne 客户端
+    ~*Throne|Neko              /throne;         # 匹配 Throne / Neko 客户端
     ~*ShadowRocket             /shadowrocket;   # 匹配 ShadowRocket 客户端
     ~*SFM|SFI|SFA              /sing-box;       # 匹配 Sing-box 官方客户端
 #   ~*Chrome|Firefox|Mozilla   /;               # 添加更多的分流规则
@@ -3230,7 +3230,7 @@ http {
     default                    /;               # 默认路径
     ~*v2rayN                   /v2rayn;         # 匹配 V2rayN 客户端
     ~*clash                    /clash2;         # 匹配 Clash 客户端
-    ~*Neko|Throne              /neko;           # 匹配 Neko 客户端
+    ~*Throne|Neko              /throne;         # 匹配 Throne / Neko 客户端
     ~*ShadowRocket             /shadowrocket;   # 匹配 ShadowRocket 客户端
     ~*SFM|SFI|SFA              /sing-box;       # 匹配 Sing-box 官方客户端
 #   ~*Chrome|Firefox|Mozilla   /;               # 添加更多的分流规则
@@ -4730,9 +4730,9 @@ ss://$(echo -n "${SHADOWSOCKS_METHOD}:${SHADOWSOCKS_PASSWORD}@${SERVER_IP_1}:$PO
 
   [ -n "$PORT_TROJAN" ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-trojan://$TROJAN_PASSWORD@${SERVER_IP_1}:$PORT_TROJAN?security=tls&insecure=1&allowInsecure=1&pcs=${SELF_SIGNED_FINGERPRINT_SHA256//:/}&type=tcp&headerType=none#${NODE_NAME[16]// /%20}%20${NODE_TAG[5]}"
+v2rayn://trojan/$(echo -n "{\"ConfigType\":6,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME[16]} ${NODE_TAG[5]}\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_TROJAN},\"Password\":\"${TROJAN_PASSWORD}\",\"Network\":\"raw\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"${TLS_SERVER}\",\"Cert\":\"${CERT_URL_2}\"}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
 
-  if [ -n "$PORT_VMESS_WS" ]; then
+ if [ -n "$PORT_VMESS_WS" ]; then
     local VMESS_CDN_PORT=${CDN_PORT[17]:-80}
     local VMESS_CDN_HOST=$(format_uri_host "${CDN[17]}")
      if [[ "${STATUS[1]}" =~ $(text 27)|$(text 28) ]] || [[ "$IS_ARGO" = 'is_argo' && "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]]; then
@@ -4798,7 +4798,7 @@ v2rayn://naive/$(echo -n "{\"ConfigType\":12,\"CoreType\":24,\"ConfigVersion\":4
 vless://${UUID[11]}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?security=reality&sni=${TLS_SERVER}&fp=firefox&pbk=${REALITY_PUBLIC[11]}&type=tcp${VISION_FLOW}&encryption=none#${NODE_NAME[11]// /%20}%20${NODE_TAG[0]}"
 
   if [ -n "$PORT_HYSTERIA2" ]; then
-    local THRONE_PARAMS="allowInsecure=true&alpn&security=tls&sni=${TLS_SERVER}&upmbps=${HY2_UP}&downmbps=${HY2_DOWN}&security=tls&tls_certificate=${CERT_URL_1}"
+    local THRONE_PARAMS="allowInsecure=false&alpn&security=tls&sni=${TLS_SERVER}&upmbps=${HY2_UP}&downmbps=${HY2_DOWN}&security=tls&tls_certificate=${CERT_URL_1}"
     if [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]]; then
       THRONE_PARAMS+="&mport=${PORT_HOPPING_START}-${PORT_HOPPING_END}&hop_interval=30s"
     fi
@@ -4809,12 +4809,12 @@ hysteria2://${UUID[12]}@${SERVER_IP_1}:${PORT_HYSTERIA2}?${THRONE_PARAMS}#${NODE
 
   [ -n "$PORT_TUIC" ] && local THRONE_SUBSCRIBE+="
 ----------------------------
-tuic://${TUIC_PASSWORD}:${UUID[13]}@${SERVER_IP_1}:${PORT_TUIC}?congestion_control=$TUIC_CONGESTION_CONTROL&alpn=h3&sni=${TLS_SERVER}&udp_relay_mode=native&allow_insecure=1&security=tls&tls_certificate=${CERT_URL_1}#${NODE_NAME[13]// /%20}%20${NODE_TAG[2]}"
+tuic://${TUIC_PASSWORD}:${UUID[13]}@${SERVER_IP_1}:${PORT_TUIC}?congestion_control=$TUIC_CONGESTION_CONTROL&alpn=h3&sni=${TLS_SERVER}&udp_relay_mode=native&allow_insecure=0&security=tls&tls_certificate=${CERT_URL_1}#${NODE_NAME[13]// /%20}%20${NODE_TAG[2]}"
   [ -n "$PORT_SHADOWTLS" ] && local THRONE_SUBSCRIBE+="
 ----------------------------
-nekoray://custom#$(echo -n "{\"_v\":0,\"addr\":\"127.0.0.1\",\"cmd\":[\"\"],\"core\":\"internal\",\"cs\":\"{\n    \\\"password\\\": \\\"${UUID[14]}\\\",\n    \\\"server\\\": \\\"${SERVER_IP_1}\\\",\n    \\\"server_port\\\": ${PORT_SHADOWTLS},\n    \\\"tag\\\": \\\"shadowtls-out\\\",\n    \\\"tls\\\": {\n        \\\"enabled\\\": true,\n        \\\"server_name\\\": \\\"${TLS_SERVER}\\\"\n    },\n    \\\"type\\\": \\\"shadowtls\\\",\n    \\\"version\\\": 3\n}\n\",\"mapping_port\":0,\"name\":\"1-tls-not-use\",\"port\":1080,\"socks_port\":0}" | base64 -w0)
+shadowtls://:${UUID[14]}@${SERVER_IP_1}:${PORT_SHADOWTLS}?version=3&security=tls&sni=${TLS_SERVER}&fp=chrome#1-tls-not-use
 
-nekoray://shadowsocks#$(echo -n "{\"_v\":0,\"method\":\"$SHADOWTLS_METHOD\",\"name\":\"2-ss-not-use\",\"pass\":\"$SHADOWTLS_PASSWORD\",\"port\":0,\"stream\":{\"ed_len\":0,\"insecure\":false,\"mux_s\":0,\"net\":\"tcp\"},\"uot\":0}" | base64 -w0)"
+ss://${SHADOWTLS_METHOD}:${SHADOWTLS_PASSWORD}@127.0.0.1:0#2-ss-not-use"
 
   [ -n "$PORT_SHADOWSOCKS" ] && local THRONE_SUBSCRIBE+="
 ----------------------------
@@ -4822,7 +4822,7 @@ ss://$(echo -n "${SHADOWSOCKS_METHOD}:${SHADOWSOCKS_PASSWORD}" | base64 -w0)@${S
 
   [ -n "$PORT_TROJAN" ] && local THRONE_SUBSCRIBE+="
 ----------------------------
-trojan://${TROJAN_PASSWORD}@${SERVER_IP_1}:$PORT_TROJAN?security=tls&sni=${TLS_SERVER}&allowInsecure=1&tls_certificate=${CERT_URL_1}&fp=firefox&type=tcp#${NODE_NAME[16]// /%20}%20${NODE_TAG[5]}"
+trojan://${TROJAN_PASSWORD}@${SERVER_IP_1}:$PORT_TROJAN?security=tls&sni=${TLS_SERVER}&allowInsecure=0&tls_certificate=${CERT_URL_1}&fp=firefox&type=tcp#${NODE_NAME[16]// /%20}%20${NODE_TAG[5]}"
 
   if [ -n "$PORT_VMESS_WS" ]; then
      if [[ "${STATUS[1]}" =~ $(text 27)|$(text 28) ]] || [[ "$IS_ARGO" = 'is_argo' && "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]]; then
@@ -4872,7 +4872,7 @@ vless://${UUID[20]}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=${T
 
   [ -n "$PORT_ANYTLS" ] && local THRONE_SUBSCRIBE+="
 ----------------------------
-anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}?idle_session_check_interval=30s&idle_session_timeout=30s&min_idle_session=5&insecure=1&security=tls&sni=${TLS_SERVER}&tls_certificate=${CERT_URL_1}&fp=firefox#${NODE_NAME[21]// /%20}%20${NODE_TAG[10]}"
+anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}?idle_session_check_interval=30s&idle_session_timeout=30s&min_idle_session=5&insecure=0&security=tls&sni=${TLS_SERVER}&tls_certificate=${CERT_URL_1}&fp=firefox#${NODE_NAME[21]// /%20}%20${NODE_TAG[10]}"
 
   [ -n "$PORT_NAIVE" ] && {
     local THRONE_SUBSCRIBE+="
@@ -4882,7 +4882,7 @@ naive+https://${UUID[22]}:${UUID[22]}@${SERVER_IP_1}:${PORT_NAIVE}?uot=1&securit
 naive+quic://${UUID[22]}:${UUID[22]}@${SERVER_IP_1}:${PORT_NAIVE}?congestion_control=bbr&security=tls&sni=${TLS_SERVER}&tls_certificate=${CERT_200_URL_1}#${NODE_NAME[22]// /%20}%20${NODE_TAG[11]}%20quic"
   }
 
-  echo -n "$THRONE_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/neko
+  echo -n "$THRONE_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/throne
 
   # 生成 Sing-box 订阅文件
   [ -n "$PORT_XTLS_REALITY" ] &&
@@ -5070,7 +5070,7 @@ V2rayN $(text 80):
 $SUBSCRIBE_ADDRESS/${UUID_CONFIRM}/v2rayn")
 
 $(hint "Throne $(text 80):
-$SUBSCRIBE_ADDRESS/${UUID_CONFIRM}/neko")
+$SUBSCRIBE_ADDRESS/${UUID_CONFIRM}/throne")
 
 $(hint "Clash $(text 80):
 $SUBSCRIBE_ADDRESS/${UUID_CONFIRM}/clash
@@ -5223,7 +5223,7 @@ change_protocols() {
   fetch_nodes_value
 
   # 用于新节点的配置信息
-  if [ "${#UUID[@]}" -gt 0 ]; then 
+  if [ "${#UUID[@]}" -gt 0 ]; then
     UUID_CONFIRM="${UUID[0]}"
   elif grep -q '.' <<< "${TROJAN_PASSWORD}"; then
     UUID_CONFIRM="${TROJAN_PASSWORD}"
@@ -5711,6 +5711,14 @@ menu() {
 
 check_cdn
 statistics_of_run_times update sing-box.sh 2>/dev/null
+
+###### 为了把原来的 nekobox 换成 Throne 做的处理，将于 2026年9月30日移除
+if [ -s $WORK_DIR/nginx.conf ] && grep -q 'Neko|Throne' $WORK_DIR/nginx.conf; then
+  sed -i 's@~\*Neko|Throne.*@~*Throne|Neko              /throne;         # 匹配 Throne / Neko 客户端@g' "$WORK_DIR/nginx.conf"
+  [ -s $WORK_DIR/subscribe/neko ] && rm -f $WORK_DIR/subscribe/neko
+  cmd_systemctl restart sing-box
+  export_list >/dev/null 2>&1
+fi
 
 # 传参
 [[ "${*^^}" =~ '-E'|'-K' ]] && L=E

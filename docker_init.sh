@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 脚本更新日期 2026.04.23
+# 脚本更新日期 2026.06.05
 set -e
 
 WORK_DIR=/sing-box
@@ -893,7 +893,8 @@ EOF
   # 获取自签证书指纹。argo 回源的是由 Google Trust Services（谷歌信任服务）作为中间 CA（CN=WE1）签发，受信任的证书（非自签名）
   local SELF_SIGNED_FINGERPRINT_SHA256=$(openssl x509 -fingerprint -noout -sha256 -in ${WORK_DIR}/cert/cert.pem | awk -F '=' '{print $NF}')
   local SELF_SIGNED_FINGERPRINT_BASE64=$(openssl x509 -in ${WORK_DIR}/cert/cert.pem -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64)
-  local CERT_URL=$(awk '{printf "%s\\r\\n", $0}' ${WORK_DIR}/cert/cert.pem)
+  local CERT_URL_1=$(awk '{printf "%s,", $0}' ${WORK_DIR}/cert/cert.pem | sed 's/ /%20/g; s/,$//')
+  local CERT_URL_2=$(awk '{printf "%s\\r\\n", $0}' ${WORK_DIR}/cert/cert.pem)
 
   # 生成 nginx 配置文件
   local NGINX_CONF="user root;
@@ -910,8 +911,9 @@ EOF
   http {
     map \$http_user_agent \$path {
       default                    /;                # 默认路径
-      ~*v2rayN|Neko|Throne       /base64;          # 匹配 V2rayN / NekoBox / Throne 客户端
+      ~*v2rayN                   /v2rayn;          # 匹配 V2rayN 客户端
       ~*clash                    /clash;           # 匹配 Clash 客户端
+      ~*Throne|Neko              /throne;          # 匹配 Neko / Throne 客户端
       ~*ShadowRocket             /shadowrocket;    # 匹配 ShadowRocket 客户端
       ~*SFM|SFI|SFA              /sing-box;        # 匹配 Sing-box 官方客户端
    #   ~*Chrome|Firefox|Mozilla  /;                # 添加更多的分流规则
@@ -1102,11 +1104,11 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?encryption=none&flow=xtls-rp
 
   [ "${HYSTERIA2}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-v2rayn://hysteria2/$(echo -n "{\"ConfigType\":7,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME} hysteria2\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_HYSTERIA2},\"Password\":\"${UUID}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"addons.mozilla.org\",\"Cert\":\"${CERT_URL}\",\"ProtoExtraObj\":{\"UpMbps\":200,\"DownMbps\":1000}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
+v2rayn://hysteria2/$(echo -n "{\"ConfigType\":7,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME} hysteria2\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_HYSTERIA2},\"Password\":\"${UUID}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"addons.mozilla.org\",\"Cert\":\"${CERT_URL_2}\",\"ProtoExtraObj\":{\"UpMbps\":200,\"DownMbps\":1000}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
 
   [ "${TUIC}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-v2rayn://tuic/$(echo -n "{\"ConfigType\":8,\"CoreType\":24,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME} tuic\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_TUIC},\"Password\":\"${UUID}\",\"Username\":\"${UUID}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"addons.mozilla.org\",\"Alpn\":\"h3\",\"Cert\":\"${CERT_URL}\",\"ProtoExtraObj\":{\"CongestionControl\":\"bbr\"}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
+v2rayn://tuic/$(echo -n "{\"ConfigType\":8,\"CoreType\":24,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME} tuic\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_TUIC},\"Password\":\"${UUID}\",\"Username\":\"${UUID}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"addons.mozilla.org\",\"Alpn\":\"h3\",\"Cert\":\"${CERT_URL_2}\",\"ProtoExtraObj\":{\"CongestionControl\":\"bbr\"}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
 
   [ "${SHADOWTLS}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
@@ -1165,7 +1167,7 @@ ss://$(echo -n "${SIP022_METHOD}:${SIP022_PASSWORD}@${SERVER_IP_1}:$PORT_SHADOWS
 
   [ "${TROJAN}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-trojan://${UUID}@${SERVER_IP_1}:$PORT_TROJAN?security=tls&insecure=1&allowInsecure=1&pcs=${SELF_SIGNED_FINGERPRINT_SHA256//:/}&type=tcp&headerType=none#${NODE_NAME// /%20}%20trojan"
+v2rayn://trojan/$(echo -n "{\"ConfigType\":6,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME} trojan\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_TROJAN},\"Password\":\"${UUID}\",\"Network\":\"raw\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"addons.mozilla.org\",\"Cert\":\"${CERT_URL_2}\"}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
 
   [ "${VMESS_WS}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
@@ -1177,7 +1179,7 @@ vless://${UUID}@${CDN}:443?encryption=none&security=tls&sni=${ARGO_DOMAIN}&type=
 
   [ "${H2_REALITY}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-vless://${UUID}@${SERVER_IP_1}:${PORT_H2_REALITY}?encryption=none&security=reality&sni=addons.mozilla.org&fp=firefox&pbk=${REALITY_PUBLIC}&type=http#${NODE_NAME// /%20}%20h2-reality"
+v2rayn://vless/$(echo -n "{\"ConfigType\":5,\"CoreType\":24,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME} h2-reality\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_H2_REALITY},\"Password\":\"${UUID}\",\"Network\":\"raw\",\"StreamSecurity\":\"reality\",\"AllowInsecure\":\"false\",\"Sni\":\"addons.mozilla.org\",\"Fingerprint\":\"firefox\",\"PublicKey\":\"${REALITY_PUBLIC}\"}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
 
   [ "${GRPC_REALITY}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
@@ -1185,60 +1187,60 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?encryption=none&security=rea
 
   [ "${ANYTLS}" = 'true' ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-v2rayn://anytls/$(echo -n "{\"ConfigType\":11,\"CoreType\":24,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME} anytls\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_ANYTLS},\"Password\":\"${UUID}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"addons.mozilla.org\",\"Fingerprint\":\"firefox\",\"Cert\":\"${CERT_URL}\"}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
+v2rayn://anytls/$(echo -n "{\"ConfigType\":11,\"CoreType\":24,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME} anytls\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_ANYTLS},\"Password\":\"${UUID}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"addons.mozilla.org\",\"Fingerprint\":\"firefox\",\"Cert\":\"${CERT_URL_2}\"}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
 
   echo -n "$V2RAYN_SUBSCRIBE" | sed -E '/^[ ]*#|^[ ]+|^--|^\{|^\}/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/v2rayn
 
-  # 生成 NekoBox 订阅文件
-  [ "${XTLS_REALITY}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
+  # 生成 Throne 订阅文件
+  [ "${XTLS_REALITY}" = 'true' ] && local THRONE_SUBSCRIBE+="
 ----------------------------
 vless://${UUID}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?security=reality&sni=addons.mozilla.org&fp=firefox&pbk=${REALITY_PUBLIC}&type=tcp&flow=xtls-rprx-vision&encryption=none#${NODE_NAME// /%20}%20xtls-reality"
 
-  [ "${HYSTERIA2}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
+  [ "${HYSTERIA2}" = 'true' ] && local THRONE_SUBSCRIBE+="
 ----------------------------
-hy2://${UUID}@${SERVER_IP_1}:${PORT_HYSTERIA2}?insecure=1&sni=addons.mozilla.org#${NODE_NAME// /%20}%20hysteria2"
+hysteria2://${UUID}@${SERVER_IP_1}:${PORT_HYSTERIA2}?allowInsecure=false&alpn&security=tls&sni=addons.mozilla.org&upmbps=200&downmbps=1000&security=tls&tls_certificate=${CERT_URL_1}#${NODE_NAME// /%20}%20hysteria2"
 
-  [ "${TUIC}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
+  [ "${TUIC}" = 'true' ] && local THRONE_SUBSCRIBE+="
 ----------------------------
-tuic://${UUID}:${UUID}@${SERVER_IP_1}:${PORT_TUIC}?congestion_control=bbr&alpn=h3&sni=addons.mozilla.org&udp_relay_mode=native&allow_insecure=1#${NODE_NAME// /%20}%20tuic"
+tuic://${UUID}:${UUID}@${SERVER_IP_1}:${PORT_TUIC}?congestion_control=bbr&alpn=h3&sni=addons.mozilla.org&udp_relay_mode=native&allow_insecure=0&security=tls&tls_certificate=${CERT_URL_1}#${NODE_NAME// /%20}%20tuic"
 
-  [ "${SHADOWTLS}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
+  [ "${SHADOWTLS}" = 'true' ] && local THRONE_SUBSCRIBE+="
 ----------------------------
-nekoray://custom#$(echo -n "{\"_v\":0,\"addr\":\"127.0.0.1\",\"cmd\":[\"\"],\"core\":\"internal\",\"cs\":\"{\n    \\\"password\\\": \\\"${UUID}\\\",\n    \\\"server\\\": \\\"${SERVER_IP_1}\\\",\n    \\\"server_port\\\": ${PORT_SHADOWTLS},\n    \\\"tag\\\": \\\"shadowtls-out\\\",\n    \\\"tls\\\": {\n        \\\"enabled\\\": true,\n        \\\"server_name\\\": \\\"addons.mozilla.org\\\"\n    },\n    \\\"type\\\": \\\"shadowtls\\\",\n    \\\"version\\\": 3\n}\n\",\"mapping_port\":0,\"name\":\"1-tls-not-use\",\"port\":1080,\"socks_port\":0}" | base64 -w0)
+shadowtls://:${UUID}@${SERVER_IP_1}:${PORT_SHADOWTLS}?version=3&security=tls&sni=addons.mozilla.org&fp=chrome#1-tls-not-use
 
-nekoray://shadowsocks#$(echo -n "{\"_v\":0,\"method\":\"${SIP022_METHOD}\",\"name\":\"2-ss-not-use\",\"pass\":\"${SIP022_PASSWORD}\",\"port\":0,\"stream\":{\"ed_len\":0,\"insecure\":false,\"mux_s\":0,\"net\":\"tcp\"},\"uot\":0}" | base64 -w0)"
+ss://${SIP022_METHOD}:${SIP022_PASSWORD}@127.0.0.1:0#2-ss-not-use"
 
-  [ "${SHADOWSOCKS}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
+  [ "${SHADOWSOCKS}" = 'true' ] && local THRONE_SUBSCRIBE+="
 ----------------------------
 ss://$(echo -n "${SIP022_METHOD}:${SIP022_PASSWORD}" | base64 -w0)@${SERVER_IP_1}:$PORT_SHADOWSOCKS#${NODE_NAME// /%20}%20shadowsocks"
 
-  [ "${TROJAN}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
+  [ "${TROJAN}" = 'true' ] && local THRONE_SUBSCRIBE+="
 ----------------------------
-trojan://${UUID}@${SERVER_IP_1}:$PORT_TROJAN?security=tls&sni=addons.mozilla.org&allowInsecure=1&fp=firefox&type=tcp#${NODE_NAME// /%20}%20trojan"
+trojan://${UUID}@${SERVER_IP_1}:${PORT_TROJAN}?security=tls&sni=addons.mozilla.org&allowInsecure=0&tls_certificate=${CERT_URL_1}&fp=firefox&type=tcp#${NODE_NAME// /%20}%20trojan"
 
-  [ "${VMESS_WS}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
+  [ "${VMESS_WS}" = 'true' ] && local THRONE_SUBSCRIBE+="
 ----------------------------
 vmess://$(echo -n "{\"add\":\"${CDN}\",\"aid\":\"0\",\"host\":\"${ARGO_DOMAIN}\",\"id\":\"${UUID}\",\"net\":\"ws\",\"path\":\"/${UUID}-vmess\",\"port\":\"80\",\"ps\":\"${NODE_NAME} vmess-ws\",\"scy\":\"auto\",\"sni\":\"\",\"tls\":\"\",\"type\":\"\",\"v\":\"2\"}" | base64 -w0)
 "
 
-  [ "${VLESS_WS}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
+  [ "${VLESS_WS}" = 'true' ] && local THRONE_SUBSCRIBE+="
 ----------------------------
 vless://${UUID}@${CDN}:443?security=tls&sni=${ARGO_DOMAIN}&type=ws&path=/${UUID}-vless?ed%3D2560&host=${ARGO_DOMAIN}&encryption=none#${NODE_NAME// /%20}%20vless-ws-tls
 "
 
-  [ "${H2_REALITY}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
+  [ "${H2_REALITY}" = 'true' ] && local THRONE_SUBSCRIBE+="
 ----------------------------
 vless://${UUID}@${SERVER_IP_1}:${PORT_H2_REALITY}?security=reality&sni=addons.mozilla.org&alpn=h2&fp=firefox&pbk=${REALITY_PUBLIC}&type=http&encryption=none#${NODE_NAME// /%20}%20h2-reality"
 
-  [ "${GRPC_REALITY}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
+  [ "${GRPC_REALITY}" = 'true' ] && local THRONE_SUBSCRIBE+="
 ----------------------------
 vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=addons.mozilla.org&fp=firefox&pbk=${REALITY_PUBLIC}&type=grpc&serviceName=grpc&encryption=none#${NODE_NAME// /%20}%20grpc-reality"
 
-  [ "${ANYTLS}" = 'true' ] && local NEKOBOX_SUBSCRIBE+="
+  [ "${ANYTLS}" = 'true' ] && local THRONE_SUBSCRIBE+="
 ----------------------------
-anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?security=tls&sni=addons.mozilla.org&insecure=1&fp=firefox#${NODE_NAME// /%20}%20anytls"
+anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?idle_session_check_interval=30s&idle_session_timeout=30s&min_idle_session=5&insecure=0&security=tls&sni=addons.mozilla.org&tls_certificate=${CERT_URL_1}&fp=firefox#${NODE_NAME// /%20}%20anytls"
 
-  echo -n "$NEKOBOX_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/neko
+  echo -n "$THRONE_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/throne
 
   # 生成 Sing-box 订阅文件
   [ "${XTLS_REALITY}" = 'true' ] &&
@@ -1294,7 +1296,7 @@ anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?security=tls&sni=addons.mozilla.o
 
   # 生成二维码 url 文件
   cat > ${WORK_DIR}/subscribe/qr << EOF
-自适应 Clash / V2rayN / NekoBox / ShadowRocket / SFI / SFA / SFM 客户端:
+自适应 Clash / V2rayN / Throne / ShadowRocket / SFI / SFA / SFM 客户端:
 模版:
 https://${ARGO_DOMAIN}/${UUID}/auto
 
@@ -1337,10 +1339,10 @@ $(info "$(sed '1d' <<< "${CLASH_SUBSCRIBE}")")
 *******************************************
 ┌────────────────┐
 │                │
-│    $(warning "NekoBox")     │
+│     $(warning "Throne")     │
 │                │
 └────────────────┘
-$(hint "${NEKOBOX_SUBSCRIBE}")
+$(hint "${THRONE_SUBSCRIBE}")
 
 *******************************************
 ┌────────────────┐
@@ -1368,8 +1370,8 @@ https://${ARGO_DOMAIN}/${UUID}/qr
 V2rayN 订阅:
 https://${ARGO_DOMAIN}/${UUID}/v2rayn")
 
-$(hint "NekoBox 订阅:
-https://${ARGO_DOMAIN}/${UUID}/neko")
+$(hint "Throne 订阅:
+https://${ARGO_DOMAIN}/${UUID}/throne")
 
 $(hint "Clash 订阅:
 https://${ARGO_DOMAIN}/${UUID}/clash
@@ -1382,7 +1384,7 @@ https://${ARGO_DOMAIN}/${UUID}/shadowrocket")
 
 *******************************************
 
-$(info " 自适应 Clash / V2rayN / NekoBox / ShadowRocket / SFI / SFA / SFM 客户端:
+$(info " 自适应 Clash / V2rayN / Throne / ShadowRocket / SFI / SFA / SFM 客户端:
 模版:
 https://${ARGO_DOMAIN}/${UUID}/auto
 

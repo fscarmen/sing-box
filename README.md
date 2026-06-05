@@ -13,7 +13,7 @@
 - [7.使用 Cloudflare API 自动创建 Argo](README.md#7使用-cloudflare-api-自动创建-argo)
 - [8.Vmess / Vless 方案设置任意端口回源以使用 CDN](README.md#8vmess--vless-方案设置任意端口回源以使用-cdn)
 - [9.Docker 和 Docker compose 安装](README.md#9docker-和-docker-compose-安装)
-- [10.Nekobox 设置 shadowTLS 方法](README.md#10nekobox-设置-shadowtls-方法)
+- [10.Throne 设置 shadowTLS 方法](README.md#10throne-设置-shadowtls-方法)
 - [11.主体目录文件及说明](README.md#11主体目录文件及说明)
 - [12.自签证书在不同客户端中的处理方式对比](README.md#12自签证书在不同客户端中的处理方式对比)
 - [13.鸣谢下列作者的文章和项目](README.md#13鸣谢下列作者的文章和项目)
@@ -150,7 +150,7 @@
 * 一键部署多协议，可以单选、多选或全选 ShadowTLS v3 / XTLS Reality / Hysteria2 / Tuic V5 / ShadowSocks / Trojan / Vmess + ws / Vless + ws + tls / H2 Reality / gRPC Reality / AnyTLS / NaiveProxy, 总有一款适合你
 * 所有协议均不需要域名，可选 Cloudflare Argo Tunnel 内网穿透以支持传统方式为 websocket 的协议
 * Hysteria2 支持 Realm 模式，适用于回国、没有公网入口、住宅 NAT、CGNAT 等无法开放入站端口的机器；有公网入口时不建议使用，并可选 WARP 辅助打洞提高严格 NAT 环境下的成功率
-* 节点信息输出到 V2rayN / Clash Verge / 小火箭 / Nekobox / Sing-box (SFI, SFA, SFM)，订阅自动适配客户端，一个订阅 url 走天下
+* 节点信息输出到 V2rayN / Clash Verge / 小火箭 / Throne / Sing-box (SFI, SFA, SFM)，订阅自动适配客户端，一个订阅 url 走天下
 * 自定义端口，适合有限开放端口的 nat 小鸡
 * 内置 warp 链式代理解锁 chatGPT
 * 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 、Armbian 和 Arch Linux,请务必选择 LTS 系统
@@ -573,8 +573,8 @@ services:
 | -e ARGO_AUTH | 否 | Argo 认证信息，可以是 Json， Token 或者 Cloudflare API，与 ARGO_DOMAIN 一并使用才能生效，不指定的话将使用临时隧道 |
 
 
-## 10.Nekobox 设置 shadowTLS 方法
-1. 复制脚本输出的两个 Neko links 进去
+## 10.Throne 设置 shadowTLS 方法
+1. 复制脚本输出的两个 Throne links 进去
 <img width="630" alt="image" src="https://github.com/fscarmen/sing-box/assets/62703343/db5960f3-63b1-4145-90a5-b01066dd39be">
 
 2. 设置链式代理，并启用
@@ -618,7 +618,7 @@ services:
 |-- logs
 |   `-- box.log                              # sing-box 运行日志文件
 |-- subscribe                                # sing-box server 配置文件目录
-|   |-- qr                                   # Nekoray / V2rayN / Shadowrock 订阅二维码
+|   |-- qr                                   # Throne / V2rayN / Shadowrock 订阅二维码
 |   |-- shadowrocket                         # Shadowrock 订阅文件
 |   |-- proxies                              # Clash proxy provider 订阅文件
 |   |-- clash                                # Clash 订阅文件1
@@ -627,7 +627,7 @@ services:
 |   |-- sing-box-phone                       # SFI / SFA 订阅文件1
 |   |-- sing-box2                            # SFI / SFA / SFM 订阅文件2
 |   |-- v2rayn                               # V2rayN 订阅文件
-|   `-- neko                                 # Nekoray 订阅文件
+|   `-- throne                               # Throne 订阅文件
 |-- cache.db                                 # sing-box 缓存文件
 |-- nginx.conf                               # 用于订阅服务的 nginx 配置文件
 |-- language                                 # 存放脚本语言文件，E 为英文，C 为中文
@@ -647,14 +647,14 @@ services:
 | 客户端 / 工具 | 使用的证书验证方式 | SNI 是否必须匹配 SAN | 是否依赖完整证书链 | 使用的 Hash / 指纹类型 | SNI 用途说明 |
 |---------------|---------------------|------------------------|------------------------|--------------------------|----------------------|
 | **V2RayN** | 标准 X.509 证书链验证 | **是**（必须匹配） | ✔ 是 | 不使用指纹 | 用于 TLS Hostname 验证（必须与 SAN 一致） |
-| **NekoBox** | 标准 X.509 证书链验证 | **是**（必须匹配） | ✔ 是 | 不使用指纹 | 用于 TLS Hostname 验证（必须与 SAN 一致） |
+| **Throne** | 标准 X.509 证书链验证 | **是**（必须匹配） | ✔ 是 | 不使用指纹 | 用于 TLS Hostname 验证（必须与 SAN 一致） |
 | **ShadowRocket** | 对证书 **DER 全内容** 做 SHA-256 | ✖ 不需要匹配 | ✖ 不依赖证书链 | **SHA-256(DER)** | 仅用于伪装，可为空或任意域名 |
 | **Clash Verge / Meta** | 对证书 **DER 全内容** 做 SHA-256 | ✖ 不需要匹配 | ✖ 不依赖证书链 | **SHA-256(DER)** | 仅用于伪装，可为空或任意域名 |
 | **Sing-box** | 仅验证 SPKI 公钥（SPKI pin） | ✖ 不需要匹配 | ✖ 不依赖证书链 | **SHA-256(SPKI Base64)** | 仅用于伪装，可为空或任意域名 |
 
 
 ### 结论：
- - **V2RayN、NekoBox 必须要 SAN = SNI**，否则“x509: cannot validate certificate because it doesn't contain IP SAN”。
+ - **V2RayN、Throne 必须要 SAN = SNI**，否则“x509: cannot validate certificate because it doesn't contain IP SAN”。
  - **ShadowRocket、Clash、Sing-box、HY2、TUIC 完全不需要 SAN**，因为用的是指纹机制。
 
 ---
@@ -675,7 +675,7 @@ services:
 | EC 曲线参数 | ✔ | ✔ | ✔ |
 | Signature Algorithm | ✔ | ✔ | ✖ |
 | Signature Value | ✔ | ✔ | ✖ |
-| 用途场景 | V2RayN / NekoBox | ShadowRocket / Clash | Sing-box / Hysteria2 / TUIC |
+| 用途场景 | V2RayN / Throne | ShadowRocket / Clash | Sing-box / Hysteria2 / TUIC |
 
 ---
 
@@ -685,7 +685,7 @@ services:
 - 完整验证 CA → Leaf 证书
 - **必须要求：SNI = SAN 中的一个 DNS 名称**
 - 不允许 SAN 不匹配或缺失
-- 用于：**V2RayN / NekoBox**
+- 用于：**V2RayN / Throne**
 
 #### **2. SHA-256(DER) 指纹**
 - 对证书 **整体 DER（二进制）内容** 计算 SHA-256
