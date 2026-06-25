@@ -860,13 +860,12 @@ change_config() {
     [[ ! "$NEW_VAL" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] && [[ ! "$NEW_VAL" =~ ^[0-9a-fA-F:]+$ ]] && error " $(text 133) "
   fi
 
-
   # 批量替换，更换服务IP和指纹不需重启服务
   [[ ! "$KEY" =~ ^(fingerprint|serverip|cdn)$ ]] && hint " $(text 112) "
 
   if [[ "$KEY" =~ ^(serverip|cdn)$ ]]; then
     # IP 在配置里出现的形式有多种，逐一替换
-    find ${WORK_DIR} -type f | xargs -P 50 sed -i -e "s|\"server\": \"${OLD}\"|\"server\": \"${NEW_VAL}\"|g" 2>/dev/null
+    find ${WORK_DIR} -type f | xargs -P 50 sed -i -e "s|\"server\": \"${OLD}\"|\"server\": \"${NEW_VAL}\"|g; s|\"WS_SERVER_IP_SHOW\": \"${OLD}\"|\"WS_SERVER_IP_SHOW\": \"${NEW_VAL}\"|g" 2>/dev/null
 
     # 同时更新 subscribe/list 等文本文件中可能出现的裸 IP
     find ${WORK_DIR}/subscribe -type f | xargs -P 50 sed -i "s|${OLD}|${NEW_VAL}|g" 2>/dev/null
