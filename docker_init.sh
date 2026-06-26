@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 脚本更新日期 2026.06.05
+# 脚本更新日期 2026.06.27
 set -e
 
 WORK_DIR=/sing-box
@@ -8,8 +8,8 @@ SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/m
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
-info() { echo -e "\033[32m\033[01m$*\033[0m"; }   # 绿色
-hint() { echo -e "\033[33m\033[01m$*\033[0m"; }   # 黄色
+info() { echo -e "\033[32m\033[01m$*\033[0m"; }     # 绿色
+hint() { echo -e "\033[33m\033[01m$*\033[0m"; }     # 黄色
 
 # 判断系统架构，以下载相应的应用
 case "$ARCH" in
@@ -30,13 +30,16 @@ check_latest_sing-box() {
   local FORCE_VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- https://raw.githubusercontent.com/fscarmen/sing-box/refs/heads/main/force_version | sed 's/^[vV]//g')
 
   # 没有强制指定版本时，获取最新版本
-  grep -q '.' <<< "$FORCE_VERSION" || local FORCE_VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v-]' '/tag_name/{print $5}' | sort -Vr | sed -n '1p')
+  if grep -q '.' <<< "$FORCE_VERSION"; then
+    echo "$FORCE_VERSION"
+    return
+  else
+    local VERSION_LIST=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- https://api.github.com/repos/SagerNet/sing-box/releases | sed -n '/tag_name/ s/^[ ]*//gp')
+    local LATEST_VERSION=$(awk -F '["v-]' '/tag_name/{print $5}' <<< "$VERSION_LIST" | sort -Vr | sed -n '1p')
 
-  # 获取最终版本号
-  local VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- https://api.github.com/repos/SagerNet/sing-box/releases | awk -F '["v]' -v var="tag_name.*$FORCE_VERSION" '$0 ~ var {print $5; exit}')
-  VERSION=${VERSION:-'1.13.0-rc.4'}
-
-  echo "$VERSION"
+    # 获取最终版本号
+    awk -F '["v]' -v var="tag_name.*$LATEST_VERSION" '$0 ~ var {print $5; exit}' <<< "$VERSION_LIST"
+  fi
 }
 
 # 安装 sing-box 容器
