@@ -24,19 +24,20 @@
 
 * * *
 ## 1.更新信息
+2026.07.01 v1.3.15 Add v2rayN Finalmask field for hysteria2 realm subscription output; v2rayN 订阅输出增加 Hysteria2 Realm 的 Finalmask 字段
 
 2026.05.29 v1.3.14 Added optional custom warp route rule management, available after installation via [sb -d] without affecting the main installation flow; 增加可选的自定义 warp 路由规则管理，不影响主程序安装流程，安装后可通过 [sb -d] 按需管理
-
-2026.05.18 v1.3.13 Added top-level http_clients configuration; 增加顶层的 http_clients 配置
-
-2026.05.14 v1.3.12 1. Add Hysteria2 Realm support for machines without public inbound access, with optional WARP-assisted hole punching for strict NAT environments; 2. Realm configuration export is supported for Clash/Mihomo and sing-box clients; 3. Hysteria2 Realm can be enabled or disabled directly via sb -d; 4. Non-interactive installs support --HY2_REALM and --HY2_WARP parameters; 1. 增加 Hysteria2 Realm 支持，适用于没有公网入口的机器，并可选 WARP 辅助打洞; 2. Realm 已支持导出 Clash/Mihomo 和 sing-box 客户端配置; 3. 修改节点配置时可直接开启或关闭 Hysteria2 Realm; 4. 无交互安装支持 --HY2_REALM 与 --HY2_WARP 参数
-
-2026.05.06 v1.3.11 1. Generate v2rayn:// dedicated links for Tuic subscriptions; 2. Generate v2rayn:// dedicated links for AnyTLS subscriptions; 3. Generate v2rayn:// dedicated links for naive http2 and quic modes. Thanks to @DHR60; 1. 为 Tuic 订阅生成 v2rayn:// 专属链接; 2. 为 AnyTLS 订阅生成 v2rayn:// 专属链接; 3. 为 naive http2 和 quic 模式生成 v2rayn:// 专属链接，感谢 @DHR60
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
 <br>
 
+>2026.05.18 v1.3.13 Added top-level http_clients configuration; 增加顶层的 http_clients 配置
+>
+>2026.05.14 v1.3.12 1. Add Hysteria2 Realm support for machines without public inbound access, with optional WARP-assisted hole punching for strict NAT environments; 2. Realm configuration export is supported for Clash/Mihomo and sing-box clients; 3. Hysteria2 Realm can be enabled or disabled directly via sb -d; 4. Non-interactive installs support --HY2_REALM and --HY2_WARP parameters; 1. 增加 Hysteria2 Realm 支持，适用于没有公网入口的机器，并可选 WARP 辅助打洞; 2. Realm 已支持导出 Clash/Mihomo 和 sing-box 客户端配置; 3. 修改节点配置时可直接开启或关闭 Hysteria2 Realm; 4. 无交互安装支持 --HY2_REALM 与 --HY2_WARP 参数
+>
+>2026.05.06 v1.3.11 1. Generate v2rayn:// dedicated links for Tuic subscriptions; 2. Generate v2rayn:// dedicated links for AnyTLS subscriptions; 3. Generate v2rayn:// dedicated links for naive http2 and quic modes. Thanks to @DHR60; 1. 为 Tuic 订阅生成 v2rayn:// 专属链接; 2. 为 AnyTLS 订阅生成 v2rayn:// 专属链接; 3. 为 naive http2 和 quic 模式生成 v2rayn:// 专属链接，感谢 @DHR60
+>
 >2026.04.25 v1.3.10 Added native protocol, but client support is extremely limited, with Shadowrocket offering the best compatibility. For the sing-box core, you must use the -glibc or -musl version according to the requirements; refer to the official documentation for details: https://sing-box.sagernet.org/configuration/outbound/naive/; 增加 native 协议，支持该协议的客户端极少，Shadowrocket 支持最好。sing-box 内核需要按说明使用-glibc 或者 -musl 版本，详见官方说明 https://sing-box.sagernet.org/zh/configuration/outbound/naive/
 >
 >2026.04.11 v1.3.9 1. remove pre-install UFW blocking logic, fallback to iptables when inactive; 2. avoid unnecessary sing-box restart for CDN / bandwidth / port hopping changes; 3. reduce redundant single-use functions; 1. 移除安装前 UFW 强制校验，inactive 自动回退 iptables; 2. 优选地址 / 带宽 / 端口跳跃修改不再重启 sing-box; 3. 清理单次调用函数，提升结构可读性

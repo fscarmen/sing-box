@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.14 (2026.06.27)'
+VERSION='v1.3.15 (2026.07.01)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -40,8 +40,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Added optional custom warp route rule management, available after installation via [sb -d] without affecting the main installation flow; 2. Added Hysteria2 Realm support for machines without public inbound access, with optional WARP-assisted hole punching"
-C[1]="1. 增加可选的自定义 warp 路由规则管理，不影响主程序安装流程，安装后可通过 [sb -d] 按需管理; 2. 增加 Hysteria2 Realm 支持，适用于没有公网入口的机器，并可选 WARP 辅助打洞"
+E[1]="1. Added Hysteria2 Realm support for machines without public inbound access, with optional WARP-assisted hole punching; 2. add v2rayN Finalmask field for hysteria2 realm subscription output"
+C[1]="1. 增加 Hysteria2 Realm 支持，适用于没有公网入口的机器，并可选 WARP 辅助打洞; 2. v2rayN 订阅输出增加 Realm 的 Finalmask 字段"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -370,6 +370,10 @@ E[165]="Please select or input client fingerprint:\n 1. chrome (default)\n 2. fi
 C[165]="请选择或输入客户端指纹:\n 1. chrome (默认)\n 2. firefox\n 或直接输入自定义值:"
 E[166]="Invalid fingerprint format."
 C[166]="无效的指纹格式"
+E[167]="Close Realm"
+C[167]="关闭 Realm"
+E[168]="Open Realm"
+C[168]="开启 Realm"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -679,13 +683,14 @@ change_config() {
 
     MENU_IDX+=(140) && MENU_KEY+=(hy2bw) && MENU_VAL+=("${HY2_UP_NOW}/${HY2_DOWN_NOW}")
 
-    local HY2_CONF_NOW=$(ls ${WORK_DIR}/conf/*_${NODE_TAG[1]}_inbounds.json 2>/dev/null | sed -n '1p')
-    if [ -n "$HY2_CONF_NOW" ] && grep -q '"realm"[[:space:]]*:' "$HY2_CONF_NOW"; then
-      local HY2_REALM_ACTION="$(text 27)"
+    if grep -q 'realm-opts' <<< "$HY2_LINE"; then
+      local HY2_REALM_ACTION="$(text 167)"
+      MENU_IDX+=(167)
     else
-      local HY2_REALM_ACTION="$(text 28)"
+      local HY2_REALM_ACTION="$(text 168)"
+      MENU_IDX+=(168)
     fi
-    MENU_IDX+=(147) && MENU_KEY+=(hy2realm) && MENU_VAL+=("${HY2_REALM_ACTION}")
+    MENU_KEY+=(hy2realm) && MENU_VAL+=("${HY2_REALM_ACTION}")
 
     check_port_hopping_nat
     MENU_IDX+=(139) && MENU_KEY+=(hy2hopping) && MENU_VAL+=("${HY2_PORT_HOPPING_RANGE}")
@@ -767,11 +772,15 @@ change_config() {
     return
   elif [ "$KEY" = "hy2realm" ]; then
     # 添加 / 删除 Hysteria2 Realm；菜单已明确显示开启/关闭动作，这里不再二次确认 Realm 本身
-    fetch_nodes_value
-    if [ "$IS_HY2_REALM" = 'is_hy2_realm' ]; then
+    # 判断依据与菜单显示一致：检查 subscribe/proxies 中是否有 realm-opts
+    local HY2_LINE=$(grep 'type: hysteria2' ${WORK_DIR}/subscribe/proxies)
+    if grep -q 'realm-opts' <<< "$HY2_LINE"; then
+      # 已开启 → 直接关闭，不需要二次确认
       set_hy2_realm_config disable
       sync_hy2_warp_route disable
     else
+      # 未开启 → 获取配置后开启，询问 WARP 辅助打洞
+      fetch_nodes_value
       IS_HY2_REALM=is_hy2_realm
       HY2_REALM_ID="${HY2_REALM_ID:-${UUID[12]:-${UUID_CONFIRM}}}"
       input_hy2_warp
@@ -817,7 +826,7 @@ change_config() {
           PORT_HOPPING_END=$NEW_END
           HY2_PORT_HOPPING_RANGE="$NEW_RANGE"
           local HOPPING_TARGET="$PORT_HOPPING_TARGET"
-          [ -z "$HOPPING_TARGET" ] && HOPPING_TARGET=$(awk -F '[:,]' '/"listen_port"/{print $2; exit}' ${WORK_DIR}/conf/*_${NODE_TAG[1]}_inbounds.json 2>/dev/null)
+          [ -z "$HOPPING_TARGET" ] && HOPPING_TARGET=$(awk -F '[:,]' '/"listen_port"/{print $2; exit}' ${WORK_DIR}/conf/*_${NODE_TAG[1]}_inbounds.json 2>/dev/null | tr -d ' ')
           # 静默添加端口跳跃规则，不显示 UFW 检测和成功提示
           (add_port_hopping_nat "$PORT_HOPPING_START" "$PORT_HOPPING_END" "$HOPPING_TARGET") >/dev/null 2>&1
           IS_HOPPING_SET=true
@@ -2251,7 +2260,7 @@ check_port_hopping_nat() {
   FW_BACKEND=$(check_port_hopping_firewall)
 
   unset PORT_HOPPING_START PORT_HOPPING_END HY2_PORT_HOPPING_RANGE
-  PORT_HOPPING_TARGET=$(awk -F '[:,]' '/"listen_port"/{print $2; exit}' ${WORK_DIR}/conf/*${NODE_TAG[1]}_inbounds.json 2>/dev/null)
+  PORT_HOPPING_TARGET=$(awk -F '[:,]' '/"listen_port"/{print $2; exit}' ${WORK_DIR}/conf/*${NODE_TAG[1]}_inbounds.json 2>/dev/null | tr -d ' ')
 
   if [ "$FW_BACKEND" = 'ufw' ]; then
     check_port_hopping_ufw_rules
@@ -4713,9 +4722,16 @@ vless://${UUID[11]}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?encryption=none${VISION_
 
   if [ -n "$PORT_HYSTERIA2" ]; then
     [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && local V2RAYN_PARAMS=",\"Ports\":\"${PORT_HOPPING_START}-${PORT_HOPPING_END}\",\"HopInterval\":\"30s\""
+    local REALM_PARAMS=""
+    [ "$IS_HY2_REALM" = 'is_hy2_realm' ] && REALM_PARAMS=",\"Finalmask\":\"{\\n        \\\"udp\\\": [\\n            {\\n                \\\"type\\\": \\\"realm\\\",\\n                \\\"settings\\\": {\\n                    \\\"url\\\": \\\"realm://public@realm.hy2.io:443/${UUID[12]}\\\",\\n                    \\\"stunServers\\\": [\\n                        \\\"stun.nextcloud.com:3478\\\",\\n                        \\\"stun.sip.us:3478\\\",\\n                        \\\"turn.cloudflare.com:3478\\\",\\n                        \\\"global.stun.twilio.com:3478\\\"\\n                    ]\\n                }\\n            }\\n        ],\\n        \\\"quicParams\\\": {\\n            \\\"congestion\\\": \\\"bbr\\\"\\n        }\\n    }\""
+
+    local HY2_JSON_1="{\"ConfigType\":7,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME[12]} ${NODE_TAG[1]}\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_HYSTERIA2},\"Password\":\"${UUID[12]}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"${TLS_SERVER}\",\"Cert\":\"${CERT_URL_2}\""
+    local HY2_JSON_2=",\"ProtoExtraObj\":{\"UpMbps\":${HY2_UP:-200},\"DownMbps\":${HY2_DOWN:-1000}"
+    local HY2_JSON_3="}}"
+    local CLEAN_V2RAYN_PARAMS="${V2RAYN_PARAMS:-}"
     local V2RAYN_SUBSCRIBE+="
 ----------------------------
-v2rayn://hysteria2/$(echo -n "{\"ConfigType\":7,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME[12]} ${NODE_TAG[1]}\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_HYSTERIA2},\"Password\":\"${UUID[12]}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"${TLS_SERVER}\",\"Cert\":\"${CERT_URL_2}\",\"ProtoExtraObj\":{\"UpMbps\":${HY2_UP},\"DownMbps\":${HY2_DOWN}${V2RAYN_PARAMS}}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
+v2rayn://hysteria2/$(printf "%s%s%s%s%s\n" "$HY2_JSON_1" "$REALM_PARAMS" "${HY2_JSON_2%$'\n'*}" "${CLEAN_V2RAYN_PARAMS%$'\n'*}" "$HY2_JSON_3"  | base64 -w0 | tr '+/' '-_' | tr -d '=')"
   fi
 
   [ -n "$PORT_TUIC" ] && local V2RAYN_SUBSCRIBE+="
@@ -4935,14 +4951,14 @@ naive+quic://${UUID[22]}:${UUID[22]}@${SERVER_IP_1}:${PORT_NAIVE}?congestion_con
   local NODE_REPLACE+="\"${NODE_NAME[11]} ${NODE_TAG[0]}\","
 
   if [ -n "$PORT_HYSTERIA2" ]; then
+    local HYSTERIA2_CONFIG=" { \"type\": \"hysteria2\", \"tag\": \"${NODE_NAME[12]} ${NODE_TAG[1]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_HYSTERIA2}, \"up_mbps\": ${HY2_UP}, \"down_mbps\": ${HY2_DOWN}, \"password\": \"${UUID[12]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER}\", \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"alpn\": [ \"h3\" ] }"
     if [ "$IS_HY2_REALM" = 'is_hy2_realm' ]; then
       HY2_REALM_ID="${HY2_REALM_ID:-${UUID[12]}}"
-      local HYSTERIA2_CONFIG=" { \"type\": \"hysteria2\", \"tag\": \"${NODE_NAME[12]} ${NODE_TAG[1]}\", \"up_mbps\": ${HY2_UP}, \"down_mbps\": ${HY2_DOWN}, \"password\": \"${UUID[12]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER}\", \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"alpn\": [ \"h3\" ] }, \"realm\": { \"server_url\": \"https://realm.hy2.io\", \"token\": \"public\", \"realm_id\": \"${HY2_REALM_ID}\", \"stun_servers\": [ \"turn.cloudflare.com:3478\", \"stun.nextcloud.com:3478\", \"stun.sip.us:3478\", \"global.stun.twilio.com:3478\" ] } },"
-    else
-      local HYSTERIA2_CONFIG=" { \"type\": \"hysteria2\", \"tag\": \"${NODE_NAME[12]} ${NODE_TAG[1]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_HYSTERIA2}, \"up_mbps\": ${HY2_UP}, \"down_mbps\": ${HY2_DOWN}, \"password\": \"${UUID[12]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER}\", \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"alpn\": [ \"h3\" ] } },"
-      if [[ -n "${PORT_HOPPING_START}" && -n "${PORT_HOPPING_END}" ]]; then
-        HYSTERIA2_CONFIG="${HYSTERIA2_CONFIG/\"server_port\": ${PORT_HYSTERIA2},/\"server_port\": ${PORT_HYSTERIA2}, \"server_ports\": [ \"${PORT_HOPPING_START}:${PORT_HOPPING_END}\" ], \"hop_interval\": \"30s\", \"hop_interval_max\": \"60s\",}"
-      fi
+      HYSTERIA2_CONFIG+=", \"realm\": { \"server_url\": \"https://realm.hy2.io\", \"token\": \"public\", \"realm_id\": \"${HY2_REALM_ID}\", \"stun_servers\": [ \"turn.cloudflare.com:3478\", \"stun.nextcloud.com:3478\", \"stun.sip.us:3478\", \"global.stun.twilio.com:3478\" ] }"
+    fi
+    HYSTERIA2_CONFIG+=" },"
+    if [[ -n "${PORT_HOPPING_START}" && -n "${PORT_HOPPING_END}" ]]; then
+      HYSTERIA2_CONFIG="${HYSTERIA2_CONFIG/\"server_port\": ${PORT_HYSTERIA2},/\"server_port\": ${PORT_HYSTERIA2}, \"server_ports\": [ \"${PORT_HOPPING_START}:${PORT_HOPPING_END}\" ], \"hop_interval\": \"30s\", \"hop_interval_max\": \"60s\",}"
     fi
     local OUTBOUND_REPLACE+="${HYSTERIA2_CONFIG}"
     local NODE_REPLACE+="\"${NODE_NAME[12]} ${NODE_TAG[1]}\","
