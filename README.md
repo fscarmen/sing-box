@@ -24,6 +24,8 @@
 
 * * *
 ## 1.更新信息
+2026.07.16 v1.3.16 1. Add bind_interface option in sb -d menu to bind outbound traffic to a specific NIC; 2. Change v2rayN Hysteria2 Realm config from Finalmask field to ProtoExtraObj; 1. sb -d 菜单新增「指定网络出口」选项，可为出站流量绑定特定网卡; 2. v2rayN 的 Hysteria2 Realm 配置从 Finalmask 字段改为 ProtoExtraObj
+
 2026.07.01 v1.3.15 Add v2rayN Finalmask field for hysteria2 realm subscription output; v2rayN 订阅输出增加 Hysteria2 Realm 的 Finalmask 字段
 
 2026.05.29 v1.3.14 Added optional custom warp route rule management, available after installation via [sb -d] without affecting the main installation flow; 增加可选的自定义 warp 路由规则管理，不影响主程序安装流程，安装后可通过 [sb -d] 按需管理
@@ -417,6 +419,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 | --HY2_REALM | [true, false]，是否启用 Hysteria2 Realm，true 为启用。适用于没有公网入口、住宅 NAT、CGNAT 或需要回国打洞的机器，有公网入口时不建议使用，默认为 false |
 | --HY2_WARP | [true, false]，是否启用 Realm 的 WARP 辅助打洞，true 为启用。适用于 NAT 严格环境；设置为 true 时会自动启用 Realm，默认为 false |
 | --REALITY_PRIVATE | reality 密钥 |
+| --BIND_INTERFACE | 指定网络出口，绑定到特定网卡，如 eth0<br>值为 default 或不指定则不绑定 |
 | --NODE_NAME_CONFIRM | 节点名 |
 
 

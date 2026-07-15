@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.15 (2026.07.01)'
+VERSION='v1.3.16 (2026.07.16)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -40,8 +40,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Added Hysteria2 Realm support for machines without public inbound access, with optional WARP-assisted hole punching; 2. add v2rayN Finalmask field for hysteria2 realm subscription output"
-C[1]="1. 增加 Hysteria2 Realm 支持，适用于没有公网入口的机器，并可选 WARP 辅助打洞; 2. v2rayN 订阅输出增加 Realm 的 Finalmask 字段"
+E[1]="1. Add bind_interface option in sb -d menu to bind outbound traffic to a specific NIC; 2. Change v2rayN Hysteria2 Realm config from Finalmask field to ProtoExtraObj"
+C[1]="1. sb -d 菜单新增「指定网络出口」选项，可为出站流量绑定特定网卡; 2. v2rayN 的 Hysteria2 Realm 配置从 Finalmask 字段改为 ProtoExtraObj"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -374,6 +374,14 @@ E[167]="Close Realm"
 C[167]="关闭 Realm"
 E[168]="Open Realm"
 C[168]="开启 Realm"
+E[169]="Bind network interface  (current: \${_val:-default})"
+C[169]="指定网络出口  (当前: \${_val:-默认})"
+E[170]="Please select network interface:"
+C[170]="请选择网络接口:"
+E[171]="1. Default (not specified)"
+C[171]="1. 默认（不指定）"
+E[172]="Bound interface updated to: "
+C[172]="绑定接口已更新为: "
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -514,7 +522,7 @@ statistics_of_run_times() {
     { wget --no-check-certificate -qO- --timeout=3 "https://stat.cloudflare.now.cc/updateStats?script=${SCRIPT}" > $TEMP_DIR/statistics 2>/dev/null || true; }&
   elif grep -q 'get' <<< "$UPDATE_OR_GET"; then
     [ -s $TEMP_DIR/statistics ] && [[ $(cat $TEMP_DIR/statistics) =~ \"todayCount\":([0-9]+),\"totalCount\":([0-9]+) ]] && local TODAY="${BASH_REMATCH[1]}" && local TOTAL="${BASH_REMATCH[2]}" && rm -f $TEMP_DIR/statistics
-    hint "\n*******************************************\n\n $(text 55) \n"
+    hint "\n *******************************************\n\n $(text 55) \n"
   fi
 }
 
@@ -667,6 +675,10 @@ change_config() {
   # 从 sing-box 格式的 list 中提取 client-fingerprint，取第一个匹配值
   local FP_NOW=$(awk -F '"' '/"fingerprint"/{print $4; exit}' ${WORK_DIR}/list)
   [ -n "$FP_NOW" ] && MENU_IDX+=(164) && MENU_KEY+=(fingerprint) && MENU_VAL+=("$FP_NOW")
+
+  # 指定网络出口
+  local BIND_IFACE_NOW=$(awk -F '"' '/"bind_interface"[[:space:]]*:[[:space:]]*"/{print $4}' "${WORK_DIR}/conf/01_outbounds.json" 2>/dev/null)
+  MENU_IDX+=(169) && MENU_KEY+=(bindinterface) && MENU_VAL+=("${BIND_IFACE_NOW:-default}")
 
   # Hysteria2 带宽和端口跳跃（仅在 Hysteria2 已安装时显示）
   if ls ${WORK_DIR}/conf/*_${NODE_TAG[1]}_inbounds.json >/dev/null 2>&1; then
@@ -852,6 +864,60 @@ change_config() {
       * ) NEW_VAL="$FP_CHOICE" ;;
     esac
     [[ ! "${NEW_VAL,,}" =~ ^[0-9a-z]+$ ]] && error " $(text 166) " || FINGER_PRINT="$NEW_VAL"
+    export_list
+    return
+  elif [ "$KEY" = "bindinterface" ]; then
+    # 指定网络出口 — 获取系统接口列表 + 选择 + 更新 JSON
+    local IFACE_LIST=() CHOOSE_BIND IDX=2 TMP_FILE="${WORK_DIR}/conf/01_outbounds.json.tmp"
+
+    if command -v ip >/dev/null 2>&1; then
+      while read -r _ iface; do
+        iface="${iface%%:*}"
+        iface="${iface%%@*}"
+        [ "$iface" != "lo" ] && IFACE_LIST+=("$iface")
+      done < <(ip -o link show up 2>/dev/null)
+    elif command -v ifconfig >/dev/null 2>&1; then
+      while read -r iface _; do
+        iface="${iface%%:}"
+        [ "$iface" != "lo" ] && IFACE_LIST+=("$iface")
+      done < <(ifconfig -a 2>/dev/null | awk '/^[a-zA-Z]/')
+    else
+      for _if in /sys/class/net/*; do
+        _if="${_if##*/}"
+        [ "$_if" != "lo" ] && IFACE_LIST+=("$_if")
+      done
+    fi
+    mapfile -t IFACE_LIST < <(printf '%s\n' "${IFACE_LIST[@]}" | sort -u)
+    [ "${#IFACE_LIST[@]}" -eq 0 ] && warning " $(text 172) " && return
+
+    hint "\n $(text 170) \n"
+    hint " $(text 171) "
+    for _if in "${IFACE_LIST[@]}"; do
+      hint " $IDX. $_if"
+      ((IDX++))
+    done
+    hint " 0. $(text 35)"
+    hint ""
+    reading " $(text 24) " CHOOSE_BIND
+
+    if [[ "$CHOOSE_BIND" == "1" || "${CHOOSE_BIND,,}" == "default" ]]; then
+      jq_exec '.outbounds |= map(if .tag == "direct" then del(.bind_interface) else . end)' \
+        "${WORK_DIR}/conf/01_outbounds.json" > "$TMP_FILE" && mv "$TMP_FILE" "${WORK_DIR}/conf/01_outbounds.json"
+      info " $(text 172) $(text 171 | sed 's/^1\. //')"
+    elif [[ "$CHOOSE_BIND" =~ ^[0-9]+$ ]] && [ "$CHOOSE_BIND" -ge 2 ] && [ "$CHOOSE_BIND" -le "$((IDX - 1))" ]; then
+      local SELECTED_IF="${IFACE_LIST[$((CHOOSE_BIND - 2))]}"
+      jq_exec --arg iface "$SELECTED_IF" '.outbounds |= map(if .tag == "direct" then .bind_interface = $iface else . end)' \
+        "${WORK_DIR}/conf/01_outbounds.json" > "$TMP_FILE" && mv "$TMP_FILE" "${WORK_DIR}/conf/01_outbounds.json"
+      info " $(text 172) $SELECTED_IF"
+    elif [ "$CHOOSE_BIND" == "0" ]; then
+      return
+    else
+      warning " Invalid selection " && return
+    fi
+
+    cmd_systemctl restart sing-box
+    sleep 2
+    cmd_systemctl status sing-box &>/dev/null && info "\n Sing-box $(text 28) $(text 37) \n" || warning "\n Sing-box $(text 27) $(text 38) \n"
     export_list
     return
   fi
@@ -3409,7 +3475,8 @@ EOF
     "outbounds":[
         {
             "type":"direct",
-            "tag":"direct"
+            "tag":"direct"${BIND_INTERFACE:+,
+            "bind_interface":"${BIND_INTERFACE}"}
         }
     ]
 }
@@ -4723,15 +4790,10 @@ vless://${UUID[11]}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?encryption=none${VISION_
   if [ -n "$PORT_HYSTERIA2" ]; then
     [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && local V2RAYN_PARAMS=",\"Ports\":\"${PORT_HOPPING_START}-${PORT_HOPPING_END}\",\"HopInterval\":\"30s\""
     local REALM_PARAMS=""
-    [ "$IS_HY2_REALM" = 'is_hy2_realm' ] && REALM_PARAMS=",\"Finalmask\":\"{\\n        \\\"udp\\\": [\\n            {\\n                \\\"type\\\": \\\"realm\\\",\\n                \\\"settings\\\": {\\n                    \\\"url\\\": \\\"realm://public@realm.hy2.io:443/${UUID[12]}\\\",\\n                    \\\"stunServers\\\": [\\n                        \\\"stun.nextcloud.com:3478\\\",\\n                        \\\"stun.sip.us:3478\\\",\\n                        \\\"turn.cloudflare.com:3478\\\",\\n                        \\\"global.stun.twilio.com:3478\\\"\\n                    ]\\n                }\\n            }\\n        ],\\n        \\\"quicParams\\\": {\\n            \\\"congestion\\\": \\\"bbr\\\"\\n        }\\n    }\""
-
-    local HY2_JSON_1="{\"ConfigType\":7,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME[12]} ${NODE_TAG[1]}\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_HYSTERIA2},\"Password\":\"${UUID[12]}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"${TLS_SERVER}\",\"Cert\":\"${CERT_URL_2}\""
-    local HY2_JSON_2=",\"ProtoExtraObj\":{\"UpMbps\":${HY2_UP:-200},\"DownMbps\":${HY2_DOWN:-1000}"
-    local HY2_JSON_3="}}"
-    local CLEAN_V2RAYN_PARAMS="${V2RAYN_PARAMS:-}"
+    [ "$IS_HY2_REALM" = 'is_hy2_realm' ] && REALM_PARAMS="\"Hy2RealmUrl\":\"realm://public@realm.hy2.io:443/${UUID[12]}?stun=stun.nextcloud.com:3478&stun=stun.sip.us:3478&stun=turn.cloudflare.com:3478&stun=global.stun.twilio.com:3478\","
     local V2RAYN_SUBSCRIBE+="
 ----------------------------
-v2rayn://hysteria2/$(printf "%s%s%s%s%s\n" "$HY2_JSON_1" "$REALM_PARAMS" "${HY2_JSON_2%$'\n'*}" "${CLEAN_V2RAYN_PARAMS%$'\n'*}" "$HY2_JSON_3"  | base64 -w0 | tr '+/' '-_' | tr -d '=')"
+v2rayn://hysteria2/$(echo -n "{\"ConfigType\":7,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME[12]} ${NODE_TAG[1]}\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_HYSTERIA2},\"Password\":\"${UUID[12]}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"${TLS_SERVER}\",\"Cert\":\"${CERT_URL_2}\",\"ProtoExtraObj\":{"${REALM_PARAMS}"\"UpMbps\":${HY2_UP:-200},\"DownMbps\":${HY2_DOWN:-1000}}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
   fi
 
   [ -n "$PORT_TUIC" ] && local V2RAYN_SUBSCRIBE+="
@@ -5114,7 +5176,7 @@ $(info "$(echo "{ \"outbounds\":[ ${OUTBOUND_REPLACE%,} ] }" | ${WORK_DIR}/jq)
 
 ${PROMPT}
 
-  $(text 72)")
+ $(text 72)")
 "
 
   [ "$IS_SUB" = 'is_sub' ] && EXPORT_LIST_FILE+="
@@ -5916,6 +5978,10 @@ for z in ${!ALL_PARAMETER[@]}; do
       ;;
     --HY2_WARP|--REALM_WARP|--WARP_REALM )
       ((z++)); [[ "${ALL_PARAMETER[z],,}" =~ ^(true|1|y|yes)$ ]] && IS_HY2_WARP=is_hy2_warp && IS_HY2_REALM=is_hy2_realm
+      ;;
+    --BIND_INTERFACE )
+      ((z++)); BIND_INTERFACE=${ALL_PARAMETER[z]}
+      [[ "${BIND_INTERFACE,,}" = "default" ]] && unset BIND_INTERFACE
       ;;
     --REALITY_PRIVATE )
       ((z++)); REALITY_PRIVATE=${ALL_PARAMETER[z]}
