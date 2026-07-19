@@ -5670,34 +5670,38 @@ version() {
     wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
 
     if [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ]; then
-      # 备份旧版本（不停止服务，不影响网络）
-      cp ${WORK_DIR}/sing-box ${WORK_DIR}/sing-box.bak
-      hint "\n $(text 102) \n"
+      # 用新版本预校验配置文件
+      if $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box check -C ${WORK_DIR}/conf &>/dev/null; then
+        hint "\n $(text 102) \n"
 
-      # 安装新版本
-      chmod +x $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ${WORK_DIR}/sing-box
+        # 生成后台升级脚本，脱离 SSH 会话独立运行
+        cat > ${TEMP_DIR}/upgrade.sh << 'UPGRADE_EOF'
+#!/usr/bin/env bash
+sleep 2
+UPGRADE_EOF
+        echo "cp ${WORK_DIR}/sing-box ${WORK_DIR}/sing-box.bak" >> ${TEMP_DIR}/upgrade.sh
+        echo "chmod +x ${TEMP_DIR}/sing-box-${ONLINE}-linux-${SING_BOX_ARCH}/sing-box && mv ${TEMP_DIR}/sing-box-${ONLINE}-linux-${SING_BOX_ARCH}/sing-box ${WORK_DIR}/sing-box" >> ${TEMP_DIR}/upgrade.sh
+        echo "systemctl restart sing-box" >> ${TEMP_DIR}/upgrade.sh
+        echo "sleep 2" >> ${TEMP_DIR}/upgrade.sh
+        echo "if systemctl is-active sing-box &>/dev/null; then" >> ${TEMP_DIR}/upgrade.sh
+        echo "  rm -f ${WORK_DIR}/sing-box.bak" >> ${TEMP_DIR}/upgrade.sh
+        echo "  echo 'Sing-box upgrade to ${ONLINE} successful.'" >> ${TEMP_DIR}/upgrade.sh
+        echo "else" >> ${TEMP_DIR}/upgrade.sh
+        echo "  echo 'New version failed, restoring old version...'" >> ${TEMP_DIR}/upgrade.sh
+        echo "  mv ${WORK_DIR}/sing-box.bak ${WORK_DIR}/sing-box" >> ${TEMP_DIR}/upgrade.sh
+        echo "  systemctl restart sing-box" >> ${TEMP_DIR}/upgrade.sh
+        echo "  sleep 2" >> ${TEMP_DIR}/upgrade.sh
+        echo "  systemctl is-active sing-box &>/dev/null || echo 'Upgrade failed!'" >> ${TEMP_DIR}/upgrade.sh
+        echo "fi" >> ${TEMP_DIR}/upgrade.sh
 
-      # SIGHUP 热重载 — 旧进程保持运行直到新进程就绪，零中断
-      systemctl kill -s HUP sing-box 2>/dev/null || systemctl reload sing-box 2>/dev/null
-      sleep 2
-
-      # 检查新版本是否成功运行
-      if systemctl is-active sing-box &>/dev/null; then
-        # 新版本运行成功，删除备份
-        rm -f ${WORK_DIR}/sing-box.bak
-        info "\n $(text 103) \n"
+        chmod +x ${TEMP_DIR}/upgrade.sh
+        nohup bash ${TEMP_DIR}/upgrade.sh > ${WORK_DIR}/logs/upgrade.log 2>&1 &
+        disown
+        info "\n Sing-box upgrade to ${ONLINE} started in background. Log: ${WORK_DIR}/logs/upgrade.log\n"
+        sleep 1
       else
-        # SIGHUP 热重载失败（如新版不兼容），回滚旧版并重启
         warning "\n $(text 104) \n"
-        mv ${WORK_DIR}/sing-box.bak ${WORK_DIR}/sing-box
-        systemctl restart sing-box
-        sleep 2
-
-        if systemctl is-active sing-box &>/dev/null; then
-          info "\n $(text 105) \n"
-        else
-          error "\n $(text 106) \n"
-        fi
+        rm -f ${TEMP_DIR}/sing-box-${ONLINE}-linux-${SING_BOX_ARCH}/sing-box
       fi
     else
       error "\n $(text 42) "
