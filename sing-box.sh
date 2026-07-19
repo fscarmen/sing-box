@@ -5674,62 +5674,36 @@ version() {
       if $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box check -C ${WORK_DIR}/conf &>/dev/null; then
         hint "\n $(text 102) \n"
 
-        # 生成后台升级脚本，脱离 SSH 会话独立运行
-        cat > ${TEMP_DIR}/upgrade.sh << UPGRADE_SCRIPT
-#!/usr/bin/env bash
-WORK_DIR='${WORK_DIR}'
-ONLINE='${ONLINE}'
-LOG="${WORK_DIR}/logs/upgrade-${ONLINE}-\$(date +%Y%m%d-%H%M%S).log"
-exec > "\$LOG" 2>&1
+        # 后台升级：subshell + disown，脱离 SSH 会话
+        (
+          sleep 2
+          mv ${WORK_DIR}/sing-box ${WORK_DIR}/sing-box.bak
+          chmod +x $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
+          cp $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ${WORK_DIR}/sing-box
 
-# 兼容 systemd 和 OpenRC (Alpine)
-if command -v systemctl &>/dev/null; then
-  DAEMON_RELOAD() { systemctl daemon-reload; }
-  SERVICE_RESTART() { systemctl restart "\$1"; }
-  SERVICE_ACTIVE() { systemctl is-active "\$1" &>/dev/null; }
-else
-  DAEMON_RELOAD() { :; }
-  SERVICE_RESTART() { rc-service "\$1" restart; }
-  SERVICE_ACTIVE() { rc-service "\$1" status &>/dev/null; }
-fi
+          if command -v systemctl &>/dev/null; then
+            systemctl daemon-reload
+            systemctl restart sing-box
+          else
+            rc-service sing-box restart
+          fi
+          sleep 2
 
-echo "[upgrade] waiting 2s before upgrade..."
-sleep 2
-
-echo "[upgrade] backing up old binary"
-mv \${WORK_DIR}/sing-box \${WORK_DIR}/sing-box.bak
-
-echo "[upgrade] installing new binary"
-cp ${TEMP_DIR}/sing-box-${ONLINE}-linux-${SING_BOX_ARCH}/sing-box \${WORK_DIR}/sing-box
-chmod +x \${WORK_DIR}/sing-box
-
-echo "[upgrade] restarting sing-box..."
-DAEMON_RELOAD
-SERVICE_RESTART sing-box
-sleep 2
-
-if SERVICE_ACTIVE sing-box; then
-  echo "[upgrade] ✅ new version ${ONLINE} is running. cleaning up..."
-  rm -f \${WORK_DIR}/sing-box.bak
-else
-  echo "[upgrade] ❌ new version failed to start. restoring old binary..."
-  rm -f \${WORK_DIR}/sing-box
-  mv \${WORK_DIR}/sing-box.bak \${WORK_DIR}/sing-box
-  DAEMON_RELOAD
-  SERVICE_RESTART sing-box
-  sleep 2
-  if SERVICE_ACTIVE sing-box; then
-    echo "[upgrade] ✅ rollback successful. old version restored."
-  else
-    echo "[upgrade] ❌ rollback also failed! manual intervention required."
-  fi
-fi
-UPGRADE_SCRIPT
-
-        chmod +x ${TEMP_DIR}/upgrade.sh
-        nohup bash ${TEMP_DIR}/upgrade.sh > /dev/null 2>&1 &
+          if systemctl is-active sing-box &>/dev/null || rc-service sing-box status &>/dev/null; then
+            rm -f ${WORK_DIR}/sing-box.bak
+          else
+            rm -f ${WORK_DIR}/sing-box
+            mv ${WORK_DIR}/sing-box.bak ${WORK_DIR}/sing-box
+            if command -v systemctl &>/dev/null; then
+              systemctl daemon-reload
+              systemctl restart sing-box
+            else
+              rc-service sing-box restart
+            fi
+          fi
+        ) > ${WORK_DIR}/logs/upgrade-${ONLINE}.log 2>&1 &
         disown
-        info "\n Sing-box upgrade to ${ONLINE} started in background. Log: ${WORK_DIR}/logs/upgrade-${ONLINE}-*.log\n"
+        info "\n Sing-box upgrade to ${ONLINE} started in background.\n"
       else
         warning "\n $(text 104) \n"
         rm -f ${TEMP_DIR}/sing-box-${ONLINE}-linux-${SING_BOX_ARCH}/sing-box
