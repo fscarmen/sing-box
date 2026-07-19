@@ -5670,30 +5670,30 @@ version() {
     wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
 
     if [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ]; then
-      cmd_systemctl disable sing-box
-
-      # 备份旧版本
+      # 备份旧版本（不停止服务，不影响网络）
       cp ${WORK_DIR}/sing-box ${WORK_DIR}/sing-box.bak
       hint "\n $(text 102) \n"
 
       # 安装新版本
       chmod +x $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box && mv $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ${WORK_DIR}/sing-box
-      cmd_systemctl enable sing-box
+
+      # SIGHUP 热重载 — 旧进程保持运行直到新进程就绪，零中断
+      systemctl kill -s HUP sing-box 2>/dev/null || systemctl reload sing-box 2>/dev/null
       sleep 2
 
       # 检查新版本是否成功运行
-      if cmd_systemctl status sing-box &>/dev/null; then
+      if systemctl is-active sing-box &>/dev/null; then
         # 新版本运行成功，删除备份
         rm -f ${WORK_DIR}/sing-box.bak
         info "\n $(text 103) \n"
       else
-        # 新版本运行失败，恢复旧版本
+        # SIGHUP 热重载失败（如新版不兼容），回滚旧版并重启
         warning "\n $(text 104) \n"
         mv ${WORK_DIR}/sing-box.bak ${WORK_DIR}/sing-box
-        cmd_systemctl enable sing-box
+        systemctl restart sing-box
         sleep 2
 
-        if cmd_systemctl status sing-box &>/dev/null; then
+        if systemctl is-active sing-box &>/dev/null; then
           info "\n $(text 105) \n"
         else
           error "\n $(text 106) \n"
