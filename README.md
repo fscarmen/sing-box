@@ -24,6 +24,8 @@
 
 * * *
 ## 1.更新信息
+2026.07.20 v1.3.17 1. Add SIGHUP hot-reload support, replace restart sequences with reload; 2. Force base-config regeneration on upgrade to guarantee sing-box check passes;  1. 新增 SIGHUP 热更支持，用 reload 替换重启流程; 2. 升级时强制重置基础配置至新版格式，保证兼容性
+
 2026.07.16 v1.3.16 1. Add bind_interface option in sb -d menu to bind outbound traffic to a specific NIC; 2. Change v2rayN Hysteria2 Realm config from Finalmask field to ProtoExtraObj; 1. sb -d 菜单新增「指定网络出口」选项，可为出站流量绑定特定网卡; 2. v2rayN 的 Hysteria2 Realm 配置从 Finalmask 字段改为 ProtoExtraObj
 
 2026.07.01 v1.3.15 Add v2rayN Finalmask field for hysteria2 realm subscription output; v2rayN 订阅输出增加 Hysteria2 Realm 的 Finalmask 字段
