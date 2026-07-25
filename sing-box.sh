@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.17 (2026.07.20)'
+VERSION='v1.3.18 (2026.07.25)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -40,8 +40,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Add bind_interface option in sb -d menu to bind outbound traffic to a specific NIC; 2. Change v2rayN Hysteria2 Realm config from Finalmask field to ProtoExtraObj; 3. add SIGHUP hot-reload support, replace restart sequences with reload; 4. force base-config regeneration on upgrade to guarantee sing-box check passes"
-C[1]="1. sb -d 菜单新增「指定网络出口」选项，可为出站流量绑定特定网卡; 2. v2rayN 的 Hysteria2 Realm 配置从 Finalmask 字段改为 ProtoExtraObj; 3. 新增 SIGHUP 热更支持，用 reload 替换重启流程; 4. 新增 SIGHUP 热更支持，用 reload 替换重启流程; 4. 升级时强制重置基础配置至新版格式，保证兼容性"
+E[1]="1. Add bind_interface option in sb -d menu to bind outbound traffic to a specific NIC; 2. Add enable/disable subscriptions option in sb -d menu 2. Change v2rayN Hysteria2 Realm config from Finalmask field to ProtoExtraObj; 3. add SIGHUP hot-reload support, replace restart sequences with reload; 4. force base-config regeneration on upgrade to guarantee sing-box check passes"
+C[1]="1. sb -d 菜单新增「指定网络出口」选项，可为出站流量绑定特定网卡; 2. sb -d 菜单新增 「订阅开关」，可随时开启关闭订阅; 3. v2rayN 的 Hysteria2 Realm 配置从 Finalmask 字段改为 ProtoExtraObj; 4. 新增 SIGHUP 热更支持，用 reload 替换重启流程; 4. 新增 SIGHUP 热更支持，用 reload 替换重启流程; 5. 升级时强制重置基础配置至新版格式，保证兼容性"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -142,8 +142,8 @@ E[50]="Please enter the \$TYPE domain name:"
 C[50]="请输入 \$TYPE 域名:"
 E[51]="Please choose or custom a cdn, http support is required:"
 C[51]="请选择或输入 cdn，要求支持 http:"
-E[52]="Please set the ip \[\${WS_SERVER_IP_SHOW}] to domain \[\${TYPE_HOST_DOMAIN}], and set the origin rule to \[\${TYPE_PORT_WS}] in Cloudflare."
-C[52]="请在 Cloudflare 绑定 \[\${WS_SERVER_IP_SHOW}] 的域名为 \[\${TYPE_HOST_DOMAIN}], 并设置 origin rule 为 \[\${TYPE_PORT_WS}]"
+E[52]="Please set the ip [\${WS_SERVER_IP_SHOW}] to domain [\${TYPE_HOST_DOMAIN}], and set the origin rule to [\${TYPE_PORT_WS}] in Cloudflare."
+C[52]="请在 Cloudflare 绑定 [\${WS_SERVER_IP_SHOW}] 的域名为 [\${TYPE_HOST_DOMAIN}], 并设置 origin rule 为 [\${TYPE_PORT_WS}]"
 E[53]="Please select or enter the preferred address (domain / IPv4 / [IPv6], optional :port), the default is \${CDN_DOMAIN[0]}:"
 C[53]="请选择或者填入优选地址（域名 / IPv4 / [IPv6]，可选 :端口），默认为 \${CDN_DOMAIN[0]}:"
 E[54]="Configuration check failed, new version \$ONLINE is incompatible with current config."
@@ -226,8 +226,8 @@ E[92]="Change the Argo tunnel (sb -t)"
 C[92]="更换 Argo 隧道 (sb -t)"
 E[93]="Can't get the temporary tunnel domain, script exits. Feedback:[https://github.com/fscarmen/sing-box/issues]"
 C[93]="获取不到临时隧道的域名，脚本退出，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
-E[94]="Please bind \[\${ARGO_DOMAIN}] tunnel TYPE to HTTP and URL to \[\localhost:\${PORT_NGINX}] in Cloudflare."
-C[94]="请在 Cloudflare 绑定 \[\${ARGO_DOMAIN}] 隧道 TYPE 为 HTTP，URL 为 \[\localhost:\${PORT_NGINX}]"
+E[94]="Please bind [\${ARGO_DOMAIN}] tunnel TYPE to HTTP and URL to [localhost:\${PORT_NGINX}] in Cloudflare."
+C[94]="请在 Cloudflare 绑定 [\${ARGO_DOMAIN}] 隧道 TYPE 为 HTTP，URL 为 [localhost:\${PORT_NGINX}]"
 E[95]="netfilter-persistent installation failed, but the installation progress will not stop. portHopping forwarding rules are temporary rules, reboot may be invalidated."
 C[95]="netfilter-persistent安装失败,但安装进度不会停止。PortHopping转发规则为临时规则,重启可能失效"
 E[96]="netfilter-persistent is not started, PortHopping forwarding rules cannot be persisted. Reboot the system, the rules will be invalidated, please manually execute [netfilter-persistent save], continue the script does not affect the subsequent configuration."
@@ -388,6 +388,10 @@ E[174]="Failed to update configuration. Please check manually. Suggestion: reins
 C[174]="更新配置后仍然无法检查成功，建议重装脚本"
 E[175]="Update base configuration? (Node configs will remain unaffected; only log, outbounds, endpoints, route, experimental, dns, ntp, http_clients, etc., will be reset) [Y/n]:"
 C[175]="是否更新基础配置？（不影响节点配置，仅重置 log、outbounds、endpoints、route、experimental、dns、ntp、http_clients）[Y/n]:"
+E[176]="Enable subscription"
+C[176]="开启订阅"
+E[177]="Disable subscription"
+C[177]="关闭订阅"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -631,16 +635,16 @@ input_cdn() {
 # 输入 UUID
 input_uuid() {
   # 输入 UUID ，错误超过 5 次将会退出
-  UUID_DEFAULT=$(cat /proc/sys/kernel/random/uuid)
+  local UUID_DEFAULT=$(cat /proc/sys/kernel/random/uuid)
   [[ "$IS_FAST_INSTALL" = 'is_fast_install' || "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]] && UUID_CONFIRM=${UUID_CONFIRM:-"$UUID_DEFAULT"}
   if [ -z "$UUID_CONFIRM" ]; then
     (( STEP_NUM++ )) || true
-    reading "\n ${TOTAL_STEPS:+(${STEP_NUM}/${TOTAL_STEPS}) } $(text 12) " UUID_CONFIRM
+    reading "\n ${TOTAL_STEPS:+(${STEP_NUM}/${TOTAL_STEPS}) }$(text 12) " UUID_CONFIRM
   fi
   local UUID_ERROR_TIME=5
   until [[ -z "$UUID_CONFIRM" || "${UUID_CONFIRM,,}" =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ ]]; do
     (( UUID_ERROR_TIME-- )) || true
-    [ "$UUID_ERROR_TIME" = 0 ] && error "\n $(text 3) \n" || reading "\n $(text 4) \n" UUID_CONFIRM
+    [ "$UUID_ERROR_TIME" = 0 ] && error "\n $(text 3) \n" || reading "\n $(text 4) " UUID_CONFIRM
   done
   UUID_CONFIRM=${UUID_CONFIRM:-"$UUID_DEFAULT"}
 }
@@ -686,6 +690,14 @@ change_config() {
   local BIND_IFACE_NOW=$(awk -F '"' '/"bind_interface"[[:space:]]*:[[:space:]]*"/{print $4}' "${WORK_DIR}/conf/01_outbounds.json" 2>/dev/null)
   MENU_IDX+=(169) && MENU_KEY+=(bindinterface) && MENU_VAL+=("${BIND_IFACE_NOW:-default}")
 
+  # 订阅开关（基于 nginx.conf 文件内容检测）
+  if [ -s "${WORK_DIR}/nginx.conf" ] && \
+     grep -qE 'location ~ \^/[^/]+/auto \{' "${WORK_DIR}/nginx.conf" 2>/dev/null; then
+    MENU_IDX+=(177) && MENU_KEY+=(subscribe) && MENU_VAL+=("$(text 177)")
+  else
+    MENU_IDX+=(176) && MENU_KEY+=(subscribe) && MENU_VAL+=("$(text 176)")
+  fi
+
   # Hysteria2 带宽和端口跳跃（仅在 Hysteria2 已安装时显示）
   if ls ${WORK_DIR}/conf/*_${NODE_TAG[1]}_inbounds.json >/dev/null 2>&1; then
     local HY2_LINE=$(grep 'type: hysteria2' ${WORK_DIR}/subscribe/proxies)
@@ -728,7 +740,7 @@ change_config() {
     local _val="${MENU_VAL[_i]}"
     local _raw
     eval "_raw=\"\${${L}[${MENU_IDX[_i]}]}\""
-    eval "hint \" $(( _i+1 )). ${_raw}\""
+    eval "hint \" $(printf '%2d' $(( _i+1 ))). ${_raw}\""
   done
   hint ""
   reading " $(text 24) " CHOOSE_NODE_INFO
@@ -761,7 +773,7 @@ change_config() {
       [ -s ${WORK_DIR}/conf/${CONF_FILES[a]} ] && sed -i "s/\(.*listen_port.*:\)$((OLD_START_PORT+a))/\1$((START_PORT+a))/" ${WORK_DIR}/conf/*
     done
     fetch_nodes_value
-    [ -n "$PORT_NGINX" ] && UUID_CONFIRM=$(awk '/location/ && /\// {match($0, /\/([^ \/]+)/, arr); p=arr[1]; sub(/-(vmess|vless|auto2|auto).*/, "", p); print p; exit}' ${WORK_DIR}/nginx.conf) && export_nginx_conf_file
+    [ -n "$PORT_NGINX" ] && export_nginx_conf_file
     cmd_systemctl reload sing-box
     [ -n "$ARGO_DOMAIN" ] && export_argo_json_file
     sync_firewall_rules
@@ -919,6 +931,64 @@ change_config() {
 
     cmd_systemctl reload sing-box
     export_list
+    return
+  elif [ "$KEY" = "subscribe" ]; then
+    # 订阅开关 — 检测 nginx.conf 中是否存在订阅分发 location 块
+    if grep -qE 'location ~ \^/[^/]+/auto \{' "${WORK_DIR}/nginx.conf" 2>/dev/null; then
+      # 已开启 → 关闭订阅
+      info "\n $(text 177) "
+      # 检测 Argo 真实状态（Alpine 和 systemd 通用：检查守护进程文件是否存在）
+      [ -s ${ARGO_DAEMON_FILE} ] && IS_ARGO=is_argo || IS_ARGO=no_argo
+      # 从旧 nginx.conf 读取 PORT_NGINX（确定文件存在，无需条件判断）
+      PORT_NGINX=$(awk '/listen/{print $2; exit}' ${WORK_DIR}/nginx.conf)
+      IS_SUB=no_sub
+      fetch_nodes_value
+      # 判断是否还需要 nginx：有 WS 协议且 Argo 反代
+      if { [ -n "$PORT_VMESS_WS" ] || [ -n "$PORT_VLESS_WS" ]; } && [ "$IS_ARGO" = 'is_argo' ]; then
+        export_nginx_conf_file
+        nginx -s reload -c ${WORK_DIR}/nginx.conf 2>/dev/null || nginx_run
+      else
+        nginx_stop
+        [ "$SYSTEM" != 'Alpine' ] && [ "$IS_CENTOS" != 'CentOS7' ] && \
+          sed -i '/ExecStartPre=.*nginx/d' ${SINGBOX_DAEMON_FILE} && systemctl daemon-reload
+        rm -f ${WORK_DIR}/nginx.conf
+        unset PORT_NGINX
+      fi
+      /bin/rm -f ${WORK_DIR}/subscribe/qr
+      export_list
+      info " $(text 112) "
+    else
+      # 未开启 → 开启订阅
+      info "\n $(text 176) "
+      IS_SUB=is_sub
+      # 确保 nginx 已安装
+      if ! command -v nginx >/dev/null 2>&1; then
+        info "\n $(text 7) nginx"
+        ${PACKAGE_INSTALL[int]} nginx >/dev/null 2>&1
+      fi
+      check_arch
+      [ ! -e "${WORK_DIR}/qrencode" ] && \
+        wget --no-check-certificate --continue -qO ${WORK_DIR}/qrencode \
+          ${GH_PROXY}https://github.com/fscarmen/client_template/raw/main/qrencode-go/qrencode-go-linux-$QRENCODE_ARCH 2>/dev/null \
+          && chmod +x ${WORK_DIR}/qrencode
+      fetch_nodes_value
+      [ -z "$PORT_NGINX" ] && input_nginx_port
+      export_nginx_conf_file
+      # 更新服务文件 ExecStartPre（非 CentOS7）
+      if [ "$SYSTEM" != 'Alpine' ] && [ "$IS_CENTOS" != 'CentOS7' ] && \
+         ! grep -q 'ExecStartPre=.*nginx' ${SINGBOX_DAEMON_FILE} 2>/dev/null; then
+        sed -i '/^ExecStart=/i ExecStartPre='$(command -v nginx)' -c '${WORK_DIR}'/nginx.conf' ${SINGBOX_DAEMON_FILE}
+        systemctl daemon-reload
+      fi
+      # 启动或 reload nginx
+      if ps -eo pid,args | grep -qE "[n]ginx.*${WORK_DIR}/nginx.conf" 2>/dev/null; then
+        nginx -s reload -c ${WORK_DIR}/nginx.conf 2>/dev/null || true
+      else
+        nginx_run
+      fi
+      export_list
+      info " $(text 112) "
+    fi
     return
   fi
 
@@ -2062,16 +2132,18 @@ check_install() {
   fi
 }
 
+# Nginx 启动/停止函数（全局定义，供 cmd_systemctl() 和 change_config() 共用）
+nginx_run() {
+  $(command -v nginx) -c $WORK_DIR/nginx.conf
+}
+
+nginx_stop() {
+  local NGINX_PID=$(ps -eo pid,args | awk -v work_dir="$WORK_DIR" '$0~(work_dir"/nginx.conf"){print $1;exit}')
+  ss -nltp | sed -n "/pid=$NGINX_PID,/ s/,/ /gp" | grep -oP 'pid=\K\S+' | sort -u | xargs kill -9 >/dev/null 2>&1
+}
+
 # 为了适配 alpine，定义 cmd_systemctl 的函数
 cmd_systemctl() {
-  nginx_run() {
-    $(command -v nginx) -c $WORK_DIR/nginx.conf
-  }
-
-  nginx_stop() {
-    local NGINX_PID=$(ps -eo pid,args | awk -v work_dir="$WORK_DIR" '$0~(work_dir"/nginx.conf"){print $1;exit}')
-    ss -nltp | sed -n "/pid=$NGINX_PID,/ s/,/ /gp" | grep -oP 'pid=\K\S+' | sort -u | xargs kill -9 >/dev/null 2>&1
-  }
 
   if [ "$SYSTEM" = 'Alpine' ]; then
     case "$1" in
@@ -4392,10 +4464,17 @@ fetch_nodes_value() {
   # 如有 Argo，获取 Argo Tunnel
   [[ ${STATUS[1]} =~ $(text 27)|$(text 28) ]] && grep -q '\--url' ${ARGO_DAEMON_FILE} && { cmd_systemctl enable argo; sleep 2 && cmd_systemctl status argo &>/dev/null && fetch_quicktunnel_domain; }
 
-  # 获取 Nginx 端口和路径
-  [[ "${IS_SUB}" = 'is_sub' || "${IS_ARGO}" = 'is_argo' ]] && local NGINX_JSON=$(cat ${WORK_DIR}/nginx.conf) &&
-  PORT_NGINX=$(awk '/listen/{print $2; exit}' <<< "$NGINX_JSON") &&
-  UUID_CONFIRM=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' <<< "$NGINX_JSON" | sed -n '1p')
+  # 获取 UUID_CONFIRM（从 JSON 配置文件读取，不依赖 nginx）
+  # 如 UUID_CONFIRM 已有值（例如上层已交互输入），跳过 JSON 读取，避免重复弹窗
+  [ -z "$UUID_CONFIRM" ] && UUID_CONFIRM=$(awk 'match($0, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/) { print substr($0, RSTART, RLENGTH); exit }' ${WORK_DIR}/conf/1*.json 2>/dev/null)
+  # JSON 中提取不到时，尝试从 nginx.conf 提取（订阅开启 / 关闭时 nginx.conf 一定含有 UUID）
+  [ -z "$UUID_CONFIRM" ] && [ -s "${WORK_DIR}/nginx.conf" ] && \
+    UUID_CONFIRM=$(awk 'match($0, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/) { print substr($0, RSTART, RLENGTH); exit }' ${WORK_DIR}/nginx.conf 2>/dev/null)
+  # 提取不到时，走交互式输入（与新安装一致：默认随机 UUID，回车使用默认值）
+  [ -z "$UUID_CONFIRM" ] && input_uuid
+  # 获取 Nginx 端口（首次开启订阅时 nginx.conf 尚未创建，静默跳过）
+  [[ "${IS_SUB}" = 'is_sub' || "${IS_ARGO}" = 'is_argo' ]] && [ -s "${WORK_DIR}/nginx.conf" ] &&
+  PORT_NGINX=$(awk '/listen/{print $2; exit}' ${WORK_DIR}/nginx.conf)
 
   # 获取 XTLS + Reality key-value
   [ -s ${WORK_DIR}/conf/*_${NODE_TAG[0]}_inbounds.json ] && local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[0]}_inbounds.json) && NODE_NAME[11]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[0]}.*/\1/p" <<< "$JSON") && PORT_XTLS_REALITY=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[11]=$(awk -F '"' '/"uuid"/{print $4}' <<< "$JSON") && REALITY_PRIVATE[11]=$(awk -F '"' '/"private_key"/{print $4}' <<< "$JSON") && REALITY_PUBLIC[11]=$(awk -F '"' '/"public_key"/{print $4}' <<< "$JSON")
@@ -5344,15 +5423,6 @@ change_protocols() {
 
   # 获取各节点信息
   fetch_nodes_value
-
-  # 用于新节点的配置信息
-  if [ "${#UUID[@]}" -gt 0 ]; then
-    UUID_CONFIRM="$(printf "%s\n" "${UUID[@]}" | grep -m 1 . )"
-  elif grep -q '.' <<< "${TROJAN_PASSWORD}"; then
-    UUID_CONFIRM="${TROJAN_PASSWORD}"
-  else
-    input_uuid
-  fi
 
   for v in "${NODE_NAME[@]}"; do
     [ -n "$v" ] && NODE_NAME_CONFIRM="$v" && break

@@ -24,18 +24,20 @@
 
 * * *
 ## 1.更新信息
+2026.07.25 v1.3.18 Add enable/disable subscriptions option in sb -d menu 2. Change v2rayN Hysteria2 Realm config from Finalmask field to ProtoExtraObj; sb -d 菜单新增 「订阅开关」，可随时开启关闭订阅
+
 2026.07.20 v1.3.17 1. Add SIGHUP hot-reload support, replace restart sequences with reload; 2. Force base-config regeneration on upgrade to guarantee sing-box check passes;  1. 新增 SIGHUP 热更支持，用 reload 替换重启流程; 2. 升级时强制重置基础配置至新版格式，保证兼容性
 
 2026.07.16 v1.3.16 1. Add bind_interface option in sb -d menu to bind outbound traffic to a specific NIC; 2. Change v2rayN Hysteria2 Realm config from Finalmask field to ProtoExtraObj; 1. sb -d 菜单新增「指定网络出口」选项，可为出站流量绑定特定网卡; 2. v2rayN 的 Hysteria2 Realm 配置从 Finalmask 字段改为 ProtoExtraObj
-
-2026.07.01 v1.3.15 Add v2rayN Finalmask field for hysteria2 realm subscription output; v2rayN 订阅输出增加 Hysteria2 Realm 的 Finalmask 字段
-
-2026.05.29 v1.3.14 Added optional custom warp route rule management, available after installation via [sb -d] without affecting the main installation flow; 增加可选的自定义 warp 路由规则管理，不影响主程序安装流程，安装后可通过 [sb -d] 按需管理
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
 <br>
 
+>2026.07.01 v1.3.15 Add v2rayN Finalmask field for hysteria2 realm subscription output; v2rayN 订阅输出增加 Hysteria2 Realm 的 Finalmask 字段
+>
+>2026.05.29 v1.3.14 Added optional custom warp route rule management, available after installation via [sb -d] without affecting the main installation flow; 增加可选的自定义 warp 路由规则管理，不影响主程序安装流程，安装后可通过 [sb -d] 按需管理
+>
 >2026.05.18 v1.3.13 Added top-level http_clients configuration; 增加顶层的 http_clients 配置
 >
 >2026.05.14 v1.3.12 1. Add Hysteria2 Realm support for machines without public inbound access, with optional WARP-assisted hole punching for strict NAT environments; 2. Realm configuration export is supported for Clash/Mihomo and sing-box clients; 3. Hysteria2 Realm can be enabled or disabled directly via sb -d; 4. Non-interactive installs support --HY2_REALM and --HY2_WARP parameters; 1. 增加 Hysteria2 Realm 支持，适用于没有公网入口的机器，并可选 WARP 辅助打洞; 2. Realm 已支持导出 Clash/Mihomo 和 sing-box 客户端配置; 3. 修改节点配置时可直接开启或关闭 Hysteria2 Realm; 4. 无交互安装支持 --HY2_REALM 与 --HY2_WARP 参数
