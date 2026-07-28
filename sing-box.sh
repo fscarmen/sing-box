@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.18 (2026.07.25)'
+VERSION='v1.3.18 (2026.07.28)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -66,8 +66,8 @@ E[12]="Please enter UUID (Default: \${UUID_DEFAULT}):"
 C[12]="请输入 UUID (默认为: \${UUID_DEFAULT}):"
 E[13]="Please enter the node name. (Default: \${NODE_NAME_DEFAULT}):"
 C[13]="请输入节点名称 (默认为: \${NODE_NAME_DEFAULT}):"
-E[14]="Node name only allow uppercase and lowercase letters, numeric characters, hyphens, underscores, dots and @, please re-enter (\${a} times remaining):"
-C[14]="节点名称只允许英文大小写、数字、连字符、下划线、点和@字符，请重新输入 (剩余\${a}次):"
+E[14]="API check failed, using SagerNet URL as default. (Warning: rule_set may not exist)"
+C[14]="API 校验失败，默认使用 SagerNet 地址。(警告: 规则集可能不存在)"
 E[15]="Sing-box script has not been installed yet."
 C[15]="Sing-box 脚本还没有安装"
 E[16]="Sing-box is completely uninstalled."
@@ -128,20 +128,20 @@ E[43]="The script must be run as root, you can enter sudo -i and then download a
 C[43]="必须以root方式运行脚本，可以输入 sudo -i 后重新下载运行，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 E[44]="Ports are in used:  \${IN_USED[*]}"
 C[44]="正在使用中的端口: \${IN_USED[*]}"
-E[45]="Ports used: \${NOW_START_PORT} - \$((NOW_START_PORT+NOW_CONSECUTIVE_PORTS-1))"
-C[45]="使用端口: \${NOW_START_PORT} - \$((NOW_START_PORT+NOW_CONSECUTIVE_PORTS-1))"
+E[45]="Current custom route rules:"
+C[45]="当前自定义路由规则:"
 E[46]="Warp / warp-go was detected to be running. Please enter the correct server IP:"
 C[46]="检测到 warp / warp-go 正在运行，请输入确认的服务器 IP:"
 E[47]="No server ip, script exits. Feedback:[https://github.com/fscarmen/sing-box/issues]"
 C[47]="没有 server ip，脚本退出，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
-E[48]="ShadowTLS - Copy the above two Neko links and manually set up the chained proxies in order. Tutorial: https://github.com/fscarmen/sing-box/blob/main/README.md#sekobox-%E8%AE%BE%E7%BD%AE-shadowtls-%E6%96%B9%E6%B3%95"
-C[48]="ShadowTLS - 复制上面两条 Neko links 进去，并按顺序手动设置链式代理，详细教程: https://github.com/fscarmen/sing-box/blob/main/README.md#sekobox-%E8%AE%BE%E7%BD%AE-shadowtls-%E6%96%B9%E6%B3%95"
+E[48]="Client Fingerprint  (current: \${_val})"
+C[48]="客户端指纹  (当前: \${_val})"
 E[49]="Select more protocols to install (e.g. hgbd). The order of the port numbers of the protocols is related to the ordering of the multiple choices:\n a. all (default)"
 C[49]="多选需要安装协议(比如 hgbd)，协议的端口号次序与多选的排序有关:\n a. all (默认)"
 E[50]="Please enter the \$TYPE domain name:"
 C[50]="请输入 \$TYPE 域名:"
-E[51]="Please choose or custom a cdn, http support is required:"
-C[51]="请选择或输入 cdn，要求支持 http:"
+E[51]="Please select or input client fingerprint:\n 1. chrome (default)\n 2. firefox\n Or input custom value:"
+C[51]="请选择或输入客户端指纹:\n 1. chrome (默认)\n 2. firefox\n 或直接输入自定义值:"
 E[52]="Please set the ip [\${WS_SERVER_IP_SHOW}] to domain [\${TYPE_HOST_DOMAIN}], and set the origin rule to [\${TYPE_PORT_WS}] in Cloudflare."
 C[52]="请在 Cloudflare 绑定 [\${WS_SERVER_IP_SHOW}] 的域名为 [\${TYPE_HOST_DOMAIN}], 并设置 origin rule 为 [\${TYPE_PORT_WS}]"
 E[53]="Please select or enter the preferred address (domain / IPv4 / [IPv6], optional :port), the default is \${CDN_DOMAIN[0]}:"
@@ -150,8 +150,8 @@ E[54]="Configuration check failed, new version \$ONLINE is incompatible with cur
 C[54]="配置文件检查失败，新版本 \$ONLINE 与当前配置不兼容"
 E[55]="The script runs today: \$TODAY. Total: \$TOTAL"
 C[55]="脚本当天运行次数: \$TODAY，累计运行次数: \$TOTAL"
-E[56]="Process ID"
-C[56]="进程ID"
+E[56]="Invalid fingerprint format."
+C[56]="无效的指纹格式"
 E[57]="Selecting the ws return method:\n 1. Argo (default)\n 2. Origin rules"
 C[57]="选择 ws 的回源方式:\n 1. Argo (默认)\n 2. Origin rules"
 E[58]="Memory Usage"
@@ -164,16 +164,16 @@ E[61]="There are no replaceable Argo tunnels."
 C[61]="没有可更换的Argo 隧道"
 E[62]="Add / Remove protocols (sb -r)"
 C[62]="增加 / 删除协议 (sb -r)"
-E[63]="(1/3) Installed protocols."
-C[63]="(1/3) 已安装的协议"
+E[63]="Close Realm"
+C[63]="关闭 Realm"
 E[64]="Please select the protocols to be removed (multiple selections possible. Press Enter to skip):"
 C[64]="请选择需要删除的协议（可以多选，回车跳过）:"
-E[65]="(2/3) Uninstalled protocols."
-C[65]="(2/3) 未安装的协议"
+E[65]="Open Realm"
+C[65]="开启 Realm"
 E[66]="Please select the protocols to be added (multiple choices possible. Press Enter to skip):"
 C[66]="请选择需要增加的协议（可以多选，回车跳过）:"
-E[67]="(3/3) Confirm all protocols for reloading."
-C[67]="(3/3) 确认重装的所有协议"
+E[67]="Bind network interface  (current: \${_val:-default})"
+C[67]="指定网络出口  (当前: \${_val:-默认})"
 E[68]="Press [n] if there is an error, other keys to continue:"
 C[68]="如有错误请按 [n]，其他键继续:"
 E[69]="Install sba scripts (argo + sing-box) [https://github.com/fscarmen/sba]"
@@ -192,10 +192,10 @@ E[75]="Add protocols"
 C[75]="新增协议"
 E[76]="Install TCP brutal"
 C[76]="安装 TCP brutal"
-E[77]="With sing-box installed, the script exits."
-C[77]="已安装 sing-box ，脚本退出"
-E[78]="Parameter [ $ERROR_PARAMETER ] error, script exits."
-C[78]="[ $ERROR_PARAMETER ] 参数错误，脚本退出"
+E[77]="Please select network interface:"
+C[77]="请选择网络接口:"
+E[78]="1. Default (not specified)"
+C[78]="1. 默认（不指定）"
 E[79]="Please enter the port number of nginx. Must be \${MIN_PORT} - \${MAX_PORT} (Default: \${PORT_NGINX_DEFAULT}):"
 C[79]="请输入 nginx 端口号，必须是 \${MIN_PORT} - \${MAX_PORT} (默认为: \${PORT_NGINX_DEFAULT}):"
 E[80]="subscribe"
@@ -206,8 +206,8 @@ E[82]="template"
 C[82]="模版"
 E[83]="Whether to uninstall Nginx [y/N] (default is N):"
 C[83]="是否卸载 Nginx [y/N] (默认为 N):"
-E[84]="Set SElinux: enforcing --> disabled"
-C[84]="设置 SElinux: enforcing --> disabled"
+E[84]="Bound interface updated to: "
+C[84]="绑定接口已更新为: "
 E[85]="Please enter Argo Token, Argo Json or Cloudflare API\n\n [*] Token: Visit https://dash.cloudflare.com/ , Zero Trust > Networks > Connectors > Create a tunnel > Select Cloudflared\n\n [*] Json: Users can easily obtain it through the following website: https://fscarmen.cloudflare.now.cc\n\n [*] Cloudflare API: Visit https://dash.cloudflare.com/profile/api-tokens > Create Token > Create Custom Token > Add the following permissions:\n - Account > Cloudflare One Connectors: cloudflared > Edit\n - Zone > DNS > Edit\n\n - Account Resources: Include > Required Account\n - Zone Resources: Include > Specific zone > Argo Root Domain"
 C[85]="请输入 Argo Token, Argo Json 或者 Cloudflare API\n\n [*] Token: 访问 https://dash.cloudflare.com/ ，Zero Trust > 网络 > 连接器 > 创建隧道 > 选择 Cloudflared\n\n [*] Json: 用户通过以下网站轻松获取: https://fscarmen.cloudflare.now.cc\n\n [*] Cloudflare API: 访问 https://dash.cloudflare.com/profile/api-tokens > 创建令牌 > 创建自定义令牌 > 添加以下权限:\n - 帐户 > Cloudflare One连接器: Cloudflared > 编辑\n - 区域 > DNS > 编辑\n\n - 帐户资源: 包括 > 所需账户\n - 区域资源: 包括 > 特定区域 > 所需域名"
 E[86]="Argo authentication message does not match the rules, neither Token nor Json, script exits. Feedback:[https://github.com/fscarmen/sba/issues]"
@@ -228,8 +228,8 @@ E[93]="Can't get the temporary tunnel domain, script exits. Feedback:[https://gi
 C[93]="获取不到临时隧道的域名，脚本退出，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 E[94]="Please bind [\${ARGO_DOMAIN}] tunnel TYPE to HTTP and URL to [localhost:\${PORT_NGINX}] in Cloudflare."
 C[94]="请在 Cloudflare 绑定 [\${ARGO_DOMAIN}] 隧道 TYPE 为 HTTP，URL 为 [localhost:\${PORT_NGINX}]"
-E[95]="netfilter-persistent installation failed, but the installation progress will not stop. portHopping forwarding rules are temporary rules, reboot may be invalidated."
-C[95]="netfilter-persistent安装失败,但安装进度不会停止。PortHopping转发规则为临时规则,重启可能失效"
+E[95]="Hot reload successful (PID unchanged: \$MAINPID)"
+C[95]="热加载成功（PID 未变: \$MAINPID）"
 E[96]="netfilter-persistent is not started, PortHopping forwarding rules cannot be persisted. Reboot the system, the rules will be invalidated, please manually execute [netfilter-persistent save], continue the script does not affect the subsequent configuration."
 C[96]="netfilter-persistent未启动，PortHopping转发规则无法持久化，重启系统，规则将会失效，请手动执行 [netfilter-persistent save],继续运行脚本不影响后续配置"
 E[97]="Port Hopping/Multiple: Users sometimes report that their ISPs block or throttle persistent UDP connections. However, these restrictions often only apply to the specific port being used. Port hopping can be used as a workaround for this situation. This function needs to occupy multiple ports, please make sure that these ports are not listening to other services. \n Tip1: The number of ports should not be too many, the recommended number is about 1000, the minimum value: $MIN_HOPPING_PORT, the maximum value: $MAX_HOPPING_PORT.\n Tip2: nat machines have a limited number of ports to listen on, usually 20-30. If setting ports out of the nat range will cause the node to not work, please use with caution!\n This function is not used by default."
@@ -240,8 +240,8 @@ E[99]="The \${SING_BOX_SCRIPT} is detected to be installed. Script exits."
 C[99]="检测到已安装 \${SING_BOX_SCRIPT}，脚本退出!"
 E[100]="Can't get the official latest version. Script exits."
 C[100]="获取不到官方的最新版本，脚本退出!"
-E[101]="The privateKey should be a 43-character base64url encoding; please check."
-C[101]="privateKey 应该是43位的 base64url 编码，请检查"
+E[101]="Failed to update configuration. Please check manually. Suggestion: reinstall script"
+C[101]="更新配置后仍然无法检查成功，建议重装脚本"
 E[102]="Backing up old version sing-box to ${WORK_DIR}/sing-box.bak"
 C[102]="已备份旧版本 sing-box 到 ${WORK_DIR}/sing-box.bak"
 E[103]="New version \$ONLINE is running successfully, backup file deleted"
@@ -254,14 +254,14 @@ E[106]="Failed to restore old version \$LOCAL, please check manually"
 C[106]="恢复旧版本 \$LOCAL 失败，请手动检查"
 E[107]="Sing-box is not installed and cannot change the CDN."
 C[107]="Sing-box 未安装，不能更换 CDN"
-E[108]="Change CDN"
-C[108]="更换 CDN"
-E[109]="Current CDN is: \${CDN_NOW}"
-C[109]="当前 CDN 为: \${CDN_NOW}"
+E[108]="Enable subscription"
+C[108]="开启订阅"
+E[109]="Disable subscription"
+C[109]="关闭订阅"
 E[110]="No CDN protocol is currently in use"
 C[110]="当前没有使用 CDN 的协议"
-E[111]="Please select or enter a new CDN (press Enter to keep the current one):"
-C[111]="请选择或输入新的 CDN (回车保持当前值):"
+E[111]="Update base configuration? (Node configs will remain unaffected; only log, outbounds, endpoints, route, experimental, dns, ntp, http_clients, etc., will be reset) [Y/n]:"
+C[111]="是否更新基础配置？（不影响节点配置，仅重置 log、outbounds、endpoints、route、experimental、dns、ntp、http_clients）[Y/n]:"
 E[112]="Change complete"
 C[112]="修改完成"
 E[113]="Failed to change CDN, using random privateKey"
@@ -336,6 +336,8 @@ E[147]="Hysteria2 Realm is useful for China-back routing or machines without pub
 C[147]="Hysteria2 Realm 适用于回国或者没有公网入口的机器；有公网入口时不建议使用。是否启用？[y/N] (默认为 N):"
 E[148]="WARP-assisted hole punching is useful in strict NAT environments. When direct hole punching fails, Cloudflare WARP can provide a CF egress path to improve success. Enable it? [y/N]:"
 C[148]="WARP 辅助打洞（适用于 NAT 严格环境）：当 NAT 类型较严格（如对称 NAT）导致直连打洞失败时，可借助 Cloudflare WARP 获取一个 CF 出口 IP 作为中转，提升打洞成功率。是否启用？[y/N]:"
+E[149]="Invalid domain format: \${DOMAIN}"
+C[149]="无效的域名格式: \${DOMAIN}"
 E[150]="Custom warp-ep outbounds rules  (rules: \${CUSTOM_ROUTE_COUNT:-0})"
 C[150]="自定义 warp-ep 出站路由规则  (规则数: \${CUSTOM_ROUTE_COUNT:-0})"
 E[151]="1. Add rule\n 2. View rules\n 3. Delete rule\n 0. Back"
@@ -358,40 +360,6 @@ E[159]="Enter warp-ep outbound rule number(s) to delete (comma-separated):"
 C[159]="输入要删除的 warp-ep 出站规则编号 (逗号分隔):"
 E[160]="Custom route rule(s) deleted."
 C[160]="自定义路由规则已删除。"
-E[161]="Invalid domain format: \${DOMAIN}"
-C[161]="无效的域名格式: \${DOMAIN}"
-E[162]="API check failed, using SagerNet URL as default. (Warning: rule_set may not exist)"
-C[162]="API 校验失败，默认使用 SagerNet 地址。(警告: 规则集可能不存在)"
-E[163]="Current custom route rules:"
-C[163]="当前自定义路由规则:"
-E[164]="Client Fingerprint  (current: \${_val})"
-C[164]="客户端指纹  (当前: \${_val})"
-E[165]="Please select or input client fingerprint:\n 1. chrome (default)\n 2. firefox\n Or input custom value:"
-C[165]="请选择或输入客户端指纹:\n 1. chrome (默认)\n 2. firefox\n 或直接输入自定义值:"
-E[166]="Invalid fingerprint format."
-C[166]="无效的指纹格式"
-E[167]="Close Realm"
-C[167]="关闭 Realm"
-E[168]="Open Realm"
-C[168]="开启 Realm"
-E[169]="Bind network interface  (current: \${_val:-default})"
-C[169]="指定网络出口  (当前: \${_val:-默认})"
-E[170]="Please select network interface:"
-C[170]="请选择网络接口:"
-E[171]="1. Default (not specified)"
-C[171]="1. 默认（不指定）"
-E[172]="Bound interface updated to: "
-C[172]="绑定接口已更新为: "
-E[173]="Hot reload successful (PID unchanged: \$MAINPID)"
-C[173]="热加载成功（PID 未变: \$MAINPID）"
-E[174]="Failed to update configuration. Please check manually. Suggestion: reinstall script"
-C[174]="更新配置后仍然无法检查成功，建议重装脚本"
-E[175]="Update base configuration? (Node configs will remain unaffected; only log, outbounds, endpoints, route, experimental, dns, ntp, http_clients, etc., will be reset) [Y/n]:"
-C[175]="是否更新基础配置？（不影响节点配置，仅重置 log、outbounds、endpoints、route、experimental、dns、ntp、http_clients）[Y/n]:"
-E[176]="Enable subscription"
-C[176]="开启订阅"
-E[177]="Disable subscription"
-C[177]="关闭订阅"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -684,18 +652,18 @@ change_config() {
 
   # 从 sing-box 格式的 list 中提取 client-fingerprint，取第一个匹配值
   local FP_NOW=$(awk -F '"' '/"fingerprint"/{print $4; exit}' ${WORK_DIR}/list)
-  [ -n "$FP_NOW" ] && MENU_IDX+=(164) && MENU_KEY+=(fingerprint) && MENU_VAL+=("$FP_NOW")
+  [ -n "$FP_NOW" ] && MENU_IDX+=(48) && MENU_KEY+=(fingerprint) && MENU_VAL+=("$FP_NOW")
 
   # 指定网络出口
   local BIND_IFACE_NOW=$(awk -F '"' '/"bind_interface"[[:space:]]*:[[:space:]]*"/{print $4}' "${WORK_DIR}/conf/01_outbounds.json" 2>/dev/null)
-  MENU_IDX+=(169) && MENU_KEY+=(bindinterface) && MENU_VAL+=("${BIND_IFACE_NOW:-default}")
+  MENU_IDX+=(67) && MENU_KEY+=(bindinterface) && MENU_VAL+=("${BIND_IFACE_NOW:-default}")
 
   # 订阅开关（基于 nginx.conf 文件内容检测）
   if [ -s "${WORK_DIR}/nginx.conf" ] && \
      grep -qE 'location ~ \^/[^/]+/auto \{' "${WORK_DIR}/nginx.conf" 2>/dev/null; then
-    MENU_IDX+=(177) && MENU_KEY+=(subscribe) && MENU_VAL+=("$(text 177)")
+    MENU_IDX+=(109) && MENU_KEY+=(subscribe) && MENU_VAL+=("$(text 109)")
   else
-    MENU_IDX+=(176) && MENU_KEY+=(subscribe) && MENU_VAL+=("$(text 176)")
+    MENU_IDX+=(108) && MENU_KEY+=(subscribe) && MENU_VAL+=("$(text 108)")
   fi
 
   # Hysteria2 带宽和端口跳跃（仅在 Hysteria2 已安装时显示）
@@ -714,11 +682,11 @@ change_config() {
     MENU_IDX+=(140) && MENU_KEY+=(hy2bw) && MENU_VAL+=("${HY2_UP_NOW}/${HY2_DOWN_NOW}")
 
     if grep -q 'realm-opts' <<< "$HY2_LINE"; then
-      local HY2_REALM_ACTION="$(text 167)"
-      MENU_IDX+=(167)
+      local HY2_REALM_ACTION="$(text 63)"
+      MENU_IDX+=(63)
     else
-      local HY2_REALM_ACTION="$(text 168)"
-      MENU_IDX+=(168)
+      local HY2_REALM_ACTION="$(text 65)"
+      MENU_IDX+=(65)
     fi
     MENU_KEY+=(hy2realm) && MENU_VAL+=("${HY2_REALM_ACTION}")
 
@@ -871,13 +839,13 @@ change_config() {
     return
   elif [ "$KEY" = "fingerprint" ]; then
     # 修改客户端指纹
-    hint "\n $(text 165) \n" && reading " $(text 24) " FP_CHOICE
+    hint "\n $(text 51) \n" && reading " $(text 24) " FP_CHOICE
     case "$FP_CHOICE" in
       ""|1) NEW_VAL="chrome" ;;
       2 ) NEW_VAL="firefox" ;;
       * ) NEW_VAL="$FP_CHOICE" ;;
     esac
-    [[ ! "${NEW_VAL,,}" =~ ^[0-9a-z]+$ ]] && error " $(text 166) " || FINGER_PRINT="$NEW_VAL"
+    [[ ! "${NEW_VAL,,}" =~ ^[0-9a-z]+$ ]] && error " $(text 56) " || FINGER_PRINT="$NEW_VAL"
     export_list
     return
   elif [ "$KEY" = "bindinterface" ]; then
@@ -902,10 +870,10 @@ change_config() {
       done
     fi
     mapfile -t IFACE_LIST < <(printf '%s\n' "${IFACE_LIST[@]}" | sort -u)
-    [ "${#IFACE_LIST[@]}" -eq 0 ] && warning " $(text 172) " && return
+    [ "${#IFACE_LIST[@]}" -eq 0 ] && warning " $(text 84) " && return
 
-    hint "\n $(text 170) \n"
-    hint " $(text 171) "
+    hint "\n $(text 77) \n"
+    hint " $(text 78) "
     for _if in "${IFACE_LIST[@]}"; do
       hint " $IDX. $_if"
       ((IDX++))
@@ -917,12 +885,12 @@ change_config() {
     if [[ "$CHOOSE_BIND" == "1" || "${CHOOSE_BIND,,}" == "default" ]]; then
       jq_exec '.outbounds |= map(if .tag == "direct" then del(.bind_interface) else . end)' \
         "${WORK_DIR}/conf/01_outbounds.json" > "$TMP_FILE" && mv "$TMP_FILE" "${WORK_DIR}/conf/01_outbounds.json"
-      info " $(text 172) $(text 171 | sed 's/^1\. //')"
+      info " $(text 84) $(text 78 | sed 's/^1\. //')"
     elif [[ "$CHOOSE_BIND" =~ ^[0-9]+$ ]] && [ "$CHOOSE_BIND" -ge 2 ] && [ "$CHOOSE_BIND" -le "$((IDX - 1))" ]; then
       local SELECTED_IF="${IFACE_LIST[$((CHOOSE_BIND - 2))]}"
       jq_exec --arg iface "$SELECTED_IF" '.outbounds |= map(if .tag == "direct" then .bind_interface = $iface else . end)' \
         "${WORK_DIR}/conf/01_outbounds.json" > "$TMP_FILE" && mv "$TMP_FILE" "${WORK_DIR}/conf/01_outbounds.json"
-      info " $(text 172) $SELECTED_IF"
+      info " $(text 84) $SELECTED_IF"
     elif [ "$CHOOSE_BIND" == "0" ]; then
       return
     else
@@ -936,7 +904,7 @@ change_config() {
     # 订阅开关 — 检测 nginx.conf 中是否存在订阅分发 location 块
     if grep -qE 'location ~ \^/[^/]+/auto \{' "${WORK_DIR}/nginx.conf" 2>/dev/null; then
       # 已开启 → 关闭订阅
-      info "\n $(text 177) "
+      info "\n $(text 109) "
       # 检测 Argo 真实状态（Alpine 和 systemd 通用：检查守护进程文件是否存在）
       [ -s ${ARGO_DAEMON_FILE} ] && IS_ARGO=is_argo || IS_ARGO=no_argo
       # 从旧 nginx.conf 读取 PORT_NGINX（确定文件存在，无需条件判断）
@@ -959,7 +927,7 @@ change_config() {
       info " $(text 112) "
     else
       # 未开启 → 开启订阅
-      info "\n $(text 176) "
+      info "\n $(text 108) "
       IS_SUB=is_sub
       # 确保 nginx 已安装
       if ! command -v nginx >/dev/null 2>&1; then
@@ -1455,7 +1423,7 @@ check_rule_set_exists() {
   # 两处 API 都没数据（可能是 rate limit 或网络问题）
   if [ ! -s "$SAGERNET_CACHE" ] && [ ! -s "$METACUBEX_CACHE" ]; then
     # API 不可用，降级使用默认 URL
-    warning " $(text 162) "
+    warning " $(text 14) "
     echo "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/${SRS_NAME}"
     return 0
   fi
@@ -1492,7 +1460,7 @@ custom_route_add() {
       if [[ "$DOMAIN" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$ ]]; then
         VALIDATED_VALUES+=("$DOMAIN")
       else
-        warning " $(text 161) "
+        warning " $(text 149) "
       fi
     done
     [ "${#VALIDATED_VALUES[@]}" -eq 0 ] && warning " $(text 135) " && return
@@ -1664,7 +1632,7 @@ custom_route_view() {
     return 1
   fi
 
-  hint "\n $(text 163) \n"
+  hint "\n $(text 45) \n"
   printf "  %-4s %-16s %s\n" "#" "Type" "Match"
   printf "  %-4s %-16s %s\n" "---" "---------------" "---------------------------------------"
 
@@ -2162,7 +2130,7 @@ cmd_systemctl() {
         local MAINPID=$(cat /var/run/sing-box.pid 2>/dev/null)
         if [ -n "$MAINPID" ] && kill -0 "$MAINPID" 2>/dev/null; then
           kill -HUP "$MAINPID" 2>/dev/null
-          info "\n $(text 173) \n"
+          info "\n $(text 95) \n"
         else
           rc-service "$2" restart >/dev/null 2>&1
         fi
@@ -2193,7 +2161,7 @@ cmd_systemctl() {
         local MAINPID=$(systemctl show -p MainPID sing-box 2>/dev/null | awk -F= '{print $2}')
         if [ -n "$MAINPID" ] && [ "$MAINPID" -gt 0 ] 2>/dev/null; then
           systemctl kill -s HUP sing-box >/dev/null 2>&1
-          info "\n $(text 173) \n"
+          info "\n $(text 95) \n"
         else
           systemctl restart sing-box >/dev/null 2>&1
         fi
@@ -5747,7 +5715,7 @@ version() {
 
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] || error "\n $(text 42) \n"
     if ! $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box check -C ${WORK_DIR}/conf >/dev/null; then
-      warning "\n $(text 54) " && reading "\n $(text 175) " UPDATE_CONFIG
+      warning "\n $(text 54) " && reading "\n $(text 111) " UPDATE_CONFIG
       [ "${UPDATE_CONFIG,,}" = 'n' ] && exit 1
 
       # 设置基础配置参数 dns.servers.prefer_go 和 dns.strategy
@@ -5765,7 +5733,7 @@ version() {
         for i in $(ls ${WORK_DIR}/conf/0*.bak); do
           mv $i ${i%%.bak}
         done
-        error "\n $(text 174) \n"
+        error "\n $(text 101) \n"
       fi
     fi
 
