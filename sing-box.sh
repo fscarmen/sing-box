@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.19 (2026.07.31)'
+VERSION='v1.3.19 (2026.08.02)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -184,8 +184,8 @@ E[71]="Create shortcut [ sb ] successfully."
 C[71]="创建快捷 [ sb ] 指令成功!"
 E[72]="Path to each client configuration file: ${WORK_DIR}/subscribe/\n The full template can be found at:\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
 C[72]="各客户端配置文件路径: ${WORK_DIR}/subscribe/\n 完整模板可参照:\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
-E[73]="There is no protocol left, if you are sure please re-run [ sb -u ] to uninstall all."
-C[73]="没有协议剩下，如确定请重新执行 [ sb -u ] 卸载所有"
+E[73]=""
+C[73]=""
 E[74]="Keep protocols"
 C[74]="保留协议"
 E[75]="Add protocols"
@@ -258,8 +258,8 @@ E[108]="Enable subscription"
 C[108]="开启订阅"
 E[109]="Disable subscription"
 C[109]="关闭订阅"
-E[110]="No CDN protocol is currently in use"
-C[110]="当前没有使用 CDN 的协议"
+E[110]=""
+C[110]=""
 E[111]="Update base configuration? (Node configs will remain unaffected; only log, outbounds, endpoints, route, experimental, dns, ntp, http_clients, etc., will be reset) [Y/n]:"
 C[111]="是否更新基础配置？（不影响节点配置，仅重置 log、outbounds、endpoints、route、experimental、dns、ntp、http_clients）[Y/n]:"
 E[112]="Change complete"
@@ -617,6 +617,28 @@ input_uuid() {
   UUID_CONFIRM=${UUID_CONFIRM:-"$UUID_DEFAULT"}
 }
 
+input_node_name() {
+  # 输入节点名，以系统的 hostname 作为默认（新安装 / 无既有协议重新添加时询问）
+  local NODE_NAME_INPUT=''
+  if [ -z "$NODE_NAME_CONFIRM" ]; then
+    local EMOJI="${EMOJI4:-$EMOJI6}"
+    local EMOJI="${EMOJI}${EMOJI:+ }"
+    if command -v hostname >/dev/null 2>&1; then
+      local NODE_NAME_DEFAULT="${EMOJI}$(hostname)"
+    elif [ -s /etc/hostname ]; then
+      local NODE_NAME_DEFAULT="${EMOJI}$(cat /etc/hostname)"
+    else
+      local NODE_NAME_DEFAULT="${EMOJI}Sing-Box"
+    fi
+    [[ "$IS_FAST_INSTALL" = 'is_fast_install' || "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]] && NODE_NAME_CONFIRM="${NODE_NAME_DEFAULT}"
+    if [ -z "$NODE_NAME_CONFIRM" ]; then
+      (( STEP_NUM++ )) || true
+      reading "\n ${TOTAL_STEPS:+(${STEP_NUM}/${TOTAL_STEPS}) }$(text 13) " NODE_NAME_INPUT
+    fi
+    grep -q '^$' <<< "$NODE_NAME_INPUT" && NODE_NAME_CONFIRM="$NODE_NAME_DEFAULT" || NODE_NAME_CONFIRM="${EMOJI}${NODE_NAME_INPUT}"
+  fi
+}
+
 # 更换优选域名 / reality SNI / 节点名 / UUID
 change_config() {
   [ ! -d "${WORK_DIR}" ] && error " $(text 107) "
@@ -639,11 +661,11 @@ change_config() {
   fi
 
   # 节点名
-  local NAME_NOW=$(awk '/"tag"/{gsub(/^.*"tag": *"/,""); gsub(/".*/,""); sub(/ [^ ]*$/,""); print; exit}' ${WORK_DIR}/conf/*_inbounds.json)
+  local NAME_NOW=$(awk '/"tag"/{gsub(/^.*"tag": *"/,""); gsub(/".*/,""); sub(/ [^ ]*$/,""); print; exit}' ${WORK_DIR}/conf/*_inbounds.json 2>/dev/null)
   [ -n "$NAME_NOW" ] && MENU_IDX+=(130) && MENU_KEY+=(name) && MENU_VAL+=("$NAME_NOW")
 
   # UUID / Password
-  local UUID_NOW="$(awk -F'"' '/"uuid"[[:space:]]*:[[:space:]]*"/ || /"id"[[:space:]]*:[[:space:]]*"/ {print $4; exit}' ${WORK_DIR}/conf/*_inbounds.json)"
+  local UUID_NOW="$(awk -F'"' '/"uuid"[[:space:]]*:[[:space:]]*"/ || /"id"[[:space:]]*:[[:space:]]*"/ {print $4; exit}' ${WORK_DIR}/conf/*_inbounds.json 2>/dev/null)"
   [ -n "$UUID_NOW" ] && MENU_IDX+=(131) && MENU_KEY+=(uuid) && MENU_VAL+=("$UUID_NOW")
 
   # 服务器 IP
@@ -700,7 +722,7 @@ change_config() {
     MENU_IDX+=(150) && MENU_KEY+=(customroute) && MENU_VAL+=("${CUSTOM_ROUTE_COUNT}")
   }
 
-  [ "${#MENU_IDX[@]}" -eq 0 ] && error " $(text 110) "
+  [ "${#MENU_IDX[@]}" -eq 0 ] && error " $(text 107) "
 
   # 显示动态菜单
   hint "\n $(text 127)\n"
@@ -2632,23 +2654,7 @@ sing-box_variables() {
   input_uuid
 
   # 输入节点名，以系统的 hostname 作为默认
-  local EMOJI="${EMOJI4:-$EMOJI6}"
-  local EMOJI="${EMOJI}${EMOJI:+ }"
-  if [ -z "$NODE_NAME_CONFIRM" ]; then
-    if command -v hostname >/dev/null 2>&1; then
-      local NODE_NAME_DEFAULT="${EMOJI}$(hostname)"
-    elif [ -s /etc/hostname ]; then
-      local NODE_NAME_DEFAULT="${EMOJI}$(cat /etc/hostname)"
-    else
-      local NODE_NAME_DEFAULT="${EMOJI}Sing-Box"
-    fi
-    [[ "$IS_FAST_INSTALL" = 'is_fast_install' || "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]] && NODE_NAME_CONFIRM="${NODE_NAME_DEFAULT}"
-    if [ -z "$NODE_NAME_CONFIRM" ]; then
-      (( STEP_NUM++ )) || true
-      reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 13) " NODE_NAME
-    fi
-    grep -q '^$' <<< "$NODE_NAME" && NODE_NAME_CONFIRM="$NODE_NAME_DEFAULT" || NODE_NAME_CONFIRM="${EMOJI}${NODE_NAME}"
-  fi
+  input_node_name
 }
 
 check_dependencies() {
@@ -2935,49 +2941,6 @@ append_unique_port() {
   ARRAY_REF+=("$PORT")
 }
 
-# 收集当前应该对外开放的普通端口
-collect_exposed_ports() {
-  EXPOSED_TCP_PORTS=()
-  EXPOSED_UDP_PORTS=()
-
-  local FILE BASENAME PORT NGINX_PORT HAS_NGINX=false
-
-  if [ -s "${WORK_DIR}/nginx.conf" ]; then
-    HAS_NGINX=true
-    NGINX_PORT=$(awk '
-      /listen[[:space:]]+[0-9]+[[:space:]]*;/ && $2 !~ /^\[/ {
-        gsub(/;/, "", $2)
-        print $2
-        exit
-      }
-    ' "${WORK_DIR}/nginx.conf")
-    append_unique_port EXPOSED_TCP_PORTS "$NGINX_PORT"
-  fi
-
-  for FILE in ${WORK_DIR}/conf/*_inbounds.json; do
-    [ ! -s "$FILE" ] && continue
-    BASENAME=$(basename "$FILE")
-    PORT=$(awk -F '[:,]' '/"listen_port"/{gsub(/[[:space:]]/, "", $2); print $2; exit}' "$FILE")
-    [ -z "$PORT" ] && continue
-
-    case "$BASENAME" in
-      *hysteria2_inbounds.json|*tuic_inbounds.json )
-        append_unique_port EXPOSED_UDP_PORTS "$PORT"
-        ;;
-      *naive_inbounds.json )
-        append_unique_port EXPOSED_TCP_PORTS "$PORT"
-        append_unique_port EXPOSED_UDP_PORTS "$PORT"
-        ;;
-      *vmess-ws_inbounds.json|*vless-ws-tls_inbounds.json )
-        [ "$HAS_NGINX" = false ] && append_unique_port EXPOSED_TCP_PORTS "$PORT"
-        ;;
-      * )
-        append_unique_port EXPOSED_TCP_PORTS "$PORT"
-        ;;
-    esac
-  done
-}
-
 # UFW 普通端口规则备注
 service_port_ufw_comment() {
   local PROTO=$1
@@ -2994,26 +2957,6 @@ add_service_port_rule_ufw() {
 
   [ -z "$PROTO" ] || [ -z "$PORT" ] && return 1
   ufw allow ${PORT}/${PROTO} comment "$COMMENT" >/dev/null 2>&1
-}
-
-# 删除 UFW 普通端口规则
-del_service_port_rule_ufw() {
-  local PROTO=$1
-  local PORT=$2
-  local COMMENT_PREFIX='Sing-box Family Bucket UFW PORT'
-  local RULE_NUM
-
-  [ -z "$PROTO" ] || [ -z "$PORT" ] && return 0
-
-  ufw --force delete allow ${PORT}/${PROTO} >/dev/null 2>&1 || true
-
-  while read -r RULE_NUM; do
-    [ -n "$RULE_NUM" ] && ufw --force delete "$RULE_NUM" >/dev/null 2>&1 || true
-  done < <(
-    ufw status numbered 2>/dev/null | \
-    grep "$COMMENT_PREFIX ${PROTO} ${PORT}" | \
-    awk -F'[][]' '{print $2}' | sort -rn
-  )
 }
 
 # 清理所有由脚本管理的 UFW 普通端口规则
@@ -4495,7 +4438,7 @@ fetch_nodes_value() {
 
   # 获取公共数据
   ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && SERVER_IP=$(awk -F '"' '/"WS_SERVER_IP_SHOW"/{print $4; exit}' ${WORK_DIR}/conf/*-ws*inbounds.json) || SERVER_IP=$(grep -A1 '"tag"' ${WORK_DIR}/list | sed -E '/-ws(-tls)*",$/{N;d}' | awk -F '"' '/"server"/{count++; if (count == 1) {print $4; exit}}')
-  EXISTED_PORTS=$(awk -F ':|,' '/listen_port/{print $2}' ${WORK_DIR}/conf/*_inbounds.json)
+  EXISTED_PORTS=$(awk -F ':|,' '/listen_port/{print $2}' ${WORK_DIR}/conf/*_inbounds.json 2>/dev/null)
   START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$EXISTED_PORTS")
   [[ -z "$NODE_NAME_CONFIRM" && -s ${WORK_DIR}/subscribe/clash ]] && NODE_NAME_CONFIRM=$(awk -F "'" '/u: &u/{print $2; exit}' ${WORK_DIR}/subscribe/clash)
 
@@ -5436,27 +5379,30 @@ change_protocols() {
   check_system_ip
 
   # 查找已安装的协议，并遍历其在所有协议列表中的名称，获取协议名后存放在 EXISTED_PROTOCOLS; 没有的协议存放在 NOT_EXISTED_PROTOCOLS
-  INSTALLED_PROTOCOLS_LIST=$(awk -F '"' '/"tag":/{print $4}' ${WORK_DIR}/conf/*_inbounds.json | grep -v 'shadowtls-in' | awk '{print $NF}')
+  INSTALLED_PROTOCOLS_LIST=$(awk -F '"' '/"tag":/{print $4}' ${WORK_DIR}/conf/*_inbounds.json 2>/dev/null | grep -v 'shadowtls-in' | awk '{print $NF}')
   for f in ${!NODE_TAG[@]}; do [[ $INSTALLED_PROTOCOLS_LIST =~ "${NODE_TAG[f]}" ]] && EXISTED_PROTOCOLS+=("${PROTOCOL_LIST[f]}") || NOT_EXISTED_PROTOCOLS+=("${PROTOCOL_LIST[f]}"); done
 
-  # 列出已安装协议（保持原有样式，仅显示协议名；F2 流量显示已移除，见需求文档 3.3 节）
-  hint "\n $(text 136) (${#EXISTED_PROTOCOLS[@]})"
-  for h in "${!EXISTED_PROTOCOLS[@]}"; do
-    hint " $(asc $(( h+97 ))). ${EXISTED_PROTOCOLS[h]} "
-  done
+  # 已安装协议为空时不交互删除，直接进入添加
+  if [ "${#EXISTED_PROTOCOLS[@]}" -gt 0 ]; then
+    # 列出已安装协议（保持原有样式，仅显示协议名；F2 流量显示已移除，见需求文档 3.3 节）
+    hint "\n $(text 136) (${#EXISTED_PROTOCOLS[@]})"
+    for h in "${!EXISTED_PROTOCOLS[@]}"; do
+      hint " $(asc $(( h+97 ))). ${EXISTED_PROTOCOLS[h]} "
+    done
 
-  # 从已安装的协议中选择需要删除的协议名，并存放在 REMOVE_PROTOCOLS，把保存的协议的协议存放在 KEEP_PROTOCOLS
-  reading "\n $(text 64) " REMOVE_SELECT
-  # 统一为小写，去掉重复选项，处理不在可选列表里的选项，把特殊符号处理
-  REMOVE_SELECT=$(sed "s/[^a-$(asc $(( ${#EXISTED_PROTOCOLS[@]} + 96 )))]//g" <<< "${REMOVE_SELECT,,}" | awk 'BEGIN{RS=""; FS=""}{delete seen; output=""; for(i=1; i<=NF; i++){ if(!seen[$i]++){ output=output $i } } print output}')
+    # 从已安装的协议中选择需要删除的协议名，并存放在 REMOVE_PROTOCOLS，把保存的协议的协议存放在 KEEP_PROTOCOLS
+    reading "\n $(text 64) " REMOVE_SELECT
+    # 统一为小写，去掉重复选项，处理不在可选列表里的选项，把特殊符号处理
+    REMOVE_SELECT=$(sed "s/[^a-$(asc $(( ${#EXISTED_PROTOCOLS[@]} + 96 )))]//g" <<< "${REMOVE_SELECT,,}" | awk 'BEGIN{RS=""; FS=""}{delete seen; output=""; for(i=1; i<=NF; i++){ if(!seen[$i]++){ output=output $i } } print output}')
 
-  for ((j=0; j<${#REMOVE_SELECT}; j++)); do
-    REMOVE_PROTOCOLS+=("${EXISTED_PROTOCOLS[$(( $(asc "$(awk "NR==$[j+1] {print}" <<< "$(grep -o . <<< "$REMOVE_SELECT")")") - 97 ))]}")
-  done
+    for ((j=0; j<${#REMOVE_SELECT}; j++)); do
+      REMOVE_PROTOCOLS+=("${EXISTED_PROTOCOLS[$(( $(asc "$(awk "NR==$[j+1] {print}" <<< "$(grep -o . <<< "$REMOVE_SELECT")")") - 97 ))]}")
+    done
 
-  for k in "${EXISTED_PROTOCOLS[@]}"; do
-    [[ ! "${REMOVE_PROTOCOLS[@]}" =~ "$k" ]] && KEEP_PROTOCOLS+=("$k")
-  done
+    for k in "${EXISTED_PROTOCOLS[@]}"; do
+      [[ ! "${REMOVE_PROTOCOLS[@]}" =~ "$k" ]] && KEEP_PROTOCOLS+=("$k")
+    done
+  fi
 
   # 如有未安装的协议，列表显示并选择安装，把增加的协议存在放在 ADD_PROTOCOLS
   if [ "${#NOT_EXISTED_PROTOCOLS[@]}" -gt 0 ]; then
@@ -5473,9 +5419,8 @@ change_protocols() {
     done
   fi
 
-  # 重新安装 = 保留 + 新增，如数量为 0 ，则触发卸载
+  # 重新安装 = 保留 + 新增；数量可为 0（协议全删后仅保留基础配置）
   REINSTALL_PROTOCOLS=("${KEEP_PROTOCOLS[@]}" "${ADD_PROTOCOLS[@]}")
-  [ "${#REINSTALL_PROTOCOLS[@]}" = 0 ] && error "\n $(text 73) "
 
   # 显示重新安装的协议列表，并确认是否正确
   hint "\n $(text 138) (${#REINSTALL_PROTOCOLS[@]}) "
@@ -5507,6 +5452,13 @@ change_protocols() {
   for v in "${NODE_NAME[@]}"; do
     [ -n "$v" ] && NODE_NAME_CONFIRM="$v" && break
   done
+
+  # 无既有协议（0 协议或全部删除后重新添加）时，像新安装一样询问节点名称；已有节点名称则沿用
+  if [ "${#REINSTALL_PROTOCOLS[@]}" -gt 0 ] && [ "${#KEEP_PROTOCOLS[@]}" -eq 0 ]; then
+    unset NODE_NAME_CONFIRM
+    input_node_name
+  fi
+
   [ "${#WS_SERVER_IP[@]}" -gt 0 ] && WS_SERVER_IP_SHOW=$(awk '{print $1}' <<< "${WS_SERVER_IP[@]}") && CDN=$(awk '{print $1}' <<< "${CDN[@]}")
 
   # 寻找待删除协议的 inbound 文件名
@@ -5769,13 +5721,22 @@ change_protocols() {
       cmd_systemctl enable argo >/dev/null 2>&1
     fi
   elif [ -s ${ARGO_DAEMON_FILE} ]; then
-    cmd_systemctl disable argo >/dev/null 2>&1
-    rm -f ${ARGO_DAEMON_FILE}
-    [ -s ${WORK_DIR}/tunnel.json ] && rm -f ${WORK_DIR}/tunnel.*
+    # 无 ws 协议：固定隧道（token/json）保留 argo；临时隧道删除
+    if [[ "$ARGO_TYPE" != 'is_token_argo' && "$ARGO_TYPE" != 'is_json_argo' ]]; then
+      cmd_systemctl disable argo >/dev/null 2>&1
+      rm -f ${ARGO_DAEMON_FILE}
+      [ -s ${WORK_DIR}/tunnel.json ] && rm -f ${WORK_DIR}/tunnel.*
+    fi
   fi
 
-  # 如有需要，删除 nginx 配置文件
-  ! ls ${ARGO_DAEMON_FILE} >/dev/null 2>&1 && [[ -s ${WORK_DIR}/nginx.conf && "$IS_SUB" = 'no_sub' ]] && IS_ARGO=no_argo && rm -f ${WORK_DIR}/nginx.conf
+  # 无 ws 协议且无订阅时删除 nginx 配置并停止进程；有订阅保留（订阅服务需要 nginx）
+  if ! ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && [[ -s ${WORK_DIR}/nginx.conf && "$IS_SUB" = 'no_sub' ]]; then
+    nginx_stop
+    [ "$SYSTEM" != 'Alpine' ] && [ "$IS_CENTOS" != 'CentOS7' ] && \
+      sed -i '/ExecStartPre=.*nginx/d' ${SINGBOX_DAEMON_FILE} && systemctl daemon-reload
+    rm -f ${WORK_DIR}/nginx.conf
+    unset PORT_NGINX
+  fi
 
   # 热更 sing-box（SIGHUP 重新加载配置，PID 不变）
   cmd_systemctl reload sing-box
