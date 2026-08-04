@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.19 (2026.08.02)'
+VERSION='v1.3.19 (2026.08.04)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -764,6 +764,7 @@ change_config() {
     done
     fetch_nodes_value
     [ -n "$PORT_NGINX" ] && export_nginx_conf_file
+    nginx_sync
     cmd_systemctl reload sing-box
     [ -n "$ARGO_DOMAIN" ] && export_argo_json_file
     sync_firewall_rules
@@ -936,14 +937,14 @@ change_config() {
       # 判断是否还需要 nginx：有 WS 协议且 Argo 反代
       if { [ -n "$PORT_VMESS_WS" ] || [ -n "$PORT_VLESS_WS" ]; } && [ "$IS_ARGO" = 'is_argo' ]; then
         export_nginx_conf_file
-        nginx -s reload -c ${WORK_DIR}/nginx.conf 2>/dev/null || nginx_run
       else
         nginx_stop
-        [ "$SYSTEM" != 'Alpine' ] && [ "$IS_CENTOS" != 'CentOS7' ] && \
-          sed -i '/ExecStartPre=.*nginx/d' ${SINGBOX_DAEMON_FILE} && systemctl daemon-reload
         rm -f ${WORK_DIR}/nginx.conf
         unset PORT_NGINX
       fi
+      # 重新生成守护文件并同步 nginx（systemd ExecStartPre / OpenRC start_pre 与最终状态一致）
+      sing-box_systemd
+      nginx_sync
       /bin/rm -f ${WORK_DIR}/subscribe/qr
       export_list
       info " $(text 112) "
@@ -964,18 +965,9 @@ change_config() {
       fetch_nodes_value
       [ -z "$PORT_NGINX" ] && input_nginx_port
       export_nginx_conf_file
-      # 更新服务文件 ExecStartPre（非 CentOS7）
-      if [ "$SYSTEM" != 'Alpine' ] && [ "$IS_CENTOS" != 'CentOS7' ] && \
-         ! grep -q 'ExecStartPre=.*nginx' ${SINGBOX_DAEMON_FILE} 2>/dev/null; then
-        sed -i '/^ExecStart=/i ExecStartPre='$(command -v nginx)' -c '${WORK_DIR}'/nginx.conf' ${SINGBOX_DAEMON_FILE}
-        systemctl daemon-reload
-      fi
-      # 启动或 reload nginx
-      if ps -eo pid,args | grep -qE "[n]ginx.*${WORK_DIR}/nginx.conf" 2>/dev/null; then
-        nginx -s reload -c ${WORK_DIR}/nginx.conf 2>/dev/null || true
-      else
-        nginx_run
-      fi
+      # 重新生成守护文件并同步 nginx（含 Alpine / CentOS7，重启后 nginx 随服务拉起）
+      sing-box_systemd
+      nginx_sync
       export_list
       info " $(text 112) "
     fi
@@ -1909,6 +1901,7 @@ change_argo() {
   # 更新节点信息和配置
   fetch_nodes_value
   export_nginx_conf_file
+  nginx_sync
   export_list
 }
 
@@ -2132,6 +2125,19 @@ nginx_stop() {
   ss -nltp | sed -n "/pid=$NGINX_PID,/ s/,/ /gp" | grep -oP 'pid=\K\S+' | sort -u | xargs kill -9 >/dev/null 2>&1
 }
 
+# 让 nginx 进程与最终配置状态保持一致：需要则启动/热重载，不需要则停止
+nginx_sync() {
+  if [ -s ${WORK_DIR}/nginx.conf ]; then
+    if ps -eo pid,args | grep -qE "[n]ginx.*${WORK_DIR}/nginx.conf" 2>/dev/null; then
+      nginx -s reload -c ${WORK_DIR}/nginx.conf 2>/dev/null || true
+    else
+      nginx_run
+    fi
+  else
+    nginx_stop
+  fi
+}
+
 # 为了适配 alpine，定义 cmd_systemctl 的函数
 cmd_systemctl() {
 
@@ -2150,6 +2156,7 @@ cmd_systemctl() {
         ;;
       reload )
         rc-service "$2" reload >/dev/null 2>&1 || rc-service "$2" restart >/dev/null 2>&1
+        [ -s ${WORK_DIR}/nginx.conf ] && nginx_sync
         local MAINPID=$(cat /var/run/sing-box.pid 2>/dev/null)
         [ -n "$MAINPID" ] && info "\n $(text 95) \n"
         ;;
@@ -2162,21 +2169,13 @@ cmd_systemctl() {
     case "$1" in
       enable | disable )
         systemctl "$1" --now "$2" >/dev/null 2>&1
-        if [ "$IS_CENTOS" = 'CentOS7' ] && [ "$2" = 'sing-box' ] && [ -s $WORK_DIR/nginx.conf ]; then
-          if [ "$1" = 'enable' ]; then
-            nginx_run
-          else
-            nginx_stop
-          fi
-        fi
         ;;
       restart )
-        [ "$IS_CENTOS" = 'CentOS7' ] && [ "$2" = 'sing-box' ] && [ -s $WORK_DIR/nginx.conf ] && nginx_stop
         systemctl restart "$2" >/dev/null 2>&1
-        [ "$IS_CENTOS" = 'CentOS7' ] && [ "$2" = 'sing-box' ] && [ -s $WORK_DIR/nginx.conf ] && nginx_run
         ;;
       reload )
         systemctl reload sing-box >/dev/null 2>&1 || systemctl restart sing-box >/dev/null 2>&1
+        [ -s ${WORK_DIR}/nginx.conf ] && nginx_sync
         local MAINPID=$(systemctl show -p MainPID sing-box 2>/dev/null | awk -F= '{print $2}')
         [ -n "$MAINPID" ] && [ "$MAINPID" -gt 0 ] 2>/dev/null && info "\n $(text 95) \n"
         ;;
@@ -4307,9 +4306,9 @@ start_pre() {
     mkdir -p /var/run
     chmod 755 /var/run"
 
-    # 如果配置了 Nginx，启动 Nginx
+    # 如果配置了 Nginx，启动 Nginx（nginx 已在运行时不阻塞服务启动）
     [ -n "$PORT_NGINX" ] && OPENRC_SERVICE+="
-    $(command -v nginx) -c ${WORK_DIR}/nginx.conf"
+    $(command -v nginx) -c ${WORK_DIR}/nginx.conf || true"
 
     OPENRC_SERVICE+="
     # 确保 PID 文件不存在，避免启动失败
@@ -4358,7 +4357,8 @@ NoNewPrivileges=yes
 TimeoutStartSec=0
 WorkingDirectory=${WORK_DIR}
 "
-    [[ -n "$PORT_NGINX" && "$IS_CENTOS" != 'CentOS7' ]] && SING_BOX_SERVICE+="ExecStartPre=$(command -v nginx) -c ${WORK_DIR}/nginx.conf
+    # 统一在 systemd 里用 ExecStartPre 管理 nginx（含 CentOS7）；"-" 前缀容忍 nginx 已在运行等情况，避免阻塞服务启动
+    [[ -n "$PORT_NGINX" ]] && SING_BOX_SERVICE+="ExecStartPre=-$(command -v nginx) -c ${WORK_DIR}/nginx.conf
 "
     SING_BOX_SERVICE+="ExecStart=${WORK_DIR}/sing-box run -C ${WORK_DIR}/conf
 ExecReload=/bin/kill -HUP \$MAINPID
@@ -5705,14 +5705,21 @@ change_protocols() {
     unset PORT_NAIVE
   fi
 
-  # 生成 Nginx 配置文件
+  # 生成各协议的 json 文件
+  sing-box_json change
+
+  # 无 ws 协议且无订阅时清理 nginx：先于守护文件生成，确保 ExecStartPre / start_pre 与最终状态一致
+  if ! ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && [[ -s ${WORK_DIR}/nginx.conf && "$IS_SUB" = 'no_sub' ]]; then
+    nginx_stop
+    rm -f ${WORK_DIR}/nginx.conf
+    unset PORT_NGINX
+  fi
+
+  # 生成 Nginx 配置文件（按最终状态）
   [ -n "$PORT_NGINX" ] && export_nginx_conf_file
 
   # 重新生成 Sing-box 守护进程文件
   sing-box_systemd
-
-  # 生成各协议的 json 文件
-  sing-box_json change
 
   # 如有需要，安装和删除 Argo 服务
   if ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1; then
@@ -5729,17 +5736,11 @@ change_protocols() {
     fi
   fi
 
-  # 无 ws 协议且无订阅时删除 nginx 配置并停止进程；有订阅保留（订阅服务需要 nginx）
-  if ! ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && [[ -s ${WORK_DIR}/nginx.conf && "$IS_SUB" = 'no_sub' ]]; then
-    nginx_stop
-    [ "$SYSTEM" != 'Alpine' ] && [ "$IS_CENTOS" != 'CentOS7' ] && \
-      sed -i '/ExecStartPre=.*nginx/d' ${SINGBOX_DAEMON_FILE} && systemctl daemon-reload
-    rm -f ${WORK_DIR}/nginx.conf
-    unset PORT_NGINX
-  fi
-
   # 热更 sing-box（SIGHUP 重新加载配置，PID 不变）
   cmd_systemctl reload sing-box
+
+  # 同步 nginx 进程：需要则启动/热重载，不需要则停止
+  nginx_sync
 
   # 打开防火墙相关端口
   sync_firewall_rules
@@ -5759,6 +5760,7 @@ uninstall() {
   if [ -d ${WORK_DIR} ]; then
     [ -s ${ARGO_DAEMON_FILE} ] && cmd_systemctl disable argo &>/dev/null
     [ -s ${SINGBOX_DAEMON_FILE} ] && cmd_systemctl disable sing-box &>/dev/null
+    nginx_stop
     sleep 1
     [[ -s ${WORK_DIR}/nginx.conf && "$(ps -ef | grep -c '[n]ginx')" = 0 ]] && reading "\n $(text 83) " REMOVE_NGINX
     [ "${REMOVE_NGINX,,}" = 'y' ] && ${PACKAGE_UNINSTALL[int]} nginx >/dev/null 2>&1
