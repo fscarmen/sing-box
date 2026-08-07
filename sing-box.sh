@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.19 (2026.08.04)'
+VERSION='v1.3.20 (2026.08.07)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -40,8 +40,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Add bind_interface option in sb -d menu to bind outbound traffic to a specific NIC; 2. Add enable/disable subscriptions option in sb -d menu 3. Change v2rayN Hysteria2 Realm config from Finalmask field to ProtoExtraObj; 4. add SIGHUP hot-reload support, replace restart sequences with reload; 5. force base-config regeneration on upgrade to guarantee sing-box check passes; 6. Add real-time traffic stats (-n / main menu)"
-C[1]="1. sb -d 菜单新增「指定网络出口」选项，可为出站流量绑定特定网卡; 2. sb -d 菜单新增 「订阅开关」，可随时开启关闭订阅; 3. v2rayN 的 Hysteria2 Realm 配置从 Finalmask 字段改为 ProtoExtraObj; 4. 新增 SIGHUP 热更支持，用 reload 替换重启流程; 4. 新增 SIGHUP 热更支持，用 reload 替换重启流程; 5. 升级时强制重置基础配置至新版格式，保证兼容性; 6. 添加实时流量统计 (-n / 主菜单)"
+E[1]="1. [sb -d] supports setting an independent (non-consecutive) port for each protocol, only available after installation via [sb -d] so the install flow stays unchanged; 2. Server address accepts an IP or a domain (for NAT VPS whose public IP changes daily, use a DDNS domain), available both during install and afterwards via sb -d"
+C[1]="1. [sb -d] 支持为各协议设置独立（非连续）端口，仅在安装后通过 [sb -d] 修改，不影响常规安装流程; 2. 服务器地址支持填写 IP 或域名（NAT VPS 公网 IP 每日变化时可用 DDNS 域名），新安装和安装后修改均可"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -58,8 +58,8 @@ E[8]="All dependencies already exist and do not need to be installed additionall
 C[8]="所有依赖已存在，不需要额外安装"
 E[9]="Whether to upgrade [y/N] (default is N):"
 C[9]="是否升级 [y/N] (默认为 N):"
-E[10]="Please enter VPS IP (Default: \${SERVER_IP_DEFAULT}):"
-C[10]="请输入 VPS IP (默认为: \${SERVER_IP_DEFAULT}):"
+E[10]="Please enter server address, IP or domain (Default: \${SERVER_IP_DEFAULT}):"
+C[10]="请输入服务器地址（IP 或域名）(默认为: \${SERVER_IP_DEFAULT}):"
 E[11]="Please enter the starting port number. Must be \${MIN_PORT} - \${MAX_PORT}, consecutive \${NUM} free ports are required (Default: \${START_PORT_DEFAULT}):"
 C[11]="请输入开始的端口号，必须是 \${MIN_PORT} - \${MAX_PORT}，需要连续\${NUM}个空闲的端口 (默认为: \${START_PORT_DEFAULT}):"
 E[12]="Please enter UUID (Default: \${UUID_DEFAULT}):"
@@ -130,8 +130,8 @@ E[44]="Ports are in used:  \${IN_USED[*]}"
 C[44]="正在使用中的端口: \${IN_USED[*]}"
 E[45]="Current custom route rules:"
 C[45]="当前自定义路由规则:"
-E[46]="Warp / warp-go was detected to be running. Please enter the correct server IP:"
-C[46]="检测到 warp / warp-go 正在运行，请输入确认的服务器 IP:"
+E[46]="Warp / warp-go was detected to be running. Please enter the correct server address (IP or domain):"
+C[46]="检测到 warp / warp-go 正在运行，请输入确认的服务器地址（IP 或域名）:"
 E[47]="No server ip, script exits. Feedback:[https://github.com/fscarmen/sing-box/issues]"
 C[47]="没有 server ip，脚本退出，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 E[48]="Client Fingerprint  (current: \${VAL_ITEM})"
@@ -302,10 +302,10 @@ E[130]="Node name  (current: \${VAL_ITEM})"
 C[130]="节点名称  (当前: \${VAL_ITEM})"
 E[131]="UUID / Password  (current: \${VAL_ITEM})"
 C[131]="UUID / 密码  (当前: \${VAL_ITEM})"
-E[132]="Server IP  (current: \${VAL_ITEM})"
-C[132]="服务器 IP  (当前: \${VAL_ITEM})"
-E[133]="Invalid IP address format"
-C[133]="IP 地址格式错误"
+E[132]="Server address  (current: \${VAL_ITEM})"
+C[132]="服务器地址  (当前: \${VAL_ITEM})"
+E[133]="Invalid server address (IPv4 / IPv6 / domain)"
+C[133]="服务器地址格式错误（IPv4 / IPv6 / 域名）"
 E[134]="Please enter new value (press Enter to skip):"
 C[134]="请输入新值 (回车跳过):"
 E[135]="No change was made."
@@ -360,6 +360,32 @@ E[159]="Enter warp-ep outbound rule number(s) to delete (comma-separated):"
 C[159]="输入要删除的 warp-ep 出站规则编号 (逗号分隔):"
 E[160]="Custom route rule(s) deleted."
 C[160]="自定义路由规则已删除。"
+E[161]="Port modification mode:\n 1. Modify start port (protocols occupy sequential ports, default)\n 2. Set an independent port for each protocol"
+C[161]="端口修改方式:\n 1. 修改开始端口（各协议按顺序占用，默认）\n 2. 修改为各协议独立端口"
+E[162]="Select the protocols whose ports to change (multi-select, e.g. bcf; asked in the same order as typed; blank = nothing to change):\n a. all (default)"
+C[162]="多选需要修改端口的协议（如 bcf，询问顺序与输入顺序一致，留空表示不修改）:\n a. all (默认)"
+E[163]="Enter the new port for \${PROTO} (current: \${PORT}, leave blank to keep):"
+C[163]="请输入「\${PROTO}」的新端口 (当前: \${PORT}，留空保持不变):"
+E[164]="Listening ports (current: \${PORTS})"
+C[164]="监听端口 (当前: \${PORTS})"
+E[165]="Ports unchanged, nothing to modify."
+C[165]="端口未变化，未做任何修改。"
+E[166]="Port \${PORT} is occupied by another protocol or service."
+C[166]="端口 \${PORT} 已被其他协议或服务占用。"
+E[167]="Port change preview:"
+C[167]="端口变更预览:"
+E[168]="Apply the changes [y/N] (default N):"
+C[168]="是否应用以上修改 [y/N] (默认为 N):"
+E[169]="\${PROTO}: \${OLD} -> \${NEW}"
+C[169]="\${PROTO}: \${OLD} -> \${NEW}"
+E[170]="Ports updated and hot-reloaded."
+C[170]="端口已更新并已热加载。"
+E[171]="Port \${PORT} is already in use by \${PROTO}."
+C[171]="端口 \${PORT} 已被 \${PROTO} 使用。"
+E[172]="\${LETTER}. \${PROTO} (\${PORT})"
+C[172]="\${LETTER}. \${PROTO} (\${PORT})"
+E[173]="Start port \${OLD_START} -> \${NEW_START}: \${NUM} protocol ports will become \${NEW_START} - \${NEW_END}."
+C[173]="起始端口 \${OLD_START} -> \${NEW_START}: \${NUM} 个协议端口将变为 \${NEW_START} - \${NEW_END}。"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -463,7 +489,7 @@ check_cdn() {
 
 # 检测是否解锁 chatGPT，以决定是否使用 warp 链式代理或者是 direct out，此处判断改编自 https://github.com/lmc999/RegionRestrictionCheck
 check_chatgpt() {
-  local CHECK_STACK=-$1
+  local CHECK_STACK=$1
   local UA_BROWSER="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
   local UA_SEC_CH_UA='"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"'
   wget --help | grep -q '\-\-ciphers' && local IS_CIPHERS=is_ciphers
@@ -654,10 +680,7 @@ change_config() {
   # 监听端口
   local PORTS_NOW=$(awk -F ':|,' '/"listen_port"/{print $2}' ${WORK_DIR}/conf/*_inbounds.json 2>/dev/null)
   if [ -n "$PORTS_NOW" ]; then
-    local PORTS_NOW_START=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0 } END {print min}' <<< "$PORTS_NOW")
-    local PORTS_NOW_COUNT=$(awk 'END { print NR }' <<< "$PORTS_NOW")
-    local PORTS_NOW_END=$((PORTS_NOW_START + PORTS_NOW_COUNT - 1))
-    MENU_IDX+=(30) && MENU_KEY+=(ports) && MENU_VAL+=("${PORTS_NOW_START} - ${PORTS_NOW_END}")
+    MENU_IDX+=(30) && MENU_KEY+=(ports) && MENU_VAL+=("$(format_ports_display ${PORTS_NOW})")
   fi
 
   # 节点名
@@ -755,21 +778,7 @@ change_config() {
     export_list
     return
   elif [ "$KEY" = "ports" ]; then
-    OLD_PORTS=$(awk -F ':|,' '/listen_port/{print $2}' ${WORK_DIR}/conf/*)
-    OLD_START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$OLD_PORTS")
-    OLD_CONSECUTIVE_PORTS=$(awk 'END { print NR }' <<< "$OLD_PORTS")
-    input_start_port $OLD_CONSECUTIVE_PORTS
-    for ((a=0; a<$OLD_CONSECUTIVE_PORTS; a++)) do
-      [ -s ${WORK_DIR}/conf/${CONF_FILES[a]} ] && sed -i "s/\(.*listen_port.*:\)$((OLD_START_PORT+a))/\1$((START_PORT+a))/" ${WORK_DIR}/conf/*
-    done
-    fetch_nodes_value
-    [ -n "$PORT_NGINX" ] && export_nginx_conf_file
-    nginx_sync
-    cmd_systemctl reload sing-box
-    [ -n "$ARGO_DOMAIN" ] && export_argo_json_file
-    sync_firewall_rules
-    sleep 2
-    export_list
+    change_port_mode
     return
   elif [ "$KEY" = "hy2bw" ]; then
     # 修改 Hysteria2 带宽
@@ -984,7 +993,7 @@ change_config() {
   elif [ "$KEY" = "sni" ]; then
     ssl_certificate "$NEW_VAL"
   elif [ "$KEY" = "serverip" ]; then
-    [[ ! "$NEW_VAL" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] && [[ ! "$NEW_VAL" =~ ^[0-9a-fA-F:]+$ ]] && error " $(text 133) "
+    is_valid_server_addr "$NEW_VAL" || error " $(text 133) "
   fi
 
   # 批量替换，更换服务IP和指纹不需重启服务
@@ -1208,7 +1217,7 @@ input_nginx_port() {
     fi
     PORT_NGINX=${PORT_NGINX:-"$PORT_NGINX_DEFAULT"}
     if [[ "$PORT_NGINX" =~ ^[1-9][0-9]{1,4}$ && "$PORT_NGINX" -ge "$MIN_PORT" && "$PORT_NGINX" -le "$MAX_PORT" ]]; then
-      ss -nltup | grep -q ":$PORT_NGINX" && warning "\n $(text 44) \n" || break
+      is_port_in_use "$PORT_NGINX" && warning "\n $(text 44) \n" || break
     fi
   done
 }
@@ -2476,11 +2485,257 @@ input_start_port() {
     START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}
     if [[ "$START_PORT" =~ ^[1-9][0-9]{2,4}$ && "$START_PORT" -ge "$MIN_PORT" && "$START_PORT" -le "$MAX_PORT" ]]; then
       for port in $(eval echo {$START_PORT..$[START_PORT+NUM-1]}); do
-        ss -nltup | grep -q ":$port" && IN_USED+=("$port")
+        is_port_in_use "$port" && IN_USED+=("$port")
       done
       [ "${#IN_USED[*]}" -eq 0 ] && break || warning "\n $(text 44) \n"
     fi
   done
+}
+
+# 段数 >4 时只显示前 4 段，末尾追加 "等 N 个"（N = 未显示的端口总数）
+format_ports_display() {
+  local -a PORTS=("$@") SEGS=()
+  local -i TOTAL=0 i a b
+  local PREV='' SEG_START='' OUT=''
+  [ "${#PORTS[@]}" -eq 0 ] && { echo; return; }
+  PORTS=($(printf '%s\n' "${PORTS[@]}" | sort -n | uniq))
+  TOTAL=${#PORTS[@]}
+  SEG_START=${PORTS[0]}
+  PREV=${PORTS[0]}
+  for ((i=1; i<TOTAL; i++)); do
+    if [ $((PREV + 1)) -eq ${PORTS[i]} ]; then
+      PREV=${PORTS[i]}
+    else
+      SEGS+=("$SEG_START $PREV")
+      SEG_START=${PORTS[i]}
+      PREV=${PORTS[i]}
+    fi
+  done
+  SEGS+=("$SEG_START $PREV")
+  if [ "${#SEGS[@]}" -eq 1 ]; then
+    read -r a b <<< "${SEGS[0]}"
+    [ "$a" -eq "$b" ] && OUT="$a" || OUT="${a} - ${b}"
+    if [ "$TOTAL" -gt 6 ]; then
+      [ "$L" = 'C' ] && OUT="${OUT}，共 ${TOTAL} 个" || OUT="${OUT}, ${TOTAL} in total"
+    fi
+  elif [ "${#SEGS[@]}" -le 4 ]; then
+    local -a PARTS=()
+    for s in "${SEGS[@]}"; do
+      read -r a b <<< "$s"
+      [ "$a" -eq "$b" ] && PARTS+=("$a") || PARTS+=("${a} - ${b}")
+    done
+    OUT="${PARTS[0]}"
+    for s in "${PARTS[@]:1}"; do OUT="${OUT}, ${s}"; done
+  else
+    local -a PARTS=()
+    local -i SHOWN=0
+    for ((i=0; i<4; i++)); do
+      read -r a b <<< "${SEGS[i]}"
+      SHOWN=$(( SHOWN + b - a + 1 ))
+      [ "$a" -eq "$b" ] && PARTS+=("$a") || PARTS+=("${a} - ${b}")
+    done
+    OUT="${PARTS[0]}"
+    for s in "${PARTS[@]:1}"; do OUT="${OUT}, ${s}"; done
+    if [ "$L" = 'C' ]; then
+      OUT="${OUT} ... 等 $(( TOTAL - SHOWN )) 个"
+    else
+      OUT="${OUT} ... $(( TOTAL - SHOWN )) more"
+    fi
+  fi
+  echo "$OUT"
+}
+
+# -d 菜单：监听端口 → 方式选择（1. 修改开始端口，默认 / 2. 各协议独立端口）
+change_port_mode() {
+  local PORTS_MODE='' MODE_ERROR=6
+  while true; do
+    hint "\n $(text 161) "
+    reading "\n $(text 24) " PORTS_MODE
+    case "${PORTS_MODE:-1}" in
+      1 ) change_start_port; return ;;
+      2 ) change_independent_port; return ;;
+      * ) (( MODE_ERROR-- )) || true
+          [ "$MODE_ERROR" = 0 ] && error "\n $(text 3) \n"
+          warning " $(text 143) " ;;
+    esac
+  done
+}
+
+# 读取 hysteria2 当前监听端口（未安装时输出为空）
+get_hy2_port() {
+  ls ${WORK_DIR}/conf/*${NODE_TAG[1]}_inbounds.json >/dev/null 2>&1 || return
+  awk -F '[:,]' '/"listen_port"/{gsub(/[[:space:]]/,"",$2); print $2; exit}' ${WORK_DIR}/conf/*${NODE_TAG[1]}_inbounds.json 2>/dev/null
+}
+
+# 端口应用后的通用后处理（方式 1 / 2 共用）：联动刷新 + 热加载 + hy2 端口跳跃目标重建
+apply_ports_post() {
+  local HY2_OLD="$1" HY2_NEW="$2"
+  fetch_nodes_value
+  # nginx 反代端口同步：nginx.conf 存在则重建并热加载（proxy_pass 必须跟随 WS 端口变化，
+  # 不依赖 PORT_NGINX 是否已被 IS_SUB/IS_ARGO 分支读入）
+  if [ -s "${WORK_DIR}/nginx.conf" ]; then
+    [ -z "$PORT_NGINX" ] && PORT_NGINX=$(awk '/listen/{print $2; exit}' ${WORK_DIR}/nginx.conf | tr -d ';')
+    # 现有 nginx.conf 已含本地 WS 反代时强制按 is_argo 重建，
+    # 避免 IS_ARGO 标志缺失/失效时导出配置丢失 WS 反代（端口变化后必须跟随）
+    local _ARGO_BAK="${IS_ARGO-}"
+    grep -q 'proxy_pass.*127.0.0.1' "${WORK_DIR}/nginx.conf" 2>/dev/null && IS_ARGO=is_argo
+    export_nginx_conf_file
+    IS_ARGO="$_ARGO_BAK"
+  fi
+  nginx_sync
+  cmd_systemctl reload sing-box
+  [ -n "$ARGO_DOMAIN" ] && export_argo_json_file
+  # Hysteria2 端口跳跃目标同步（hy2 端口变化且跳跃已启用时，显式重建 dnat 目标）
+  if [ -n "$HY2_OLD" ] && [ -n "$HY2_NEW" ] && [ "$HY2_OLD" != "$HY2_NEW" ]; then
+    check_port_hopping_nat
+    if [ -n "$PORT_HOPPING_START" ] && [ -n "$PORT_HOPPING_END" ]; then
+      del_port_hopping_nat
+      (add_port_hopping_nat "$PORT_HOPPING_START" "$PORT_HOPPING_END" "$HY2_NEW") >/dev/null 2>&1
+    fi
+  fi
+  sync_firewall_rules
+  sleep 2
+  export_list
+  # 显示新端口列表
+  local PORTS=$(format_ports_display $(awk -F ':|,' '/"listen_port"/{print $2}' ${WORK_DIR}/conf/*_inbounds.json 2>/dev/null))
+  [ -n "$PORTS" ] && hint " $(text 164) "
+  info " $(text 170) "
+}
+
+# 方式 1：修改开始端口（各协议按顺序占用，现有逻辑 + 预览确认 + hy2 跳跃联动）
+change_start_port() {
+  local OLD_PORTS OLD_START_PORT OLD_CONSECUTIVE_PORTS
+  local _STEP_NUM_BAK="${STEP_NUM-}" _TOTAL_STEPS_BAK="${TOTAL_STEPS-}"
+  OLD_PORTS=$(awk -F ':|,' '/listen_port/{print $2}' ${WORK_DIR}/conf/*)
+  OLD_START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$OLD_PORTS")
+  OLD_CONSECUTIVE_PORTS=$(awk 'END { print NR }' <<< "$OLD_PORTS")
+  local HY2_OLD=$(get_hy2_port)
+  unset STEP_NUM TOTAL_STEPS
+  input_start_port $OLD_CONSECUTIVE_PORTS
+  STEP_NUM="$_STEP_NUM_BAK"
+  TOTAL_STEPS="$_TOTAL_STEPS_BAK"
+  [ "$START_PORT" = "$OLD_START_PORT" ] && { info " $(text 135) "; return; }
+  # 预览确认（方式 1 / 方式 2 同一套确认交互）
+  local NUM="$OLD_CONSECUTIVE_PORTS" OLD_START="$OLD_START_PORT" NEW_START="$START_PORT" NEW_END=$((START_PORT + OLD_CONSECUTIVE_PORTS - 1))
+  hint "\n $(text 173) "
+  reading "\n $(text 168) " PORTS_CONFIRM
+  [ "${PORTS_CONFIRM,,}" != 'y' ] && { info " $(text 135) "; return; }
+  for ((a=0; a<$OLD_CONSECUTIVE_PORTS; a++)) do
+    [ -s ${WORK_DIR}/conf/${CONF_FILES[a]} ] && sed -i "s/\(.*listen_port.*:\)$((OLD_START_PORT+a))/\1$((START_PORT+a))/" ${WORK_DIR}/conf/*
+  done
+  apply_ports_post "$HY2_OLD" "$(get_hy2_port)"
+}
+
+# 方式 2：各协议独立端口（多选协议 → 逐项询问端口 → 校验 → 预览确认 → 应用）
+change_independent_port() {
+  local -a LETTERS=() PROTOS=() PORTS=() PROTO_IDX=()
+  local -A OWNER=()
+  local -i i j
+  local letter proto port
+  for ((i=0; i<${#PROTOCOL_LIST[@]}; i++)); do
+    local -a FILES=(${WORK_DIR}/conf/*${NODE_TAG[i]}_inbounds.json)
+    [ -s "${FILES[0]}" ] || continue
+    port=$(awk -F '[:,]' '/"listen_port"/{gsub(/[[:space:]]/,"",$2); print $2; exit}' "${FILES[0]}")
+    [ -n "$port" ] || continue
+    letter=$(asc $((i+98)))
+    LETTERS+=("$letter"); PROTOS+=("${PROTOCOL_LIST[i]}"); PORTS+=("$port"); PROTO_IDX+=("$i")
+    OWNER[$port]="${PROTOCOL_LIST[i]}"
+  done
+  [ "${#LETTERS[@]}" -eq 0 ] && { info " $(text 135) "; return; }
+
+  # 多选需要修改端口的协议（a = 全部，b.. = 逐协议，留空 = 不修改，顺序 = 输入顺序）
+  local MAX_LETTER=$(asc $(( ${#PROTOCOL_LIST[@]} + 97 )))
+  local CHOOSE='' SELECTED=()
+  hint "\n $(text 162) "
+  for ((i=0; i<${#LETTERS[@]}; i++)); do
+    local LETTER="${LETTERS[i]}" PROTO="${PROTOS[i]}" PORT="${PORTS[i]}"
+    hint " $(text 172) "
+  done
+  reading "\n $(text 24) " CHOOSE
+  if [ -z "$CHOOSE" ]; then
+    info " $(text 135) "
+    return
+  fi
+  if [[ "${CHOOSE,,}" =~ ^[aA]$ ]]; then
+    SELECTED=("${LETTERS[@]}")
+  else
+    local FILTERED=$(grep -o . <<< "${CHOOSE,,}" | sed "/[^b-$MAX_LETTER]/d" | awk '!seen[$0]++' | tr -d '\n')
+    local TMP=() ch
+    while IFS= read -r -n1 ch; do
+      [ -n "$ch" ] && [[ " ${LETTERS[*]} " =~ " $ch " ]] && TMP+=("$ch")
+    done <<< "$FILTERED"
+    SELECTED=("${TMP[@]}")
+  fi
+  [ "${#SELECTED[@]}" -eq 0 ] && { info " $(text 135) "; return; }
+
+  # 逐协议询问新端口（留空 = 不变；校验：数字范围 / 与他协议重复 / 系统占用，错误即时提示，上限 6 次）
+  local -a CHG_LETTERS=() CHG_OLDS=() CHG_NEWS=()
+  local chg_letter proto oldport newport conflict new_port err_time
+  for ((j=0; j<${#SELECTED[@]}; j++)); do
+    chg_letter="${SELECTED[j]}"
+    for ((i=0; i<${#LETTERS[@]}; i++)); do
+      [ "${LETTERS[i]}" = "$chg_letter" ] && break
+    done
+    proto="${PROTOS[i]}"; oldport="${PORTS[i]}"
+    new_port=''
+    err_time=6
+    while true; do
+      local PROTO="$proto" PORT="$oldport"
+      reading " $(text 163) " new_port
+      if [ -z "$new_port" ]; then
+        newport="$oldport"; break
+      fi
+      if [[ "$new_port" =~ ^[1-9][0-9]{2,4}$ && "$new_port" -ge "$MIN_PORT" && "$new_port" -le "$MAX_PORT" ]]; then
+        conflict="${OWNER[$new_port]-}"
+        if [ -n "$conflict" ] && [ "$conflict" != "$proto" ]; then
+          local PORT="$new_port" PROTO="$conflict"
+          warning " $(text 171) "
+          (( err_time-- )) || true
+          [ "$err_time" = 0 ] && error "\n $(text 3) \n"
+          continue
+        fi
+        if [ "$new_port" != "$oldport" ] && is_port_in_use "$new_port"; then
+          local PORT="$new_port"
+          warning " $(text 166) "
+          (( err_time-- )) || true
+          [ "$err_time" = 0 ] && error "\n $(text 3) \n"
+          continue
+        fi
+        newport="$new_port"; break
+      else
+        local PORT="$new_port"
+        warning " $(text 166) "
+        (( err_time-- )) || true
+        [ "$err_time" = 0 ] && error "\n $(text 3) \n"
+      fi
+    done
+    [ "$newport" != "$oldport" ] && { unset "OWNER[$oldport]"; OWNER[$newport]="$proto"; }
+    [ "$newport" != "$oldport" ] && { CHG_LETTERS+=("$chg_letter"); CHG_OLDS+=("$oldport"); CHG_NEWS+=("$newport"); }
+  done
+
+  [ "${#CHG_LETTERS[@]}" -eq 0 ] && { info " $(text 165) "; return; }
+
+  # 变更预览（只列变更项）与确认
+  hint "\n $(text 167) "
+  for ((j=0; j<${#CHG_LETTERS[@]}; j++)); do
+    for ((i=0; i<${#LETTERS[@]}; i++)); do
+      [ "${LETTERS[i]}" = "${CHG_LETTERS[j]}" ] && break
+    done
+    local PROTO="${PROTOS[i]}" OLD="${CHG_OLDS[j]}" NEW="${CHG_NEWS[j]}"
+    hint " $(text 169) "
+  done
+  reading " $(text 168) " PORTS_CONFIRM
+  [ "${PORTS_CONFIRM,,}" != 'y' ] && { info " $(text 135) "; return; }
+
+  # 应用（按协议文件替换，避免端口号在其他字段重复出现时误伤）
+  local HY2_OLD=$(get_hy2_port)
+  for ((j=0; j<${#CHG_LETTERS[@]}; j++)); do
+    for ((i=0; i<${#LETTERS[@]}; i++)); do
+      [ "${LETTERS[i]}" = "${CHG_LETTERS[j]}" ] && break
+    done
+    sed -i "/\"listen_port\"/s/[0-9]\+/${CHG_NEWS[j]}/" ${WORK_DIR}/conf/*${NODE_TAG[PROTO_IDX[i]]}_inbounds.json
+  done
+  apply_ports_post "$HY2_OLD" "$(get_hy2_port)"
 }
 
 # 定义 Sing-box 变量
@@ -2499,7 +2754,7 @@ sing-box_variables() {
       SERVER_IP_DEFAULT=$WAN6
     else
       local a=6
-      until [ -n "$SERVER_IP" ]; do
+      until [ -n "$SERVER_IP" ] && is_valid_server_addr "$SERVER_IP"; do
         ((a--)) || true
         [ "$a" = 0 ] && error "\n $(text 3) \n"
         reading "\n $(text 46) " SERVER_IP
@@ -2554,7 +2809,15 @@ sing-box_variables() {
       SERVER_IP="$SERVER_IP_DEFAULT"
     else
       (( STEP_NUM++ )) || true
-      reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 10) " SERVER_IP
+      local IP_ERROR_TIME=6
+      while true; do
+        reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 10) " SERVER_IP
+        [ -z "$SERVER_IP" ] && break
+        is_valid_server_addr "$SERVER_IP" && break
+        (( IP_ERROR_TIME-- )) || true
+        [ "$IP_ERROR_TIME" = 0 ] && error "\n $(text 3) \n"
+        warning " $(text 133) "
+      done
     fi
   fi
   SERVER_IP=${SERVER_IP:-"$SERVER_IP_DEFAULT"} && WS_SERVER_IP_SHOW=$SERVER_IP
@@ -2590,9 +2853,16 @@ sing-box_variables() {
       ;;
   esac
 
-  # 检测是否解锁 chatGPT
-  CHATGPT_OUT=warp-ep;
-  [ "$(check_chatgpt $(grep -oE '[46]' <<< "$STRATEGY"))" = 'unlock' ] && CHATGPT_OUT=direct
+  # 检测是否解锁 chatGPT：按服务器地址类型决定检测栈；域名（NAT 动态地址）交由 wget 按系统默认解析，避免域名被误判为 IPv6 栈
+  CHATGPT_OUT=warp-ep
+  if [[ "$SERVER_IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    local CHATGPT_STACK='-4'
+  elif [[ "$SERVER_IP" =~ ^[0-9a-fA-F:]+$ && "$SERVER_IP" =~ : ]]; then
+    local CHATGPT_STACK='-6'
+  else
+    local CHATGPT_STACK=''
+  fi
+  [ "$(check_chatgpt $CHATGPT_STACK)" = 'unlock' ] && CHATGPT_OUT=direct
 
   # 如果选择有 b j k 这些 reality 协议，自定义 reality 公私钥，如果没有则自动生成
   if [ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' ] && [[ "${INSTALL_PROTOCOLS[@]}" =~ 'b'|'j'|'k' ]]; then
@@ -3450,6 +3720,21 @@ format_traffic() {
   echo "${IDX}.${REM} ${UNIT}"
 }
 
+# 检测端口是否被系统占用（严格匹配端口号，避免 1111 误命中 11111）
+is_port_in_use() {
+  local _PORT="$1"
+  ss -nltup 2>/dev/null | grep -qE "([[:space:]]|^)[^[:space:]]*:${_PORT}([[:space:]]|$)"
+}
+
+# 校验服务器地址：IPv4 / IPv6 / 域名（域名须含至少一个点，NAT 场景可用 DDNS 域名）
+is_valid_server_addr() {
+  local _ADDR="$1"
+  [[ "$_ADDR" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] && return 0
+  [[ "$_ADDR" =~ ^[0-9a-fA-F:]+$ && "$_ADDR" =~ : ]] && return 0
+  [[ "$_ADDR" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$ ]] && return 0
+  return 1
+}
+
 # 在脚本限制的端口范围内（MIN_PORT-MAX_PORT）随机找一个未被系统占用的端口。
 # 逻辑统一为数组承载候选端口：一次性随机生成 16 个端口装入数组，
 # 逐个用 ss -nltp 探测占用情况，返回第一个空闲端口；全部占用则返回 1。
@@ -3461,7 +3746,7 @@ find_free_port() {
     CAND+=("$((MIN_PORT + ((RANDOM * 2) + (RANDOM % 2)) % SPAN))")
   done
   for PORT in "${CAND[@]}"; do
-    if ! ss -nltp 2>/dev/null | grep -q ":${PORT} "; then
+    if ! is_port_in_use "$PORT"; then
       echo "$PORT"; return 0
     fi
   done
@@ -4286,10 +4571,6 @@ depend() {
     need net
     after net"
 
-    # 如果配置了 Nginx，添加依赖
-    [ -n "$PORT_NGINX" ] && OPENRC_SERVICE+="
-    need nginx"
-
     # 添加 reload 函数，支持 SIGHUP 热更
     OPENRC_SERVICE+="
 }
@@ -4306,9 +4587,11 @@ start_pre() {
     mkdir -p /var/run
     chmod 755 /var/run"
 
-    # 如果配置了 Nginx，启动 Nginx（nginx 已在运行时不阻塞服务启动）
-    [ -n "$PORT_NGINX" ] && OPENRC_SERVICE+="
-    $(command -v nginx) -c ${WORK_DIR}/nginx.conf || true"
+    # 存在 nginx.conf 时自管 nginx（与 xray 守护一致）：已运行则跳过，未运行才启动，失败不阻塞服务启动
+    [ -s ${WORK_DIR}/nginx.conf ] && OPENRC_SERVICE+="
+    if command -v /usr/sbin/nginx >/dev/null 2>&1 && ! pgrep -f \"nginx.*${WORK_DIR}/nginx.conf\" >/dev/null 2>&1; then
+        /usr/sbin/nginx -c ${WORK_DIR}/nginx.conf
+    fi"
 
     OPENRC_SERVICE+="
     # 确保 PID 文件不存在，避免启动失败
@@ -4316,7 +4599,7 @@ start_pre() {
 }"
 
     # 添加 stop_post 函数，用于在服务停止后清理 nginx 进程
-    [ -n "$PORT_NGINX" ] && OPENRC_SERVICE+="
+    [ -s ${WORK_DIR}/nginx.conf ] && OPENRC_SERVICE+="
 
 stop_post() {
     # 停止 nginx：优先用内置命令
@@ -4357,8 +4640,8 @@ NoNewPrivileges=yes
 TimeoutStartSec=0
 WorkingDirectory=${WORK_DIR}
 "
-    # 统一在 systemd 里用 ExecStartPre 管理 nginx（含 CentOS7）；"-" 前缀容忍 nginx 已在运行等情况，避免阻塞服务启动
-    [[ -n "$PORT_NGINX" ]] && SING_BOX_SERVICE+="ExecStartPre=-$(command -v nginx) -c ${WORK_DIR}/nginx.conf
+    # 存在 nginx.conf 时用 ExecStartPre 管理 nginx（含 CentOS7）：已在运行则 reload 最新配置，未运行则启动
+    [[ -s "${WORK_DIR}/nginx.conf" ]] && SING_BOX_SERVICE+="ExecStartPre=/bin/bash -c 'nginx -c ${WORK_DIR}/nginx.conf -s reload 2>/dev/null || nginx -c ${WORK_DIR}/nginx.conf'
 "
     SING_BOX_SERVICE+="ExecStart=${WORK_DIR}/sing-box run -C ${WORK_DIR}/conf
 ExecReload=/bin/kill -HUP \$MAINPID
@@ -4569,9 +4852,6 @@ install_sing-box() {
   cp $TEMP_DIR/sing-box $TEMP_DIR/jq ${WORK_DIR}
   [ -x $TEMP_DIR/qrencode ] && cp $TEMP_DIR/qrencode ${WORK_DIR}
 
-  # 生成 sing-box systemd 配置文件
-  sing-box_systemd
-
   # 生成 Argo systemd 配置文件，并复制 cloudflared 可执行二进制文件
   cp $TEMP_DIR/cloudflared ${WORK_DIR}
   [ -n "$ARGO_RUNS" ] && argo_systemd
@@ -4579,8 +4859,11 @@ install_sing-box() {
   # 如果是 Json Argo，把配置文件复制到工作目录
   [ -n "$ARGO_JSON" ] && cp $TEMP_DIR/tunnel.* ${WORK_DIR}
 
-  # 生成 Nginx 配置文件
+  # 生成 Nginx 配置文件（先于守护文件，确保 ExecStartPre / start_pre 与最终状态一致）
   [ -n "$PORT_NGINX" ] && export_nginx_conf_file
+
+  # 生成 sing-box systemd 配置文件
+  sing-box_systemd
 
   # 系统启动 sing-box 服务
   cmd_systemctl enable sing-box

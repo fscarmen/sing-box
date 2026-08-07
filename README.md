@@ -24,6 +24,8 @@
 
 * * *
 ## 1.更新信息
+2026.08.07 v1.3.20 1. Support independent (non-consecutive) ports per protocol in sb -d, only available after installation so the install flow stays unchanged; 2. Server address accepts an IP or a domain (use DDNS for NAT VPS whose public IP changes daily); 1. sb -d 支持为各协议设置独立（非连续）端口，仅在安装后修改，不影响常规安装流程; 2. 服务器地址支持填写 IP 或域名（NAT VPS 公网 IP 每日变化时可用 DDNS 域名）
+
 2026.07.31 v1.3.19 Add real-time traffic stats (-n / main menu); 添加实时流量统计 (-n / 主菜单)
 
 2026.07.25 v1.3.18 Add enable/disable subscriptions option in sb -d menu 2. Change v2rayN Hysteria2 Realm config from Finalmask field to ProtoExtraObj; sb -d 菜单新增 「订阅开关」，可随时开启关闭订阅
@@ -161,6 +163,8 @@
 * Hysteria2 支持 Realm 模式，适用于回国、没有公网入口、住宅 NAT、CGNAT 等无法开放入站端口的机器；有公网入口时不建议使用，并可选 WARP 辅助打洞提高严格 NAT 环境下的成功率
 * 节点信息输出到 V2rayN / Clash Verge / 小火箭 / Throne / Sing-box (SFI, SFA, SFM)，订阅自动适配客户端，一个订阅 url 走天下
 * 自定义端口，适合有限开放端口的 nat 小鸡
+* 安装后通过 sb -d 可修改监听端口：修改开始端口（各协议按顺序占用）或为各协议设置独立（非连续）端口，端口变更自动同步 nginx 反代并热加载
+* 服务器地址支持填写 IP 或域名，NAT VPS 公网 IP 每日变化时可直接使用 DDNS 域名，新安装与 sb -d 修改均可
 * 内置 warp 链式代理解锁 chatGPT
 * 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 、Armbian 和 Arch Linux,请务必选择 LTS 系统
 * 支持硬件结构类型: AMD 和 ARM，支持 IPv4 和 IPv6
