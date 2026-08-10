@@ -216,6 +216,10 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh) -f config.conf
 ```
 
+> **独立 WARP 账户 / Independent WARP account**：安装时默认通过 Cloudflare API 为本机注册独立 WARP 账户，避免内置共享密钥被并发使用互抢会话、导致 WARP 数据面不通；注册失败会自动回退共享密钥并提示。如需沿用共享密钥：KV 传参加 `--WARP_SHARED=true`，配置文件设 `WARP_SHARED=true`。安装后可随时通过 `sb -d` 注册 / 重新注册。
+>
+> By default the installer registers an independent WARP account for the machine via the Cloudflare API, avoiding the built-in shared key whose concurrent use causes session preemption and a broken WARP data plane. If registration fails, the script falls back to the shared key with a warning. To keep the shared key: pass `--WARP_SHARED=true` (KV args) or set `WARP_SHARED=true` (config file). After installation, register / re-register anytime via `sb -d`.
+
 ### 方式3. KV 传参，举例
 
 <details>

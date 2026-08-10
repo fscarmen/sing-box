@@ -386,6 +386,18 @@ E[172]="\${LETTER}. \${PROTO} (\${PORT})"
 C[172]="\${LETTER}. \${PROTO} (\${PORT})"
 E[173]="Start port \${OLD_START} -> \${NEW_START}: \${NUM} protocol ports will become \${NEW_START} - \${NEW_END}."
 C[173]="起始端口 \${OLD_START} -> \${NEW_START}: \${NUM} 个协议端口将变为 \${NEW_START} - \${NEW_END}。"
+E[174]="Register / re-register an independent WARP account"
+C[174]="注册 / 重新注册独立 WARP 账户"
+E[175]="Register an independent WARP account? The built-in shared key is used concurrently by many users and sessions preempt each other, which breaks the WARP data plane. [Y/n]:"
+C[175]="是否注册独立 WARP 账户？内置共享密钥被多人并发使用会互抢会话，导致 WARP 数据面不通。[Y/n]:"
+E[176]="Registering an independent WARP account ..."
+C[176]="正在注册独立 WARP 账户 ..."
+E[177]="Independent WARP account registered successfully. IPv6: \${WARP_V6}"
+C[177]="独立 WARP 账户注册成功。IPv6: \${WARP_V6}"
+E[178]="WARP registration failed. Falling back to the built-in shared key. You can retry later via [sb -d]."
+C[178]="WARP 注册失败，已回退到内置共享密钥。稍后可运行 [sb -d] 重新注册。"
+E[179]="WARP configuration was written but sing-box check failed. Please check manually."
+C[179]="WARP 配置已写入，但 sing-box check 未通过，请手动检查。"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -743,6 +755,9 @@ change_config() {
   grep -q '"warp-ep"' ${WORK_DIR}/conf/02_endpoints.json 2>/dev/null && {
     CUSTOM_ROUTE_COUNT=$(custom_route_count)
     MENU_IDX+=(150) && MENU_KEY+=(customroute) && MENU_VAL+=("${CUSTOM_ROUTE_COUNT}")
+
+    # 注册 / 重新注册独立 WARP 账户
+    MENU_IDX+=(174) && MENU_KEY+=(warpreg) && MENU_VAL+=("")
   }
 
   [ "${#MENU_IDX[@]}" -eq 0 ] && error " $(text 107) "
@@ -868,6 +883,16 @@ change_config() {
     return
   elif [ "$KEY" = "customroute" ]; then
     custom_route_menu
+    return
+  elif [ "$KEY" = "warpreg" ]; then
+    # 注册 / 重新注册独立 WARP 账户，成功后校验配置并热更
+    if register_warp_account; then
+      if $(sing_box_bin) check -C ${WORK_DIR}/conf >/dev/null 2>&1; then
+        cmd_systemctl reload sing-box
+      else
+        warning "\n $(text 179) "
+      fi
+    fi
     return
   elif [ "$KEY" = "fingerprint" ]; then
     # 修改客户端指纹
@@ -2943,8 +2968,8 @@ check_dependencies() {
   fi
 
   # 2. 基础通用依赖（不含防火墙，防火墙仅端口跳跃时按需安装）
-  DEPS_CHECK+=("wget" "tar" "ss"  "ip"        "bash" "openssl" "ping")
-  DEPS_INSTALL+=("wget" "tar" "iproute2" "iproute2" "bash" "openssl" "iputils-ping")
+  DEPS_CHECK+=("wget" "curl" "tar" "ss"  "ip"        "bash" "openssl" "ping")
+  DEPS_INSTALL+=("wget" "curl" "tar" "iproute2" "iproute2" "bash" "openssl" "iputils-ping")
 
   [ "$SYSTEM" != 'Alpine' ] && DEPS_CHECK+=("systemctl") && DEPS_INSTALL+=("systemctl")
 
@@ -3784,6 +3809,116 @@ ensure_stats_data() {
   [ -n "$STATS_JSON" ] || return 1
 }
 
+# 定位可用的 sing-box 二进制（安装期在 TEMP_DIR，安装后在 WORK_DIR）
+sing_box_bin() {
+  [ -x ${WORK_DIR}/sing-box ] && echo ${WORK_DIR}/sing-box || echo $TEMP_DIR/sing-box
+}
+
+# 生成 warp-ep endpoint 配置：优先使用已注册的独立账户（warp_account.conf），否则回退内置公共共享密钥
+export_warp_endpoint_conf() {
+  local WARP_PRIVATE_KEY='YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY='
+  local WARP_V6='2606:4700:110:8a36:df92:102a:9602:fa18'
+  local WARP_RESERVED='78, 135, 76'
+  [ -s ${WORK_DIR}/warp_account.conf ] && . ${WORK_DIR}/warp_account.conf
+  [ ! -d ${WORK_DIR}/conf ] && mkdir -p ${WORK_DIR}/conf
+
+  cat > ${WORK_DIR}/conf/02_endpoints.json << EOF
+{
+    "endpoints":[
+        {
+            "type":"wireguard",
+            "tag":"warp-ep",
+            "mtu":1400,
+            "address":[
+                "172.16.0.2/32",
+                "${WARP_V6}/128"
+            ],
+            "private_key":"${WARP_PRIVATE_KEY}",
+            "peers": [
+              {
+                "address": "engage.cloudflareclient.com",
+                "port":2408,
+                "public_key":"bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+                "allowed_ips": [
+                  "0.0.0.0/0",
+                  "::/0"
+                ],
+                "reserved":[
+                    ${WARP_RESERVED}
+                ]
+              }
+            ]
+        }
+    ]
+}
+EOF
+}
+
+# 通过 Cloudflare API 匿名注册独立 WARP 账户。
+# 内置共享密钥被全网并发使用，会话互抢会导致握手成功但数据面不通，因此每台机器应独立注册。
+# 成功：写入 ${WORK_DIR}/warp_account.conf 并刷新 02_endpoints.json；失败：保留共享密钥兜底，返回 1。
+register_warp_account() {
+  hint "\n $(text 176) "
+  local WG_KEYPAIR WARP_PRIVATE WARP_PUBLIC REG_RESPONSE WARP_V6 CLIENT_ID WARP_RESERVED
+
+  WG_KEYPAIR=$($(sing_box_bin) generate wg-keypair 2>/dev/null) && \
+  WARP_PRIVATE=$(awk '/PrivateKey/{print $NF}' <<< "$WG_KEYPAIR") && \
+  WARP_PUBLIC=$(awk '/PublicKey/{print $NF}' <<< "$WG_KEYPAIR")
+  if [[ ! ${#WARP_PRIVATE} = 44 || ! ${#WARP_PUBLIC} = 44 ]]; then
+    warning "\n $(text 178) "
+    return 1
+  fi
+
+  # Cloudflare 按 TLS 指纹拦截 wget（1010 Access denied，伪装 UA 无效），优先使用 curl
+  local REG_URL="https://api.cloudflareclient.com/v0a2483/reg"
+  local POST_DATA="{\"key\":\"${WARP_PUBLIC}\",\"install_id\":\"\",\"fcm_token\":\"\",\"tos\":\"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\",\"model\":\"Linux\",\"serial_number\":\"\",\"locale\":\"en_US\"}"
+  if command -v curl >/dev/null 2>&1; then
+    REG_RESPONSE=$(curl -s --max-time 15 --retry 1 -X POST "$REG_URL" -H "Content-Type: application/json" -d "$POST_DATA")
+  else
+    REG_RESPONSE=$(wget --no-check-certificate -qO- --content-on-error --timeout=15 --tries=2 \
+      --header="Content-Type: application/json" \
+      --header="User-Agent: okhttp/3.12.1" \
+      --post-data="$POST_DATA" \
+      "$REG_URL")
+  fi
+
+  WARP_V6=$(jq_exec -r '.config.interface.addresses.v6 // empty' <<< "$REG_RESPONSE" 2>/dev/null)
+  CLIENT_ID=$(jq_exec -r '.config.client_id // empty' <<< "$REG_RESPONSE" 2>/dev/null)
+  if [[ ! "$WARP_V6" =~ : || -z "$CLIENT_ID" ]]; then
+    warning "\n $(text 178) "
+    return 1
+  fi
+
+  # client_id base64 解码为 3 个字节，作为 WireGuard reserved（逗号分隔、无空格，保证 conf 可被 source）
+  WARP_RESERVED=$(echo "${CLIENT_ID}==" | base64 -d 2>/dev/null | od -An -tu1 | tr -s ' ' | sed 's/^ //; s/ /,/g')
+  if [[ ! "$WARP_RESERVED" =~ ^[0-9]+,[0-9]+,[0-9]+$ ]]; then
+    warning "\n $(text 178) "
+    return 1
+  fi
+
+  cat > ${WORK_DIR}/warp_account.conf << EOF
+WARP_PRIVATE_KEY="${WARP_PRIVATE}"
+WARP_V6="${WARP_V6}"
+WARP_RESERVED="${WARP_RESERVED}"
+EOF
+
+  export_warp_endpoint_conf
+  hint " $(text 177) "
+  return 0
+}
+
+# 安装期独立 WARP 账户注册入口：交互模式默认 [Y/n]=Y；无交互 / 快速安装默认注册，可用 --WARP_SHARED=true 关闭
+input_warp_account() {
+  if [[ "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' || "$IS_FAST_INSTALL" = 'is_fast_install' ]]; then
+    [ "$IS_WARP_SHARED" = 'is_warp_shared' ] && return
+  else
+    local CHOOSE_WARP_REG
+    reading "\n $(text 175) " CHOOSE_WARP_REG
+    [[ "${CHOOSE_WARP_REG,,}" =~ ^(n|no)$ ]] && return
+  fi
+  register_warp_account
+}
+
 # 生成 sing-box 基础配置
 generate_sing_box_base_conf() {
   # 生成 log 配置
@@ -3811,39 +3946,8 @@ EOF
 }
 EOF
 
-  # 生成 endpoint 配置
-  cat > ${WORK_DIR}/conf/02_endpoints.json << EOF
-{
-    "endpoints":[
-        {
-            "type":"wireguard",
-            "tag":"warp-ep",
-            "mtu":1400,
-            "address":[
-                "172.16.0.2/32",
-                "2606:4700:110:8a36:df92:102a:9602:fa18/128"
-            ],
-            "private_key":"YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY=",
-            "peers": [
-              {
-                "address": "engage.cloudflareclient.com",
-                "port":2408,
-                "public_key":"bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
-                "allowed_ips": [
-                  "0.0.0.0/0",
-                  "::/0"
-                ],
-                "reserved":[
-                    78,
-                    135,
-                    76
-                ]
-              }
-            ]
-        }
-    ]
-}
-EOF
+  # 生成 endpoint 配置（已注册独立 WARP 账户则使用之，否则回退内置共享密钥）
+  export_warp_endpoint_conf
 
   # 生成 route 配置
   cat > ${WORK_DIR}/conf/03_route.json << EOF
@@ -4847,6 +4951,8 @@ install_sing-box() {
   [ ! -d ${TEMP_DIR} ] && mkdir -p $TEMP_DIR
   ssl_certificate $TLS_SERVER_DEFAULT
   hint "\n $(text 2) " && wait
+  # 注册独立 WARP 账户（需在 sing-box_json 生成配置前完成，二进制已于 wait 后就绪）
+  input_warp_account
   sing-box_json
   echo "${L^^}" > ${WORK_DIR}/language
   cp $TEMP_DIR/sing-box $TEMP_DIR/jq ${WORK_DIR}
@@ -6327,6 +6433,7 @@ if [[ -n "$CONFIG_FILE" && -s "$CONFIG_FILE" ]]; then
   L=${LANGUAGE^^}
   [ "$ARGO" = 'true' ] && IS_ARGO=is_argo || IS_ARGO=no_argo
   [ "$SUBSCRIBE" = 'true' ] && IS_SUB=is_sub || IS_SUB=no_sub
+  [ "$WARP_SHARED" = 'true' ] && IS_WARP_SHARED=is_warp_shared
 fi
 
 check_root
@@ -6454,6 +6561,9 @@ for z in ${!ALL_PARAMETER[@]}; do
       ;;
     --HY2_WARP|--REALM_WARP|--WARP_REALM )
       ((z++)); [[ "${ALL_PARAMETER[z],,}" =~ ^(true|1|y|yes)$ ]] && IS_HY2_WARP=is_hy2_warp && IS_HY2_REALM=is_hy2_realm
+      ;;
+    --WARP_SHARED )
+      ((z++)); [[ "${ALL_PARAMETER[z],,}" =~ ^(true|1|y|yes)$ ]] && IS_WARP_SHARED=is_warp_shared
       ;;
     --BIND_INTERFACE )
       ((z++)); BIND_INTERFACE=${ALL_PARAMETER[z]}
