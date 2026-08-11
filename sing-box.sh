@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.21 (2026.08.11)'
+VERSION='v1.3.22 (2026.08.11)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -40,8 +40,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. [sb -d] supports setting an independent (non-consecutive) port for each protocol, only available after installation via [sb -d] so the install flow stays unchanged; 2. Server address accepts an IP or a domain (for NAT VPS whose public IP changes daily, use a DDNS domain), available both during install and afterwards via [sb -d]; 3. Use a newly registered WARP account"
-C[1]="1. [sb -d] 支持为各协议设置独立（非连续）端口，仅在安装后通过 [sb -d] 修改，不影响常规安装流程; 2. 服务器地址支持填写 IP 或域名（NAT VPS 公网 IP 每日变化时可用 DDNS 域名），新安装和安装后修改均可; 3. 使用新注册的 WARP 账户"
+E[1]="1. Pre-register a fresh WARP account during install with shared-key fallback; 2. [sb -d] Change WARP account with register / manual input, hot-reload via sing-box check + SIGHUP and exit after success; 3. make Hysteria2 Realm and port hopping mutually exclusive with confirm prompts in install and [sb -d]"
+C[1]="1. 安装期后台预注册 WARP 账户，失败回退共享密钥; 2. [sb -d] 菜单新增「更换 WARP 账户」，支持重新注册 / 手动输入，sing-box check + SIGHUP 热更成功后退出; 3. 安装与 [sb -d] 修改链路中 Realm 与端口跳跃互斥，切换前均先提示确认"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -258,8 +258,8 @@ E[108]="Enable subscription"
 C[108]="开启订阅"
 E[109]="Disable subscription"
 C[109]="关闭订阅"
-E[110]=""
-C[110]=""
+E[110]="Port hopping is enabled. Enabling Realm will disable port hopping. Continue? [y/N] (default N):"
+C[110]="端口跳跃已开启，启用 Realm 将关闭端口跳跃。是否继续？[y/N]（默认 N）:"
 E[111]="Update base configuration? (Node configs will remain unaffected; only log, outbounds, endpoints, route, experimental, dns, ntp, http_clients, etc., will be reset) [Y/n]:"
 C[111]="是否更新基础配置？（不影响节点配置，仅重置 log、outbounds、endpoints、route、experimental、dns、ntp、http_clients）[Y/n]:"
 E[112]="Change complete"
@@ -404,12 +404,14 @@ E[181]="Checking configuration..."
 C[181]="正在校验配置..."
 E[182]="Change WARP endpoint"
 C[182]="更换 warp endpoint"
-E[183]=""
-C[183]=""
+E[183]="Realm is enabled. Enabling port hopping will disable Realm. Continue? [y/N] (default N):"
+C[183]="Realm 已开启，启用端口跳跃将关闭 Realm。是否继续？[y/N]（默认 N）:"
 E[184]="Invalid private key format. Please enter a 43-character base64 key ending with \"=\"."
 C[184]="Private Key 格式错误，请输入 43 位 base64 密钥且以 \"=\" 结尾"
 E[185]="New WARP endpoint:\n IPv6: \${ADDRESS6}\n Private Key: \${PRIVATE_KEY}\n Reserved: [\${R1}, \${R2}, \${R3}]"
 C[185]="新 WARP 端点:\n IPv6: \${ADDRESS6}\n Private Key: \${PRIVATE_KEY}\n Reserved: [\${R1}, \${R2}, \${R3}]"
+E[186]="Hysteria2 Realm and port hopping cannot be used together (choose one). Realm is for NAT VPS without public inbound access. If you enable Realm, port hopping will be skipped."
+C[186]="Hysteria2 Realm 与端口跳跃不能同时使用（二选一）。Realm 适用于没有公网入站的 NAT 机器；启用 Realm 后将跳过端口跳跃。"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -837,6 +839,15 @@ change_config() {
     else
       # 未开启 → 获取配置后开启，询问 WARP 辅助打洞
       fetch_nodes_value
+      # Realm 与端口跳跃互斥：端口跳跃已开启时需确认，确认后先关闭端口跳跃
+      check_port_hopping_nat
+      if [ -n "$PORT_HOPPING_START" ] && [ -n "$PORT_HOPPING_END" ]; then
+        local HY2_CONFIRM
+        reading "\n $(text 110) " HY2_CONFIRM
+        [[ "${HY2_CONFIRM,,}" =~ ^(y|yes)$ ]] || return
+        del_port_hopping_nat
+        unset PORT_HOPPING_START PORT_HOPPING_END HY2_PORT_HOPPING_RANGE
+      fi
       IS_HY2_REALM=is_hy2_realm
       HY2_REALM_ID="${HY2_REALM_ID:-${UUID[12]:-${UUID_CONFIRM}}}"
       input_hy2_warp
@@ -850,6 +861,16 @@ change_config() {
     # 修改 Hysteria2 端口跳跃
     check_port_hopping_nat
     local OLD_START="$PORT_HOPPING_START" OLD_END="$PORT_HOPPING_END"
+    # Realm 与端口跳跃互斥：Realm 已开启时先确认，确认后才进入端口跳跃流程
+    local HY2_LINE=''
+    [ -s ${WORK_DIR}/subscribe/proxies ] && HY2_LINE=$(grep 'type: hysteria2' ${WORK_DIR}/subscribe/proxies)
+    if grep -q 'realm-opts' <<< "$HY2_LINE"; then
+      local HY2_CONFIRM
+      reading "\n $(text 183) " HY2_CONFIRM
+      [[ "${HY2_CONFIRM,,}" =~ ^(y|yes)$ ]] || return
+      set_hy2_realm_config disable
+      sync_hy2_warp_route disable
+    fi
     hint "\n $(text 97) \n"
 
     local HOPPING_ERROR_TIME=6
@@ -2539,6 +2560,8 @@ del_port_hopping_nat() {
     local COMMENT="NAT ${PORT_HOPPING_START}:${PORT_HOPPING_END} to ${PORT_HOPPING_TARGET} (Sing-box Family Bucket)"
     iptables  --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "$COMMENT" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
     ip6tables --table nat -D PREROUTING -p udp --dport ${PORT_HOPPING_START}:${PORT_HOPPING_END} -m comment --comment "$COMMENT" -j DNAT --to-destination :${PORT_HOPPING_TARGET} 2>/dev/null
+    rc-service iptables  save >/dev/null 2>&1
+    rc-service ip6tables save >/dev/null 2>&1
 
   elif command -v firewall-cmd >/dev/null 2>&1 || [ "$SYSTEM" = 'CentOS' ]; then
     firewall-cmd --zone=public --permanent --remove-forward-port=port=${PORT_HOPPING_START}-${PORT_HOPPING_END}:proto=udp:toport=${PORT_HOPPING_TARGET} >/dev/null 2>&1
@@ -3033,10 +3056,12 @@ sing-box_variables() {
   # 如选择有 c. hysteria2 时，先选择 Realm / WARP，再选择是否使用端口跳跃。
   # 这三项属于 Hysteria2 子选项，不计入安装总步骤，也不显示步骤编号。
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ 'c' ]]; then
+    # Realm 与端口跳跃互斥：先提示；开启 Realm 后跳过端口跳跃交互
+    hint "\n $(text 186) \n"
     input_hy2_realm
     local _SAVED_TOTAL_STEPS="$TOTAL_STEPS"
     TOTAL_STEPS=''
-    input_hopping_port
+    [ "$IS_HY2_REALM" != 'is_hy2_realm' ] && input_hopping_port
     TOTAL_STEPS="$_SAVED_TOTAL_STEPS"
   fi
 
@@ -5973,7 +5998,7 @@ change_protocols() {
     if [[ " ${ADD_PROTOCOLS[*]} " =~ " ${PROTOCOL_LIST[1]} " ]] && [ -z "$IS_HY2_REALM" ]; then
       input_hy2_realm
     fi
-    [ -z "${PORT_HOPPING_START}${PORT_HOPPING_END}" ] && input_hopping_port
+    [ -z "${PORT_HOPPING_START}${PORT_HOPPING_END}" ] && [ "$IS_HY2_REALM" != 'is_hy2_realm' ] && input_hopping_port
   else
     unset PORT_HYSTERIA2 IS_HY2_REALM IS_HY2_WARP HY2_REALM_ID
   fi

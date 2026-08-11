@@ -24,7 +24,9 @@
 
 * * *
 ## 1.更新信息
-2026.08.11 v1.3.21 Use a newly registered WARP account; 使用新注册的 WARP 账户
+2026.08.11 v1.3.22 make Hysteria2 Realm and port hopping mutually exclusive with confirm prompts in install and [sb -d]; 安装与 [sb -d] 修改链路中 Realm 与端口跳跃互斥，切换前均先提示确认
+
+2026.08.11 v1.3.21 1. Pre-register a fresh WARP account during install with shared-key fallback; 2. [sb -d] Change WARP account with register / manual input, hot-reload via sing-box check + SIGHUP and exit after success; 1. 安装期后台预注册 WARP 账户，失败回退共享密钥; 2. [sb -d] 菜单新增「更换 WARP 账户」，支持重新注册 / 手动输入，sing-box check + SIGHUP 热更成功后退出
 
 2026.08.07 v1.3.20 1. Support independent (non-consecutive) ports per protocol in [sb -d], only available after installation so the install flow stays unchanged; 2. Server address accepts an IP or a domain (use DDNS for NAT VPS whose public IP changes daily); 1. [sb -d] 支持为各协议设置独立（非连续）端口，仅在安装后修改，不影响常规安装流程; 2. 服务器地址支持填写 IP 或域名（NAT VPS 公网 IP 每日变化时可用 DDNS 域名）
 
