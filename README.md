@@ -24,7 +24,9 @@
 
 * * *
 ## 1.更新信息
-2026.08.07 v1.3.20 1. Support independent (non-consecutive) ports per protocol in sb -d, only available after installation so the install flow stays unchanged; 2. Server address accepts an IP or a domain (use DDNS for NAT VPS whose public IP changes daily); 1. sb -d 支持为各协议设置独立（非连续）端口，仅在安装后修改，不影响常规安装流程; 2. 服务器地址支持填写 IP 或域名（NAT VPS 公网 IP 每日变化时可用 DDNS 域名）
+2026.08.11 v1.3.21 Use a newly registered WARP account; 使用新注册的 WARP 账户
+
+2026.08.07 v1.3.20 1. Support independent (non-consecutive) ports per protocol in [sb -d], only available after installation so the install flow stays unchanged; 2. Server address accepts an IP or a domain (use DDNS for NAT VPS whose public IP changes daily); 1. [sb -d] 支持为各协议设置独立（非连续）端口，仅在安装后修改，不影响常规安装流程; 2. 服务器地址支持填写 IP 或域名（NAT VPS 公网 IP 每日变化时可用 DDNS 域名）
 
 2026.07.31 v1.3.19 Add real-time traffic stats (-n / main menu); 添加实时流量统计 (-n / 主菜单)
 
