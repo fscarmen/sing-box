@@ -402,10 +402,10 @@ E[180]="Invalid reserved format. Please enter 3 numbers like 123,456,789"
 C[180]="reserved 格式错误，请输入 3 个数字，如 123,456,789"
 E[181]="Checking configuration..."
 C[181]="正在校验配置..."
-E[182]="Change WARP endpoint \$(text 37)"
-C[182]="更换 warp endpoint \$(text 37)"
-E[183]="Change WARP endpoint \$(text 38)"
-C[183]="更换 warp endpoint \$(text 38)"
+E[182]="Change WARP endpoint"
+C[182]="更换 warp endpoint"
+E[183]=""
+C[183]=""
 E[184]="Invalid private key format. Please enter a 43-character base64 key ending with \"=\"."
 C[184]="Private Key 格式错误，请输入 43 位 base64 密钥且以 \"=\" 结尾"
 E[185]="New WARP endpoint:\n IPv6: \${ADDRESS6}\n Private Key: \${PRIVATE_KEY}\n Reserved: [\${R1}, \${R2}, \${R3}]"
@@ -1912,16 +1912,16 @@ change_warp_account_apply() {
     fi
     if [ -n "$SB_PID_AFTER" ] && [ "$SB_PID_AFTER" != '0' ]; then
       rm -f "$WARP_ENDPOINT_FILE.bak"
-      info "\n $(text 182) \n"
+      info "\n $(text 182) $(text 37) \n"
       info " $(text 185) "
       exit 0
     else
       mv -f "$WARP_ENDPOINT_FILE.bak" "$WARP_ENDPOINT_FILE"
-      warning "\n $(text 183) \n"
+      warning "\n $(text 182) $(text 38) \n"
     fi
   else
     mv -f "$WARP_ENDPOINT_FILE.bak" "$WARP_ENDPOINT_FILE"
-    warning "\n $(text 183) \n"
+    warning "\n $(text 182) $(text 38) \n"
   fi
 }
 
