@@ -24,6 +24,7 @@
 
 * * *
 ## 1.更新信息
+2026.08.11 v1.3.21 1. Register a fresh independent WARP account at install time (background task, non-blocking), replacing the built-in shared key whose concurrent use causes session preemption; 2. [sb -d] adds "Change WARP account" submenu: re-register a free account or enter account info manually (paid Team accounts supported), with .bak backup + sing-box check + SIGHUP hot-reload and automatic rollback on failure; 3. Bump default sing-box core to 1.14.0-beta.13; 1. 安装时后台注册全新独立 WARP 账户（不阻塞安装流程），替代内置共享密钥（并发使用会互抢会话导致数据面不通）; 2. sb -d 新增「更换 WARP 账户」二级菜单：重新注册免费账户或手动输入账户信息（支持付费 Team 账户），带 .bak 备份 + sing-box 校验 + SIGHUP 热更，失败自动回滚; 3. 默认 sing-box 内核版本升至 1.14.0-beta.13
 2026.08.07 v1.3.20 1. Support independent (non-consecutive) ports per protocol in sb -d, only available after installation so the install flow stays unchanged; 2. Server address accepts an IP or a domain (use DDNS for NAT VPS whose public IP changes daily); 1. sb -d 支持为各协议设置独立（非连续）端口，仅在安装后修改，不影响常规安装流程; 2. 服务器地址支持填写 IP 或域名（NAT VPS 公网 IP 每日变化时可用 DDNS 域名）
 
 2026.07.31 v1.3.19 Add real-time traffic stats (-n / main menu); 添加实时流量统计 (-n / 主菜单)

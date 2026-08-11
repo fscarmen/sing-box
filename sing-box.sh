@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.20 (2026.08.07)'
+VERSION='v1.3.21 (2026.08.11)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -22,7 +22,7 @@ NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
 CDN_DOMAIN=("skk.moe" "ip.sb" "time.is" "cfip.xxxxxxxx.tk" "bestcf.top" "cdn.2020111.xyz" "xn--b6gac.eu.org" "cf.090227.xyz")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
-DEFAULT_NEWEST_VERSION='1.13.0-rc.4'
+DEFAULT_NEWEST_VERSION='1.14.0-beta.13'
 FINGER_PRINT='chrome'
 STEP_NUM=0      # 当前步骤编号（安装流程中动态递增）
 TOTAL_STEPS=''  # 总步骤数（协议确定后动态计算）
@@ -40,8 +40,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. [sb -d] supports setting an independent (non-consecutive) port for each protocol, only available after installation via [sb -d] so the install flow stays unchanged; 2. Server address accepts an IP or a domain (for NAT VPS whose public IP changes daily, use a DDNS domain), available both during install and afterwards via sb -d"
-C[1]="1. [sb -d] 支持为各协议设置独立（非连续）端口，仅在安装后通过 [sb -d] 修改，不影响常规安装流程; 2. 服务器地址支持填写 IP 或域名（NAT VPS 公网 IP 每日变化时可用 DDNS 域名），新安装和安装后修改均可"
+E[1]="1. [sb -d] supports setting an independent (non-consecutive) port for each protocol, only available after installation via [sb -d] so the install flow stays unchanged; 2. Server address accepts an IP or a domain (for NAT VPS whose public IP changes daily, use a DDNS domain), available both during install and afterwards via [sb -d]; 3. Use a newly registered WARP account"
+C[1]="1. [sb -d] 支持为各协议设置独立（非连续）端口，仅在安装后通过 [sb -d] 修改，不影响常规安装流程; 2. 服务器地址支持填写 IP 或域名（NAT VPS 公网 IP 每日变化时可用 DDNS 域名），新安装和安装后修改均可; 3. 使用新注册的 WARP 账户"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -386,6 +386,30 @@ E[172]="\${LETTER}. \${PROTO} (\${PORT})"
 C[172]="\${LETTER}. \${PROTO} (\${PORT})"
 E[173]="Start port \${OLD_START} -> \${NEW_START}: \${NUM} protocol ports will become \${NEW_START} - \${NEW_END}."
 C[173]="起始端口 \${OLD_START} -> \${NEW_START}: \${NUM} 个协议端口将变为 \${NEW_START} - \${NEW_END}。"
+E[174]="Change WARP account"
+C[174]="更换 WARP 账户"
+E[175]="Select WARP account operation:\n 1. Register a new free account\n 2. Enter account info manually\n 0. Back"
+C[175]="请选择 WARP 账户操作:\n 1. 重新注册免费账户\n 2. 手动输入信息\n 0. 返回"
+E[176]="New account registration failed. Please try again later. The existing account is kept."
+C[176]="注册新账户失败，请稍后再试。已保留原有账户。"
+E[177]="Enter the WARP IPv6 address:"
+C[177]="请输入 WARP IPv6 地址:"
+E[178]="Enter the WARP private key:"
+C[178]="请输入 WARP Private Key:"
+E[179]="Enter WARP reserved values (format: 123,456,789):"
+C[179]="请输入 WARP reserved 保留值（格式: 123,456,789）:"
+E[180]="Invalid reserved format. Please enter 3 numbers like 123,456,789"
+C[180]="reserved 格式错误，请输入 3 个数字，如 123,456,789"
+E[181]="Checking configuration..."
+C[181]="正在校验配置..."
+E[182]="Change WARP endpoint \$(text 37)"
+C[182]="更换 warp endpoint \$(text 37)"
+E[183]="Change WARP endpoint \$(text 38)"
+C[183]="更换 warp endpoint \$(text 38)"
+E[184]="Invalid private key format. Please enter a 43-character base64 key ending with \"=\"."
+C[184]="Private Key 格式错误，请输入 43 位 base64 密钥且以 \"=\" 结尾"
+E[185]="New WARP endpoint:\n IPv6: \${ADDRESS6}\n Private Key: \${PRIVATE_KEY}\n Reserved: [\${R1}, \${R2}, \${R3}]"
+C[185]="新 WARP 端点:\n IPv6: \${ADDRESS6}\n Private Key: \${PRIVATE_KEY}\n Reserved: [\${R1}, \${R2}, \${R3}]"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -692,11 +716,13 @@ change_config() {
   [ -n "$UUID_NOW" ] && MENU_IDX+=(131) && MENU_KEY+=(uuid) && MENU_VAL+=("$UUID_NOW")
 
   # 服务器 IP
-  ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && local SERVER_IP_NOW=$(awk -F '"' '/"WS_SERVER_IP_SHOW"/{print $4; exit}' ${WORK_DIR}/conf/*-ws*inbounds.json) || local SERVER_IP_NOW=$(grep -A1 '"tag"' ${WORK_DIR}/list | sed -E '/-ws(-tls)*",$/{N;d}' | awk -F '"' '/"server"/{count++; if (count == 1) {print $4; exit}}')
+  ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && local SERVER_IP_NOW=$(awk -F '"' '/"WS_SERVER_IP_SHOW"/{print $4; exit}' ${WORK_DIR}/conf/*-ws*inbounds.json) || local SERVER_IP_NOW=$([ -s ${WORK_DIR}/list ] && grep -A1 '"tag"' ${WORK_DIR}/list | sed -E '/-ws(-tls)*",$/{N;d}' | awk -F '"' '/"server"/{count++; if (count == 1) {print $4; exit}}')
   [ -n "$SERVER_IP_NOW" ] && MENU_IDX+=(132) && MENU_KEY+=(serverip) && MENU_VAL+=("$SERVER_IP_NOW")
 
-  # 从 sing-box 格式的 list 中提取 client-fingerprint，取第一个匹配值
-  local FP_NOW=$(awk -F '"' '/"fingerprint"/{print $4; exit}' ${WORK_DIR}/list)
+  # 从 sing-box 格式的 list 中提取 client-fingerprint，取第一个匹配值；无 list（未开启订阅）时默认 chrome
+  local FP_NOW=chrome
+  [ -s ${WORK_DIR}/list ] && FP_NOW=$(awk -F '"' '/"fingerprint"/{print $4; exit}' ${WORK_DIR}/list)
+  [ -n "$FP_NOW" ] || FP_NOW=chrome
   [ -n "$FP_NOW" ] && MENU_IDX+=(48) && MENU_KEY+=(fingerprint) && MENU_VAL+=("$FP_NOW")
 
   # 指定网络出口
@@ -713,7 +739,8 @@ change_config() {
 
   # Hysteria2 带宽和端口跳跃（仅在 Hysteria2 已安装时显示）
   if ls ${WORK_DIR}/conf/*_${NODE_TAG[1]}_inbounds.json >/dev/null 2>&1; then
-    local HY2_LINE=$(grep 'type: hysteria2' ${WORK_DIR}/subscribe/proxies)
+    local HY2_LINE=''
+    [ -s ${WORK_DIR}/subscribe/proxies ] && HY2_LINE=$(grep 'type: hysteria2' ${WORK_DIR}/subscribe/proxies)
     if [[ "$HY2_LINE" =~ up:[[:space:]]*\"([0-9]+)[[:space:]]*Mbps\".*down:[[:space:]]*\"([0-9]+)[[:space:]]*Mbps\" ]]; then
       HY2_UP_NOW="${BASH_REMATCH[1]}"
       HY2_DOWN_NOW="${BASH_REMATCH[2]}"
@@ -743,6 +770,7 @@ change_config() {
   grep -q '"warp-ep"' ${WORK_DIR}/conf/02_endpoints.json 2>/dev/null && {
     CUSTOM_ROUTE_COUNT=$(custom_route_count)
     MENU_IDX+=(150) && MENU_KEY+=(customroute) && MENU_VAL+=("${CUSTOM_ROUTE_COUNT}")
+    MENU_IDX+=(174) && MENU_KEY+=(warpaccount) && MENU_VAL+=("")
   }
 
   [ "${#MENU_IDX[@]}" -eq 0 ] && error " $(text 107) "
@@ -793,14 +821,15 @@ change_config() {
       [[ "$HY2_DOWN" =~ ^[1-9][0-9]*$ ]] && break
       warning " $(text 143) "
     done
-    sed -i -E "s/(up: \")([0-9]+)( Mbps\")/\1${HY2_UP}\3/g; s/(down: \")([0-9]+)( Mbps\")/\1${HY2_DOWN}\3/g" ${WORK_DIR}/subscribe/proxies
+    [ -s ${WORK_DIR}/subscribe/proxies ] && sed -i -E "s/(up: \")([0-9]+)( Mbps\")/\1${HY2_UP}\3/g; s/(down: \")([0-9]+)( Mbps\")/\1${HY2_DOWN}\3/g" ${WORK_DIR}/subscribe/proxies
     hint " $(text 112) "
     export_list
     return
   elif [ "$KEY" = "hy2realm" ]; then
     # 添加 / 删除 Hysteria2 Realm；菜单已明确显示开启/关闭动作，这里不再二次确认 Realm 本身
     # 判断依据与菜单显示一致：检查 subscribe/proxies 中是否有 realm-opts
-    local HY2_LINE=$(grep 'type: hysteria2' ${WORK_DIR}/subscribe/proxies)
+    local HY2_LINE=''
+    [ -s ${WORK_DIR}/subscribe/proxies ] && HY2_LINE=$(grep 'type: hysteria2' ${WORK_DIR}/subscribe/proxies)
     if grep -q 'realm-opts' <<< "$HY2_LINE"; then
       # 已开启 → 直接关闭，不需要二次确认
       set_hy2_realm_config disable
@@ -868,6 +897,9 @@ change_config() {
     return
   elif [ "$KEY" = "customroute" ]; then
     custom_route_menu
+    return
+  elif [ "$KEY" = "warpaccount" ]; then
+    change_warp_account
     return
   elif [ "$KEY" = "fingerprint" ]; then
     # 修改客户端指纹
@@ -1002,7 +1034,7 @@ change_config() {
     find ${WORK_DIR} -type f | xargs -P 50 sed -i -e "s|\"server\": \"${OLD}\"|\"server\": \"${NEW_VAL}\"|g; s|\"WS_SERVER_IP_SHOW\": \"${OLD}\"|\"WS_SERVER_IP_SHOW\": \"${NEW_VAL}\"|g" 2>/dev/null
 
     # 同时更新 subscribe/list 等文本文件中可能出现的裸 IP
-    find ${WORK_DIR}/subscribe -type f | xargs -P 50 sed -i "s|${OLD}|${NEW_VAL}|g" 2>/dev/null
+    find ${WORK_DIR}/subscribe -type f 2>/dev/null | xargs -P 50 sed -i "s|${OLD}|${NEW_VAL}|g" 2>/dev/null
   else
     find ${WORK_DIR} -type f | xargs -P 50 sed -i "s|${OLD}|${NEW_VAL}|g" 2>/dev/null
     [[ ! "$KEY" =~ ^(fingerprint)$ ]] && cmd_systemctl reload sing-box
@@ -1771,6 +1803,130 @@ custom_route_menu() {
 }
 
 # ===================== 自定义路由规则 END =====================
+# ===================== 更换 WARP 账户 START =====================
+
+# 更换 WARP 账户：二级菜单（重新注册 / 手动输入）
+change_warp_account() {
+  local WARP_ACCOUNT_CHOICE
+  while true; do
+    hint "\n $(text 175) \n"
+    reading " $(text 24) " WARP_ACCOUNT_CHOICE
+
+    case "$WARP_ACCOUNT_CHOICE" in
+      1 ) change_warp_account_register ;;
+      2 ) change_warp_account_manual ;;
+      0 ) return ;;
+      * ) info " $(text 135) " ;;
+    esac
+  done
+}
+
+# 方式1：重新注册免费账户
+change_warp_account_register() {
+  local WARP_ACCOUNT PRIVATE_KEY ADDRESS6 R1 R2 R3
+  WARP_ACCOUNT=$(wget -qO- --tries=10 --waitretry=1 --timeout=2 "https://warp.cloudflare.nyc.mn/?run=register")
+
+  if ! grep -q '"id"' <<< "$WARP_ACCOUNT"; then
+    warning "\n $(text 176) \n"
+    return
+  fi
+
+  PRIVATE_KEY=$(awk -F'"' '/"private_key"/{print $4}' <<< "$WARP_ACCOUNT")
+  ADDRESS6=$(awk -F'"' '/"v6":/ && $4 !~ /^\[/ {print $4}' <<< "$WARP_ACCOUNT")
+  R1=$(awk '/"reserved":/ {getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
+  R2=$(awk '/"reserved":/ {getline; getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
+  R3=$(awk '/"reserved":/ {getline; getline; getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
+
+  # 兜底：接口返回格式异常导致提取为空时，按注册失败处理，保留原账户
+  if [ -z "$PRIVATE_KEY" ] || [ -z "$ADDRESS6" ] || [ -z "$R1" ] || [ -z "$R2" ] || [ -z "$R3" ]; then
+    warning "\n $(text 176) \n"
+    return
+  fi
+
+  change_warp_account_apply "$ADDRESS6" "$PRIVATE_KEY" "$R1" "$R2" "$R3"
+}
+
+# 方式2：手动输入账户信息（IPv6 / Private Key / Reserved）
+change_warp_account_manual() {
+  local ADDRESS6 PRIVATE_KEY RESERVED_INPUT R1 R2 R3 RESERVED_ERROR_TIME=5
+
+  # 第 1 步：IPv6 地址（校验含冒号）
+  while true; do
+    reading "\n $(text 177) " ADDRESS6
+    [[ "$ADDRESS6" =~ : ]] && break
+    warning " $(text 133) "
+  done
+
+  # 第 2 步：Private Key（43 位 base64 字符 + 结尾 =）
+  while true; do
+    reading " $(text 178) " PRIVATE_KEY
+    [[ "$PRIVATE_KEY" =~ ^[A-Za-z0-9+/_-]{43}=$ ]] && break
+    warning " $(text 184) "
+  done
+
+  # 第 3 步：Reserved（先读取一次，再进入校验循环；捕获组提取 3 组连续数字，错误计数复用 UUID_ERROR_TIME 风格）
+  reading " $(text 179) " RESERVED_INPUT
+  until [[ "$RESERVED_INPUT" =~ ([0-9]+)[^0-9]*([0-9]+)[^0-9]*([0-9]+) ]] || [ "$RESERVED_ERROR_TIME" = 0 ]; do
+    (( RESERVED_ERROR_TIME-- )) || true
+    [ "$RESERVED_ERROR_TIME" = 0 ] && { warning "\n $(text 180) \n"; return; }
+    warning " $(text 180) "
+    reading " $(text 179) " RESERVED_INPUT
+  done
+  R1="${BASH_REMATCH[1]}"; R2="${BASH_REMATCH[2]}"; R3="${BASH_REMATCH[3]}"
+
+  change_warp_account_apply "$ADDRESS6" "$PRIVATE_KEY" "$R1" "$R2" "$R3"
+}
+
+# 替换 02_endpoints.json + sing-box check + SIGHUP 热更 + 结果提示
+change_warp_account_apply() {
+  local ADDRESS6="$1" PRIVATE_KEY="$2" R1="$3" R2="$4" R3="$5"
+  local WARP_ENDPOINT_FILE="${WORK_DIR}/conf/02_endpoints.json"
+  local SB_PID_BEFORE SB_PID_AFTER
+
+  [ -s "$WARP_ENDPOINT_FILE" ] || return 1
+
+  cp "$WARP_ENDPOINT_FILE" "$WARP_ENDPOINT_FILE.bak"
+
+  sed -i "s|\"private_key\":[ ]*\".*\"|\"private_key\":\"${PRIVATE_KEY}\"|" "$WARP_ENDPOINT_FILE"
+  sed -i -E "s|\"([0-9a-fA-F:]+)/128\"|\"${ADDRESS6}/128\"|" "$WARP_ENDPOINT_FILE"
+  # reserved 为多行数组，sed 单行正则无法覆盖，用 jq 原子更新（失败不落盘）
+  jq_exec --argjson res "[${R1},${R2},${R3}]" \
+    '(.endpoints[] | select(.tag == "warp-ep") | .peers[].reserved) = $res' \
+    "$WARP_ENDPOINT_FILE" > "${WARP_ENDPOINT_FILE}.tmp" 2>/dev/null && mv "${WARP_ENDPOINT_FILE}.tmp" "$WARP_ENDPOINT_FILE"
+
+  hint "\n $(text 181) \n"
+
+  if ${WORK_DIR}/sing-box check -C ${WORK_DIR}/conf >/dev/null 2>&1; then
+    # 热更（SIGHUP，PID 不变）；记录热更前后 PID 判断服务是否存活
+    if [ "$SYSTEM" = 'Alpine' ]; then
+      SB_PID_BEFORE=$(cat /var/run/sing-box.pid 2>/dev/null)
+    else
+      SB_PID_BEFORE=$(systemctl show -p MainPID sing-box 2>/dev/null | awk -F= '{print $2}')
+    fi
+    cmd_systemctl reload sing-box >/dev/null 2>&1
+    sleep 1
+    if [ "$SYSTEM" = 'Alpine' ]; then
+      SB_PID_AFTER=$(cat /var/run/sing-box.pid 2>/dev/null)
+    else
+      SB_PID_AFTER=$(systemctl show -p MainPID sing-box 2>/dev/null | awk -F= '{print $2}')
+    fi
+    if [ -n "$SB_PID_AFTER" ] && [ "$SB_PID_AFTER" != '0' ]; then
+      rm -f "$WARP_ENDPOINT_FILE.bak"
+      info "\n $(text 182) \n"
+      info " $(text 185) "
+      exit 0
+    else
+      mv -f "$WARP_ENDPOINT_FILE.bak" "$WARP_ENDPOINT_FILE"
+      warning "\n $(text 183) \n"
+    fi
+  else
+    mv -f "$WARP_ENDPOINT_FILE.bak" "$WARP_ENDPOINT_FILE"
+    warning "\n $(text 183) \n"
+  fi
+}
+
+# ===================== 更换 WARP 账户 END =====================
+
 
 # 输入 Reality 密钥
 input_reality_key() {
@@ -2053,6 +2209,10 @@ check_install() {
         && chmod +x $TEMP_DIR/qrencode
     } &
 
+    # 任务 4: 注册 warp 账号
+    {
+      wget -qO- --tries=10 --waitretry=1 --timeout=2 "https://warp.cloudflare.nyc.mn/?run=register" > $TEMP_DIR/warp_account.json 2>/dev/null
+    } &
   elif [ "${STATUS[0]}" != "$(text 26)" ]; then
     # 查 sing-box 进程号，运行时长和内存占用，占用的端口
     SING_BOX_VERSION="Version: $(${WORK_DIR}/sing-box version | awk '/version/{print $NF}')"
@@ -3812,6 +3972,27 @@ EOF
 EOF
 
   # 生成 endpoint 配置
+  if [ -s $TEMP_DIR/warp_account.json ] && grep -q '"id"' $TEMP_DIR/warp_account.json; then
+    local WARP_ACCOUNT=$(< "$TEMP_DIR/warp_account.json")
+    rm -f "$TEMP_DIR/warp_account.json"
+  else
+    local WARP_ACCOUNT=$(wget -qO- --tries=10 --waitretry=1 --timeout=2 "https://warp.cloudflare.nyc.mn/?run=register")
+  fi
+
+  if grep -q '"id"' <<< "$WARP_ACCOUNT"; then
+    local ADDRESS6=$(awk -F'"' '/"v6":/ && $4 !~ /^\[/ {print $4}' <<< "$WARP_ACCOUNT")
+    local PRIVATE_KEY=$(awk -F'"' '/"private_key"/{print $4}' <<< "$WARP_ACCOUNT")
+    local RESERVED[1]=$(awk '/"reserved":/ {getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
+    local RESERVED[2]=$(awk '/"reserved":/ {getline; getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
+    local RESERVED[3]=$(awk '/"reserved":/ {getline; getline; getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
+  else
+    local ADDRESS6="2606:4700:110:8a36:df92:102a:9602:fa18"
+    local PRIVATE_KEY="YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY="
+    local RESERVED[1]=78
+    local RESERVED[2]=135
+    local RESERVED[3]=76
+  fi
+
   cat > ${WORK_DIR}/conf/02_endpoints.json << EOF
 {
     "endpoints":[
@@ -3821,9 +4002,9 @@ EOF
             "mtu":1400,
             "address":[
                 "172.16.0.2/32",
-                "2606:4700:110:8a36:df92:102a:9602:fa18/128"
+                "${ADDRESS6}/128"
             ],
-            "private_key":"YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY=",
+            "private_key":"${PRIVATE_KEY}",
             "peers": [
               {
                 "address": "engage.cloudflareclient.com",
@@ -3834,9 +4015,9 @@ EOF
                   "::/0"
                 ],
                 "reserved":[
-                    78,
-                    135,
-                    76
+                    ${RESERVED[1]},
+                    ${RESERVED[2]},
+                    ${RESERVED[3]}
                 ]
               }
             ]
@@ -4720,7 +4901,7 @@ fetch_nodes_value() {
   unset NODE_NAME PORT_XTLS_REALITY UUID TLS_SERVER REALITY_PRIVATE REALITY_PUBLIC PORT_HYSTERIA2 HY2_REALM_ID IS_HY2_REALM IS_HY2_WARP PORT_TUIC TUIC_PASSWORD TUIC_CONGESTION_CONTROL PORT_SHADOWTLS SHADOWTLS_PASSWORD SHADOWSOCKS_METHOD PORT_SHADOWSOCKS PORT_TROJAN TROJAN_PASSWORD PORT_VMESS_WS VMESS_WS_PATH WS_SERVER_IP WS_SERVER_IP_SHOW VMESS_HOST_DOMAIN CDN CDN_PORT PORT_VLESS_WS VLESS_WS_PATH VLESS_HOST_DOMAIN PORT_H2_REALITY PORT_GRPC_REALITY ARGO_DOMAIN PORT_ANYTLS PORT_NAIVE SELF_SIGNED_FINGERPRINT_SHA256 SELF_SIGNED_FINGERPRINT_BASE64
 
   # 获取公共数据
-  ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && SERVER_IP=$(awk -F '"' '/"WS_SERVER_IP_SHOW"/{print $4; exit}' ${WORK_DIR}/conf/*-ws*inbounds.json) || SERVER_IP=$(grep -A1 '"tag"' ${WORK_DIR}/list | sed -E '/-ws(-tls)*",$/{N;d}' | awk -F '"' '/"server"/{count++; if (count == 1) {print $4; exit}}')
+  ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && SERVER_IP=$(awk -F '"' '/"WS_SERVER_IP_SHOW"/{print $4; exit}' ${WORK_DIR}/conf/*-ws*inbounds.json) || SERVER_IP=$([ -s ${WORK_DIR}/list ] && grep -A1 '"tag"' ${WORK_DIR}/list | sed -E '/-ws(-tls)*",$/{N;d}' | awk -F '"' '/"server"/{count++; if (count == 1) {print $4; exit}}')
   EXISTED_PORTS=$(awk -F ':|,' '/listen_port/{print $2}' ${WORK_DIR}/conf/*_inbounds.json 2>/dev/null)
   START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$EXISTED_PORTS")
   [[ -z "$NODE_NAME_CONFIRM" && -s ${WORK_DIR}/subscribe/clash ]] && NODE_NAME_CONFIRM=$(awk -F "'" '/u: &u/{print $2; exit}' ${WORK_DIR}/subscribe/clash)
@@ -4749,8 +4930,8 @@ fetch_nodes_value() {
     NODE_NAME[12]=$(awk -F '"' -v suffix=" ${NODE_TAG[1]}" '/"tag"[[:space:]]*:/ {v=$4; sub(suffix"$", "", v); print v; exit}' <<< "$JSON")
     PORT_HYSTERIA2=$(awk -F ':' '/"listen_port"[[:space:]]*:/ {gsub(/[[:space:],]/, "", $2); print $2; exit}' <<< "$JSON")
     UUID[12]=$(awk -F '"' '/"password"[[:space:]]*:/ {count++; if (count == 1) {print $4; exit}}' <<< "$JSON")
-    HY2_UP=${HY2_UP:-"$(sed -n '/type: hysteria2/ s/.*,[ ]*up:[ ]*"\([0-9]\+\)[ ]*Mbps.*/\1/gp' $WORK_DIR/list)"}
-    HY2_DOWN=${HY2_DOWN:-"$(sed -n '/type: hysteria2/ s/.*,[ ]*down:[ ]*"\([0-9]\+\)[ ]*Mbps.*/\1/gp' $WORK_DIR/list)"}
+    HY2_UP=${HY2_UP:-"$([ -s $WORK_DIR/list ] && sed -n '/type: hysteria2/ s/.*,[ ]*up:[ ]*"\([0-9]\+\)[ ]*Mbps.*/\1/gp' $WORK_DIR/list)"}
+    HY2_DOWN=${HY2_DOWN:-"$([ -s $WORK_DIR/list ] && sed -n '/type: hysteria2/ s/.*,[ ]*down:[ ]*"\([0-9]\+\)[ ]*Mbps.*/\1/gp' $WORK_DIR/list)"}
     if grep -q '"realm"[[:space:]]*:' <<< "$JSON"; then
       IS_HY2_REALM=is_hy2_realm
       HY2_REALM_ID=$(awk -F '"' '/"realm_id"[[:space:]]*:/{print $4; exit}' <<< "$JSON")
