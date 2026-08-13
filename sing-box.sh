@@ -4940,8 +4940,16 @@ fetch_nodes_value() {
   # JSON 中提取不到时，尝试从 nginx.conf 提取（订阅开启 / 关闭时 nginx.conf 一定含有 UUID）
   [ -z "$UUID_CONFIRM" ] && [ -s "${WORK_DIR}/nginx.conf" ] && \
     UUID_CONFIRM=$(awk 'match($0, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/) { print substr($0, RSTART, RLENGTH); exit }' ${WORK_DIR}/nginx.conf 2>/dev/null)
-  # 提取不到时，走交互式输入（与新安装一致：默认随机 UUID，回车使用默认值）
-  [ -z "$UUID_CONFIRM" ] && input_uuid
+  # 提取不到时，仅在安装相关流程走交互式输入；其余只读流程（如 sb -n 查看节点信息）用随机 UUID 兜底，避免无谓弹窗
+  # 说明：仅安装 shadowsocks / trojan / anytls / naive 等"凭证非 UUID 格式"协议时，以上提取必然为空，
+  #       此时导出节点信息不需要 UUID，不应阻塞用户交互
+  if [ -z "$UUID_CONFIRM" ]; then
+    if [ "$IS_INSTALL" = 'install' ] || [ "$IS_FAST_INSTALL" = 'is_fast_install' ] || [ "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]; then
+      input_uuid
+    else
+      UUID_CONFIRM=$(cat /proc/sys/kernel/random/uuid)
+    fi
+  fi
   # 获取 Nginx 端口（首次开启订阅时 nginx.conf 尚未创建，静默跳过）
   [[ "${IS_SUB}" = 'is_sub' || "${IS_ARGO}" = 'is_argo' ]] && [ -s "${WORK_DIR}/nginx.conf" ] &&
   PORT_NGINX=$(awk '/listen/{print $2; exit}' ${WORK_DIR}/nginx.conf)
