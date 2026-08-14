@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 脚本更新日期 2026.06.27
+# 脚本更新日期 2026.08.14
 set -e
 
 WORK_DIR=/sing-box
@@ -843,7 +843,7 @@ EOF
 
     # 根据ARGO_JSON或ARGO_TOKEN设置ARGO_RUNS
     if [[ -n "$ARGO_JSON" ]]; then
-      local ARGO_RUNS="cloudflared tunnel --edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run"
+      local ARGO_RUNS="cloudflared tunnel --edge-ip-version auto --protocol http2 --config ${WORK_DIR}/tunnel.yml run"
       echo $ARGO_JSON > ${WORK_DIR}/tunnel.json
       cat > ${WORK_DIR}/tunnel.yml << EOF
 tunnel: $(cut -d\" -f12 <<< $ARGO_JSON)
@@ -855,12 +855,12 @@ ingress:
   - service: http_status:404
 EOF
     elif [[ -n "$ARGO_TOKEN" ]]; then
-      local ARGO_RUNS="cloudflared tunnel --edge-ip-version auto run --token ${ARGO_TOKEN}"
+      local ARGO_RUNS="cloudflared tunnel --edge-ip-version auto --protocol http2 run --token ${ARGO_TOKEN}"
     fi
   else
     ((PORT++))
     METRICS_PORT=$PORT
-    local ARGO_RUNS="cloudflared tunnel --edge-ip-version auto --no-autoupdate --no-tls-verify --metrics 0.0.0.0:$METRICS_PORT --url http://localhost:$START_PORT"
+    local ARGO_RUNS="cloudflared tunnel --edge-ip-version auto --protocol http2 --no-autoupdate --no-tls-verify --metrics 0.0.0.0:$METRICS_PORT --url http://localhost:$START_PORT"
   fi
 
   # 生成 s6-overlay 服务脚本（替代 supervisord）

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.22 (2026.08.11)'
+VERSION='v1.3.23 (2026.08.14)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -22,7 +22,7 @@ NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
 CDN_DOMAIN=("skk.moe" "ip.sb" "time.is" "cfip.xxxxxxxx.tk" "bestcf.top" "cdn.2020111.xyz" "xn--b6gac.eu.org" "cf.090227.xyz")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
-DEFAULT_NEWEST_VERSION='1.14.0-beta.13'
+DEFAULT_NEWEST_VERSION='1.14.0-beta.14'
 FINGER_PRINT='chrome'
 STEP_NUM=0      # 当前步骤编号（安装流程中动态递增）
 TOTAL_STEPS=''  # 总步骤数（协议确定后动态计算）
@@ -40,8 +40,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Pre-register a fresh WARP account during install with shared-key fallback; 2. [sb -d] Change WARP account with register / manual input, hot-reload via sing-box check + SIGHUP and exit after success; 3. make Hysteria2 Realm and port hopping mutually exclusive with confirm prompts in install and [sb -d]"
-C[1]="1. 安装期后台预注册 WARP 账户，失败回退共享密钥; 2. [sb -d] 菜单新增「更换 WARP 账户」，支持重新注册 / 手动输入，sing-box check + SIGHUP 热更成功后退出; 3. 安装与 [sb -d] 修改链路中 Realm 与端口跳跃互斥，切换前均先提示确认"
+E[1]="Force HTTP/2 transport for cloudflared tunnels"
+C[1]="cloudflared 隧道统一使用 HTTP/2 传输"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -1826,6 +1826,28 @@ custom_route_menu() {
 # ===================== 自定义路由规则 END =====================
 # ===================== 更换 WARP 账户 START =====================
 
+# 获取 WARP 账户并解析到全局变量 WARP_ADDRESS6 / WARP_PRIVATE_KEY / WARP_RESERVED[1..3]
+# $1 为空则在线注册；非空则直接解析该 JSON（如安装期后台预注册的缓存）
+# 返回 0 成功 / 1 失败（接口无 id 或解析字段缺失），失败时调用方自行兜底
+warp_account_register() {
+  local WARP_ACCOUNT="$1"
+  [ -n "$WARP_ACCOUNT" ] || WARP_ACCOUNT=$(wget -qO- --tries=10 --waitretry=1 --timeout=2 "https://warp.cloudflare.nyc.mn/?run=register")
+
+  grep -q '"id"' <<< "$WARP_ACCOUNT" || return 1
+
+  WARP_ADDRESS6=$(awk -F'"' '/"v6":/ && $4 !~ /^\[/ {print $4}' <<< "$WARP_ACCOUNT")
+  WARP_PRIVATE_KEY=$(awk -F'"' '/"private_key"/{print $4}' <<< "$WARP_ACCOUNT")
+  WARP_RESERVED[1]=$(awk '/"reserved":/ {getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
+  WARP_RESERVED[2]=$(awk '/"reserved":/ {getline; getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
+  WARP_RESERVED[3]=$(awk '/"reserved":/ {getline; getline; getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
+
+  if [ -z "$WARP_ADDRESS6" ] || [ -z "$WARP_PRIVATE_KEY" ] || [ -z "${WARP_RESERVED[1]}" ] || [ -z "${WARP_RESERVED[2]}" ] || [ -z "${WARP_RESERVED[3]}" ]; then
+    unset WARP_ADDRESS6 WARP_PRIVATE_KEY WARP_RESERVED
+    return 1
+  fi
+  return 0
+}
+
 # 更换 WARP 账户：二级菜单（重新注册 / 手动输入）
 change_warp_account() {
   local WARP_ACCOUNT_CHOICE
@@ -1844,27 +1866,12 @@ change_warp_account() {
 
 # 方式1：重新注册免费账户
 change_warp_account_register() {
-  local WARP_ACCOUNT PRIVATE_KEY ADDRESS6 R1 R2 R3
-  WARP_ACCOUNT=$(wget -qO- --tries=10 --waitretry=1 --timeout=2 "https://warp.cloudflare.nyc.mn/?run=register")
-
-  if ! grep -q '"id"' <<< "$WARP_ACCOUNT"; then
+  if ! warp_account_register; then
     warning "\n $(text 176) \n"
     return
   fi
 
-  PRIVATE_KEY=$(awk -F'"' '/"private_key"/{print $4}' <<< "$WARP_ACCOUNT")
-  ADDRESS6=$(awk -F'"' '/"v6":/ && $4 !~ /^\[/ {print $4}' <<< "$WARP_ACCOUNT")
-  R1=$(awk '/"reserved":/ {getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
-  R2=$(awk '/"reserved":/ {getline; getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
-  R3=$(awk '/"reserved":/ {getline; getline; getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
-
-  # 兜底：接口返回格式异常导致提取为空时，按注册失败处理，保留原账户
-  if [ -z "$PRIVATE_KEY" ] || [ -z "$ADDRESS6" ] || [ -z "$R1" ] || [ -z "$R2" ] || [ -z "$R3" ]; then
-    warning "\n $(text 176) \n"
-    return
-  fi
-
-  change_warp_account_apply "$ADDRESS6" "$PRIVATE_KEY" "$R1" "$R2" "$R3"
+  change_warp_account_apply "$WARP_ADDRESS6" "$WARP_PRIVATE_KEY" "${WARP_RESERVED[1]}" "${WARP_RESERVED[2]}" "${WARP_RESERVED[3]}"
 }
 
 # 方式2：手动输入账户信息（IPv6 / Private Key / Reserved）
@@ -1985,7 +1992,7 @@ input_argo_auth() {
   fi
 
   if [[ ( -z "$ARGO_DOMAIN" || "$ARGO_DOMAIN" =~ trycloudflare\.com$ ) && ( "$IS_CHANGE_ARGO" = 'is_add_protocols' || "$IS_CHANGE_ARGO" = 'is_install' || "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ) ]]; then
-    ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --no-autoupdate --url http://localhost:$PORT_NGINX"
+    ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --no-autoupdate --url http://localhost:$PORT_NGINX"
   elif [ -n "${ARGO_DOMAIN}" ]; then
     if [ -z "${ARGO_AUTH}" ]; then
       until [[ "$ARGO_AUTH" =~ TunnelSecret || "$ARGO_AUTH" =~ [A-Z0-9a-z=]{120,250}$ || "${#ARGO_AUTH}" =~ ^[3-6][0-9]$ ]]; do
@@ -2000,26 +2007,26 @@ input_argo_auth() {
       ARGO_TYPE=is_json_argo
       ARGO_JSON=${ARGO_AUTH//[ ]/}
       [ "$IS_CHANGE_ARGO" = 'is_install' ] && export_argo_json_file $TEMP_DIR || export_argo_json_file ${WORK_DIR}
-      ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run"
+      ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --config ${WORK_DIR}/tunnel.yml run"
     elif [[ "${ARGO_AUTH}" =~ [A-Z0-9a-z=]{120,250}$ ]]; then
       ARGO_TYPE=is_token_argo
       ARGO_TOKEN=$(awk '{print $NF}' <<< "$ARGO_AUTH")
-      ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto run --token ${ARGO_TOKEN}"
+      ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 run --token ${ARGO_TOKEN}"
     elif [[ "${#ARGO_AUTH}" =~ ^[3-6][0-9]$ ]]; then
       hint "\n $(text 119) \n "
       create_argo_tunnel "${ARGO_AUTH}" "${ARGO_DOMAIN}" "${PORT_NGINX}"
       if [[ "$ARGO_JSON" =~ TunnelSecret ]]; then
         ARGO_TYPE=is_json_argo
         [ "$IS_CHANGE_ARGO" = 'is_install' ] && export_argo_json_file $TEMP_DIR || export_argo_json_file ${WORK_DIR}
-        ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run"
+        ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --config ${WORK_DIR}/tunnel.yml run"
       elif [[ "${#ARGO_TOKEN}" =~ ^[0-9]+$ && "${#ARGO_TOKEN}" -ge 120 && "${#ARGO_TOKEN}" -le 250 ]]; then
         ARGO_TYPE=is_token_argo
-        ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto run --token ${ARGO_TOKEN}"
+        ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 run --token ${ARGO_TOKEN}"
       else
         # 创建隧道失败，回退到使用临时隧道
         hint "\n $(text 117) \n "
         unset ARGO_DOMAIN
-        ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --no-autoupdate --url http://localhost:$PORT_NGINX"
+        ARGO_RUNS="${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --no-autoupdate --url http://localhost:$PORT_NGINX"
       fi
     fi
   fi
@@ -2060,7 +2067,7 @@ change_argo() {
       [ -s ${WORK_DIR}/tunnel.json ] && rm -f ${WORK_DIR}/tunnel.{json,yml}
 
       # 根据系统类型修改配置文件
-      [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto --no-autoupdate --url http://localhost:$PORT_NGINX\"@g" ${ARGO_DAEMON_FILE} || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --no-autoupdate --url http://localhost:$PORT_NGINX@g" ${ARGO_DAEMON_FILE}
+      [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto --protocol http2 --no-autoupdate --url http://localhost:$PORT_NGINX\"@g" ${ARGO_DAEMON_FILE} || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --no-autoupdate --url http://localhost:$PORT_NGINX@g" ${ARGO_DAEMON_FILE}
       ;;
     2 )
       [ -s ${WORK_DIR}/tunnel.json ] && rm -f ${WORK_DIR}/tunnel.{json,yml}
@@ -2068,9 +2075,9 @@ change_argo() {
       cmd_systemctl disable argo
 
       if [ -n "$ARGO_TOKEN" ]; then
-        [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto run --token ${ARGO_TOKEN}\"@g" ${ARGO_DAEMON_FILE} || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto run --token ${ARGO_TOKEN}@g" ${ARGO_DAEMON_FILE}
+        [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto --protocol http2 run --token ${ARGO_TOKEN}\"@g" ${ARGO_DAEMON_FILE} || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 run --token ${ARGO_TOKEN}@g" ${ARGO_DAEMON_FILE}
       elif [ -n "$ARGO_JSON" ]; then
-        [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run\"@g" ${ARGO_DAEMON_FILE} || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --config ${WORK_DIR}/tunnel.yml run@g" ${ARGO_DAEMON_FILE}
+        [ "$SYSTEM" = 'Alpine' ] && sed -i "s@^command_args=.*@command_args=\"--edge-ip-version auto --protocol http2 --config ${WORK_DIR}/tunnel.yml run\"@g" ${ARGO_DAEMON_FILE} || sed -i "s@ExecStart=.*@ExecStart=${WORK_DIR}/cloudflared tunnel --edge-ip-version auto --protocol http2 --config ${WORK_DIR}/tunnel.yml run@g" ${ARGO_DAEMON_FILE}
       fi
 
       # 更新相关配置文件中的域名
@@ -3996,26 +4003,15 @@ EOF
 }
 EOF
 
-  # 生成 endpoint 配置
-  if [ -s $TEMP_DIR/warp_account.json ] && grep -q '"id"' $TEMP_DIR/warp_account.json; then
-    local WARP_ACCOUNT=$(< "$TEMP_DIR/warp_account.json")
+  # 生成 endpoint 配置：优先复用安装期后台预注册的缓存，否则在线注册；均失败回退共享账户
+  if [ -s $TEMP_DIR/warp_account.json ] && warp_account_register "$(< "$TEMP_DIR/warp_account.json")"; then
     rm -f "$TEMP_DIR/warp_account.json"
-  else
-    local WARP_ACCOUNT=$(wget -qO- --tries=10 --waitretry=1 --timeout=2 "https://warp.cloudflare.nyc.mn/?run=register")
-  fi
-
-  if grep -q '"id"' <<< "$WARP_ACCOUNT"; then
-    local ADDRESS6=$(awk -F'"' '/"v6":/ && $4 !~ /^\[/ {print $4}' <<< "$WARP_ACCOUNT")
-    local PRIVATE_KEY=$(awk -F'"' '/"private_key"/{print $4}' <<< "$WARP_ACCOUNT")
-    local RESERVED[1]=$(awk '/"reserved":/ {getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
-    local RESERVED[2]=$(awk '/"reserved":/ {getline; getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
-    local RESERVED[3]=$(awk '/"reserved":/ {getline; getline; getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
-  else
-    local ADDRESS6="2606:4700:110:8a36:df92:102a:9602:fa18"
-    local PRIVATE_KEY="YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY="
-    local RESERVED[1]=78
-    local RESERVED[2]=135
-    local RESERVED[3]=76
+  elif ! warp_account_register; then
+    WARP_ADDRESS6="2606:4700:110:8a36:df92:102a:9602:fa18"
+    WARP_PRIVATE_KEY="YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY="
+    WARP_RESERVED[1]=78
+    WARP_RESERVED[2]=135
+    WARP_RESERVED[3]=76
   fi
 
   cat > ${WORK_DIR}/conf/02_endpoints.json << EOF
@@ -4027,9 +4023,9 @@ EOF
             "mtu":1400,
             "address":[
                 "172.16.0.2/32",
-                "${ADDRESS6}/128"
+                "${WARP_ADDRESS6}/128"
             ],
-            "private_key":"${PRIVATE_KEY}",
+            "private_key":"${WARP_PRIVATE_KEY}",
             "peers": [
               {
                 "address": "engage.cloudflareclient.com",
@@ -4040,9 +4036,9 @@ EOF
                   "::/0"
                 ],
                 "reserved":[
-                    ${RESERVED[1]},
-                    ${RESERVED[2]},
-                    ${RESERVED[3]}
+                    ${WARP_RESERVED[1]},
+                    ${WARP_RESERVED[2]},
+                    ${WARP_RESERVED[3]}
                 ]
               }
             ]
