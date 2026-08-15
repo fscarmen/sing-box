@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.23 (2026.08.14)'
+VERSION='v1.3.23 (2026.08.15)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -456,12 +456,15 @@ calc_install_steps() {
   TOTAL_STEPS=$STEP_TOTAL
 }
 
-# 检测是否需要启用 Github CDN，如能直接连通 api.github.com，则不使用
+# 检测是否需要启用 Github CDN，raw 与 releases 两个下载域都直连可达才不使用
 check_cdn() {
-  local PROXY CODE PID CMD
-  local WAIT_COUNT=40
+  local PROXY CODE PID CMD _url P1 P2 CODE_RAW CODE_REL
   local PIDS=()
-  local API_URL='https://api.github.com/repos/SagerNet/sing-box/releases'
+  # 探测点1：raw 域（脚本及订阅模板文件下载路径）
+  local RAW_URL='https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh'
+  # 探测点2：github releases 域（sing-box / jq / cloudflared 等二进制真实下载路径，
+  # latest 指向永远有效）。修复 IPv6-only / 部分封锁场景：raw 域可达 ≠ releases 域可达，任一域失败都必须走代理
+  local REL_URL='https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64'
 
   # 确定下载工具：优先 wget，次选 curl
   if command -v wget >/dev/null 2>&1; then
@@ -483,27 +486,35 @@ check_cdn() {
     fi
   }
 
-  # 直连检测
-  CODE=$(get_code "$API_URL")
-  if [ "$CODE" = '200' ]; then
+  # 直连检测：raw 与 releases 两个下载域并行 HEAD 探测，必须全部可达才可直连
+  get_code "$RAW_URL" > "${TEMP_DIR}/cdn_raw" &
+  P1=$!
+  get_code "$REL_URL" > "${TEMP_DIR}/cdn_rel" &
+  P2=$!
+  wait "$P1" "$P2" 2>/dev/null
+  CODE_RAW=$(cat "${TEMP_DIR}/cdn_raw" 2>/dev/null)
+  CODE_REL=$(cat "${TEMP_DIR}/cdn_rel" 2>/dev/null)
+  rm -f "${TEMP_DIR}/cdn_raw" "${TEMP_DIR}/cdn_rel"
+  if [ "$CODE_RAW" = '200' ] && [ "$CODE_REL" = '200' ]; then
     GH_PROXY=''
     return
   fi
 
-  # 并发探测代理
+  # 直连失败 → 并发探测代理镜像（对两个下载域都要求可达，与直连判定标准一致）
   for PROXY in "${GITHUB_PROXY[@]}"; do
     {
-      CODE=$(get_code "${PROXY}${API_URL}")
+      # 两个下载域都经代理可达才认定该镜像可用（Bash 异步子壳中不能用 return，用短路逻辑）
+      for _url in "$RAW_URL" "$REL_URL"; do
+        CODE=$(get_code "${PROXY}${_url}")
+        [ "$CODE" = '200' ] || { CODE=; break; }
+      done
       [ "$CODE" = '200' ] && [ ! -e "${TEMP_DIR}/cdn_proxy" ] && printf '%s' "$PROXY" > "${TEMP_DIR}/cdn_proxy"
     } &
     PIDS+=("$!")
   done
 
-  # 等第一个返回 200 的代理，超时则回退为直连，避免无限等待卡死
-  while [ ! -e "${TEMP_DIR}/cdn_proxy" ] && [ "$WAIT_COUNT" -gt 0 ]; do
-    sleep 0.05
-    (( WAIT_COUNT-- )) || true
-  done
+  # wait -n 等首个返回 200 的代理（Bash 4.3+），老版本兜底 sleep 1，避免无限等待卡死
+  [ "${#PIDS[@]}" -gt 0 ] && { wait -n 2>/dev/null || sleep 1; }
 
   [ -e "${TEMP_DIR}/cdn_proxy" ] && GH_PROXY=$(cat "${TEMP_DIR}/cdn_proxy") || GH_PROXY=''
 
@@ -1021,7 +1032,7 @@ change_config() {
       fi
       check_arch
       [ ! -e "${WORK_DIR}/qrencode" ] && \
-        wget --no-check-certificate --continue -qO ${WORK_DIR}/qrencode \
+        wget --no-check-certificate --continue --tries=2 --timeout=10 -qO ${WORK_DIR}/qrencode \
           ${GH_PROXY}https://github.com/fscarmen/client_template/raw/main/qrencode-go/qrencode-go-linux-$QRENCODE_ARCH 2>/dev/null \
           && chmod +x ${WORK_DIR}/qrencode
       fetch_nodes_value
@@ -2204,9 +2215,9 @@ check_install() {
 
   # 并发下载订阅模板 (clash, clash2, sing-box-template)，在新安装和更换协议时会用到
   {
-    wget --no-check-certificate --continue -qO $TEMP_DIR/clash ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/clash 2>/dev/null &
-    wget --no-check-certificate --continue -qO $TEMP_DIR/clash2 ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/clash2 2>/dev/null &
-    wget --no-check-certificate --continue -qO $TEMP_DIR/sing-box-template ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/sing-box 2>/dev/null &
+    wget --no-check-certificate --continue --tries=2 --timeout=10 -qO $TEMP_DIR/clash ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/clash 2>/dev/null &
+    wget --no-check-certificate --continue --tries=2 --timeout=10 -qO $TEMP_DIR/clash2 ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/clash2 2>/dev/null &
+    wget --no-check-certificate --continue --tries=2 --timeout=10 -qO $TEMP_DIR/sing-box-template ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/sing-box 2>/dev/null &
     wait
   } &
 
@@ -2217,7 +2228,7 @@ check_install() {
       local ONLINE=$(get_sing_box_version)
       local SB_DIR="$TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH"
       local SB_BIN="$SB_DIR/sing-box"
-      wget --no-check-certificate --continue \
+      wget --no-check-certificate --continue --tries=2 --timeout=10 \
         ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz \
         -qO- | tar xz -C $TEMP_DIR 2>/dev/null
       [ -s "$SB_BIN" ] && [ -x "$SB_BIN" ] && mv "$SB_BIN" "$TEMP_DIR/sing-box" && chmod +x "$TEMP_DIR/sing-box"
@@ -2225,14 +2236,14 @@ check_install() {
 
     # 任务 2: 下载 jq
     {
-      wget --no-check-certificate --continue -qO $TEMP_DIR/jq \
+      wget --no-check-certificate --continue --tries=2 --timeout=10 -qO $TEMP_DIR/jq \
         ${GH_PROXY}https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$JQ_ARCH 2>/dev/null \
         && chmod +x $TEMP_DIR/jq
     } &
 
     # 任务 3: 下载 qrencode
     {
-      wget --no-check-certificate --continue -qO $TEMP_DIR/qrencode \
+      wget --no-check-certificate --continue --tries=2 --timeout=10 -qO $TEMP_DIR/qrencode \
         ${GH_PROXY}https://github.com/fscarmen/client_template/raw/main/qrencode-go/qrencode-go-linux-$QRENCODE_ARCH 2>/dev/null \
         && chmod +x $TEMP_DIR/qrencode
     } &
@@ -2286,7 +2297,7 @@ check_install() {
   # 如果有需要，后台静默下载 cloudflared
   if [[ "${STATUS[1]}" = "$(text 26)" || "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]] && [ ! -s ${WORK_DIR}/cloudflared ]; then
     {
-      wget --no-check-certificate -qO $TEMP_DIR/cloudflared ${GH_PROXY}https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$ARGO_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/cloudflared >/dev/null 2>&1
+      wget --no-check-certificate --tries=2 --timeout=10 -qO $TEMP_DIR/cloudflared ${GH_PROXY}https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$ARGO_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/cloudflared >/dev/null 2>&1
     }&
   elif [ "${STATUS[1]}" != "$(text 26)" ]; then
     # 查 Argo 进程号，运行时长和内存占用
@@ -2319,7 +2330,7 @@ nginx_run() {
 
 nginx_stop() {
   local NGINX_PID=$(ps -eo pid,args | awk -v work_dir="$WORK_DIR" '$0~(work_dir"/nginx.conf"){print $1;exit}')
-  ss -nltp | sed -n "/pid=$NGINX_PID,/ s/,/ /gp" | grep -oP 'pid=\K\S+' | sort -u | xargs kill -9 >/dev/null 2>&1
+  ss -nltp | sed -n "/pid=$NGINX_PID,/ s/,/ /gp" | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u | xargs kill -9 >/dev/null 2>&1
 }
 
 # 让 nginx 进程与最终配置状态保持一致：需要则启动/热重载，不需要则停止
@@ -4791,7 +4802,7 @@ start_pre() {
 
     # 存在 nginx.conf 时自管 nginx（与 xray 守护一致）：已运行则跳过，未运行才启动，失败不阻塞服务启动
     [ -s ${WORK_DIR}/nginx.conf ] && OPENRC_SERVICE+="
-    if command -v /usr/sbin/nginx >/dev/null 2>&1 && ! pgrep -f \"nginx.*${WORK_DIR}/nginx.conf\" >/dev/null 2>&1; then
+    if command -v /usr/sbin/nginx >/dev/null 2>&1 && ! ps -eo pid,args | grep -q \"[n]ginx.*${WORK_DIR}/nginx.conf\"; then
         /usr/sbin/nginx -c ${WORK_DIR}/nginx.conf
     fi"
 
@@ -4809,7 +4820,7 @@ stop_post() {
         /usr/sbin/nginx -s quit -c ${WORK_DIR}/nginx.conf 2>/dev/null
         sleep 1 # 等待优雅关闭
         # 如果仍运行，用 SIGKILL
-        local NGINX_MASTER=\$(pgrep -f \"nginx: master process /usr/sbin/nginx -c ${WORK_DIR}/nginx.conf\")
+        local NGINX_MASTER=\$(ps -eo pid,args | grep \"nginx: master process.*${WORK_DIR}/nginx.conf\" | awk '{print \$1; exit}')
         if [ -n \"\$NGINX_MASTER\" ]; then
             kill -KILL \$NGINX_MASTER 2>/dev/null
         fi
@@ -5016,7 +5027,7 @@ fetch_nodes_value() {
     }' > ${WORK_DIR}/conf/04_experimental.json
     # 补全后立即热加载（SIGHUP）使 clash_api 监听马上生效；
     # 前台同步执行确保信号送达（SIGHUP reload 不断连 SSH）；仅当 sing-box 运行中才 reload
-    if pgrep -x sing-box >/dev/null 2>&1; then
+    if ps -eo pid,args | grep -q '[s]ing-box run'; then
       cmd_systemctl reload sing-box
     fi
   fi
@@ -5692,7 +5703,7 @@ naive+quic://${UUID[22]}:${UUID[22]}@${SERVER_IP_1}:${PORT_NAIVE}?congestion_con
 
   {
     # 生成 sing-box SFM SFA SFI 订阅文件
-    [ ! -s "$TEMP_DIR/sing-box-template" ] && wget --no-check-certificate --continue -qO "$TEMP_DIR/sing-box-template" "${GH_PROXY}${SUBSCRIBE_TEMPLATE}/sing-box" 2>/dev/null
+    [ ! -s "$TEMP_DIR/sing-box-template" ] && wget --no-check-certificate --continue --tries=2 --timeout=10 -qO "$TEMP_DIR/sing-box-template" "${GH_PROXY}${SUBSCRIBE_TEMPLATE}/sing-box" 2>/dev/null
     cat $TEMP_DIR/sing-box-template | sed "s#\"<OUTBOUND_REPLACE>\",#$OUTBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | ${WORK_DIR}/jq > ${WORK_DIR}/subscribe/sing-box
     rm -f $TEMP_DIR/sing-box-template
   } &>/dev/null
@@ -6279,7 +6290,7 @@ version() {
 
   if [ "${UPDATE,,}" = 'y' ]; then
     check_system_info
-    wget --no-check-certificate --continue ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
+    wget --no-check-certificate --continue --tries=2 --timeout=10 ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
 
     [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] || error "\n $(text 42) \n"
     if ! $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box check -C ${WORK_DIR}/conf >/dev/null; then
@@ -6287,7 +6298,7 @@ version() {
       [ "${UPDATE_CONFIG,,}" = 'n' ] && exit 1
 
       # 设置基础配置参数 dns.servers.prefer_go 和 dns.strategy
-      local STRATEGY=$(grep -E --exclude="03_route.json" 'ipv4_only|ipv6_only|prefer_ipv4|prefer_ipv6' ${WORK_DIR}/conf/0*.json | awk -F '"' '{print $(NF-1); exit}')
+      local STRATEGY=$(awk -F '"' '/ipv4_only|ipv6_only|prefer_ipv4|prefer_ipv6/ && FILENAME !~ /03_route\.json/{print $(NF-1); exit}' ${WORK_DIR}/conf/0*.json)
       STRATEGY=${STRATEGY:-prefer_ipv4}
       command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet systemd-resolved && local IS_PREFER_GO=false || local IS_PREFER_GO=true
 
