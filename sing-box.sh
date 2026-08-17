@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.23 (2026.08.15)'
+VERSION='v1.3.23 (2026.08.17)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -184,8 +184,8 @@ E[71]="Create shortcut [ sb ] successfully."
 C[71]="创建快捷 [ sb ] 指令成功!"
 E[72]="Path to each client configuration file: ${WORK_DIR}/subscribe/\n The full template can be found at:\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
 C[72]="各客户端配置文件路径: ${WORK_DIR}/subscribe/\n 完整模板可参照:\n https://github.com/chika0801/sing-box-examples/tree/main/Tun"
-E[73]=""
-C[73]=""
+E[73]="Common rule_set: openai / google / youtube / netflix / telegram / tiktok / twitter / claude / gemini\n Enter name will auto-prefix geosite- and validate existence"
+C[73]="常用规则集: openai / google / youtube / netflix / telegram / tiktok / twitter / claude / gemini\n 输入名称会自动补全 geosite- 前缀并校验是否存在"
 E[74]="Keep protocols"
 C[74]="保留协议"
 E[75]="Add protocols"
@@ -1554,6 +1554,7 @@ custom_route_add() {
 
   elif [ "$RULE_TYPE" = "rule_set" ]; then
     # 输入规则集名称
+    hint "\n $(text 73) \n"
     reading " $(text 154) " RULESET_INPUT
     [ -z "$RULESET_INPUT" ] && info " $(text 135) " && return
 
@@ -3074,8 +3075,8 @@ sing-box_variables() {
   # 如选择有 c. hysteria2 时，先选择 Realm / WARP，再选择是否使用端口跳跃。
   # 这三项属于 Hysteria2 子选项，不计入安装总步骤，也不显示步骤编号。
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ 'c' ]]; then
-    # Realm 与端口跳跃互斥：先提示；开启 Realm 后跳过端口跳跃交互
-    hint "\n $(text 186) \n"
+    # Realm 与端口跳跃互斥：仅交互式安装提示；快速 / 非交互安装默认不使用 Realm，无需提示
+    [[ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' && "$IS_FAST_INSTALL" != 'is_fast_install' ]] && hint "\n $(text 186) \n"
     input_hy2_realm
     local _SAVED_TOTAL_STEPS="$TOTAL_STEPS"
     TOTAL_STEPS=''
@@ -4943,10 +4944,11 @@ fetch_nodes_value() {
 
   # 获取 UUID_CONFIRM（从 JSON 配置文件读取，不依赖 nginx）
   # 如 UUID_CONFIRM 已有值（例如上层已交互输入），跳过 JSON 读取，避免重复弹窗
-  [ -z "$UUID_CONFIRM" ] && UUID_CONFIRM=$(awk 'match($0, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/) { print substr($0, RSTART, RLENGTH); exit }' ${WORK_DIR}/conf/1*.json 2>/dev/null)
-  # JSON 中提取不到时，尝试从 nginx.conf 提取（订阅开启 / 关闭时 nginx.conf 一定含有 UUID）
+  [ -z "$UUID_CONFIRM" ] && UUID_CONFIRM=$(awk -F '"' '/"uuid"[[:space:]]*:[[:space:]]*"/ || /"id"[[:space:]]*:[[:space:]]*"/ {print $4; exit}' ${WORK_DIR}/conf/1*.json 2>/dev/null)
+  # JSON 中提取不到时，尝试从 nginx.conf 提取订阅 / WS 路径段（订阅开启 / 关闭时 nginx.conf 一定含有 UUID；
+  # 用 sed 抓路径段而非 match 量词正则，兼容 BusyBox / mawk）
   [ -z "$UUID_CONFIRM" ] && [ -s "${WORK_DIR}/nginx.conf" ] && \
-    UUID_CONFIRM=$(awk 'match($0, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/) { print substr($0, RSTART, RLENGTH); exit }' ${WORK_DIR}/nginx.conf 2>/dev/null)
+    UUID_CONFIRM=$(sed -n 's#.*location ~ \^/\([^/]*\)/auto.*#\1#p; s#.*location /\([^/]*\)-vmess.*#\1#p; s#.*location /\([^/]*\)-vless.*#\1#p' ${WORK_DIR}/nginx.conf 2>/dev/null | sed -n '1p')
   # 提取不到时，仅在安装相关流程走交互式输入；其余只读流程（如 sb -n 查看节点信息）用随机 UUID 兜底，避免无谓弹窗
   # 说明：仅安装 shadowsocks / trojan / anytls / naive 等"凭证非 UUID 格式"协议时，以上提取必然为空，
   #       此时导出节点信息不需要 UUID，不应阻塞用户交互
@@ -6406,7 +6408,7 @@ menu_setting() {
     OPTION[8]="8.  $(text 69)"
     OPTION[9]="9.  $(text 76)"
 
-    ACTION[1]() { IS_FAST_INSTALL='is_fast_install'; CHOOSE_PROTOCOLS=${CHOOSE_PROTOCOLS:-'a'}; START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}; CDN=${CDN:-"${CDN_DOMAIN[0]}"}; IS_SUB='is_sub'; IS_ARGO='is_argo'; HY2_PORT_HOPPING_RANGE=${HY2_PORT_HOPPING_RANGE:-'50000:51000'}; install_sing-box; export_list install; create_shortcut; exit; }
+    ACTION[1]() { IS_FAST_INSTALL='is_fast_install'; CHOOSE_PROTOCOLS=${CHOOSE_PROTOCOLS:-'a'}; START_PORT=${START_PORT:-"$START_PORT_DEFAULT"}; CDN=${CDN:-"${CDN_DOMAIN[0]}"}; IS_SUB='is_sub'; IS_ARGO='is_argo'; install_sing-box; export_list install; create_shortcut; exit; }
     ACTION[2]() { IS_SUB=is_sub; IS_ARGO=is_argo; install_sing-box; export_list install; create_shortcut; exit; }
     ACTION[3]() { IS_SUB=no_sub; IS_ARGO=is_argo; install_sing-box; export_list install; create_shortcut; exit; }
     ACTION[4]() { IS_SUB=is_sub; IS_ARGO=no_argo; install_sing-box; export_list install; create_shortcut; exit; }
