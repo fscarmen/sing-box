@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.23 (2026.08.17)'
+VERSION='v1.3.24 (2026.08.21)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -22,7 +22,7 @@ NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
 CDN_DOMAIN=("skk.moe" "ip.sb" "time.is" "cfip.xxxxxxxx.tk" "bestcf.top" "cdn.2020111.xyz" "xn--b6gac.eu.org" "cf.090227.xyz")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
-DEFAULT_NEWEST_VERSION='1.14.0-beta.14'
+DEFAULT_NEWEST_VERSION='1.14.0-beta.17'
 FINGER_PRINT='chrome'
 STEP_NUM=0      # 当前步骤编号（安装流程中动态递增）
 TOTAL_STEPS=''  # 总步骤数（协议确定后动态计算）
@@ -40,8 +40,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="Force HTTP/2 transport for cloudflared tunnels"
-C[1]="cloudflared 隧道统一使用 HTTP/2 传输"
+E[1]="1. Add no-TUN environment support; 2. Fix Alpine OpenRC service stop error"
+C[1]="1. 新增无 TUN 环境支持; 2. 修复 Alpine OpenRC 服务停止误报"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -779,8 +779,8 @@ change_config() {
     MENU_IDX+=(139) && MENU_KEY+=(hy2hopping) && MENU_VAL+=("${HY2_PORT_HOPPING_RANGE}")
   fi
 
-  # 自定义路由规则（仅在 warp-ep 存在时显示）
-  grep -q '"warp-ep"' ${WORK_DIR}/conf/02_endpoints.json 2>/dev/null && {
+  # 自定义路由规则（仅支持 TUN 且 warp-ep 出站存在时显示；无 TUN 时无该出站，隐藏入口）
+  [ "$IS_TUN" = 'is_tun' ] && grep -q '"warp-ep"' ${WORK_DIR}/conf/02_endpoints.json 2>/dev/null && {
     CUSTOM_ROUTE_COUNT=$(custom_route_count)
     MENU_IDX+=(150) && MENU_KEY+=(customroute) && MENU_VAL+=("${CUSTOM_ROUTE_COUNT}")
     MENU_IDX+=(174) && MENU_KEY+=(warpaccount) && MENU_VAL+=("")
@@ -1376,6 +1376,8 @@ input_hy2_realm() {
 
 # 输入 Hysteria2 Realm 的 WARP 辅助打洞选项
 input_hy2_warp() {
+  # 无 TUN 时没有 warp-ep 出站，WARP 辅助打洞不可用，不询问
+  [ "$IS_TUN" != 'is_tun' ] && return
   local CHOOSE_WARP
   reading "\n $(text 148) " CHOOSE_WARP
   [[ "${CHOOSE_WARP,,}" =~ ^(y|yes)$ ]] && IS_HY2_WARP=is_hy2_warp || unset IS_HY2_WARP
@@ -1412,6 +1414,8 @@ set_hy2_realm_config() {
 
 # Hysteria2 Realm 的 WARP 辅助路由：添加或删除 inbound -> warp-ep
 sync_hy2_warp_route() {
+  # 无 TUN 时没有 warp-ep 出站，无需同步 WARP 辅助路由
+  [ "$IS_TUN" != 'is_tun' ] && return
   local ACTION=$1
   local ROUTE_FILE="${WORK_DIR}/conf/03_route.json"
   [ ! -s "$ROUTE_FILE" ] && return
@@ -1843,7 +1847,7 @@ custom_route_menu() {
 # 返回 0 成功 / 1 失败（接口无 id 或解析字段缺失），失败时调用方自行兜底
 warp_account_register() {
   local WARP_ACCOUNT="$1"
-  [ -n "$WARP_ACCOUNT" ] || WARP_ACCOUNT=$(wget -qO- --tries=10 --waitretry=1 --timeout=2 "https://warp.cloudflare.nyc.mn/?run=register")
+  [ -n "$WARP_ACCOUNT" ] || WARP_ACCOUNT=$(timeout 15 bash <(wget -qO- --timeout=5 --tries=1 "https://gitlab.com/fscarmen/warp/-/raw/main/api.sh") --register)
 
   grep -q '"id"' <<< "$WARP_ACCOUNT" || return 1
 
@@ -2249,9 +2253,10 @@ check_install() {
         && chmod +x $TEMP_DIR/qrencode
     } &
 
-    # 任务 4: 注册 warp 账号
+    # 任务 4: 注册 warp 账号（仅支持 TUN 时才有 warp-ep 出站，无 TUN 时不需注册）
+    [ "$IS_TUN" = 'is_tun' ] &&
     {
-      wget -qO- --tries=10 --waitretry=1 --timeout=2 "https://warp.cloudflare.nyc.mn/?run=register" > $TEMP_DIR/warp_account.json 2>/dev/null
+      timeout 15 bash <(wget -qO- --timeout=5 --tries=1 "https://gitlab.com/fscarmen/warp/-/raw/main/api.sh") --register > $TEMP_DIR/warp_account.json 2>/dev/null
     } &
   elif [ "${STATUS[0]}" != "$(text 26)" ]; then
     # 查 sing-box 进程号，运行时长和内存占用，占用的端口
@@ -2450,17 +2455,27 @@ check_system_info() {
   fi
 
   # 判断虚拟化
-  if command -v systemd-detect-virt >/dev/null 2>&1; then
+  if [ "$SYSTEM" = 'Alpine' ]; then
+    command -v virt-what >/dev/null 2>&1 || ${PACKAGE_INSTALL[int]} virt-what >/dev/null 2>&1
+    command -v virt-what >/dev/null 2>&1 && VIRT=$(virt-what | sed -n 1p) || VIRT=unknown
+  elif command -v systemd-detect-virt >/dev/null 2>&1; then
     VIRT=$(systemd-detect-virt)
+  elif command -v hostnamectl >/dev/null 2>&1; then
+    VIRT=$(hostnamectl | awk '/Virtualization/{print $NF}')
   elif grep -qa container= /proc/1/environ 2>/dev/null; then
     VIRT=$(tr '\0' '\n' </proc/1/environ | awk -F= '/container=/{print $2; exit}')
   elif grep -Eq '(lxc|docker|kubepods|containerd)' /proc/1/cgroup 2>/dev/null; then
     VIRT=$(grep -Eo '(lxc|docker|kubepods|containerd)' /proc/1/cgroup | sed -n 1p)
-  elif command -v hostnamectl >/dev/null 2>&1; then
-    VIRT=$(hostnamectl | awk '/Virtualization/{print $NF}')
   else
-    command -v virt-what >/dev/null 2>&1 && ${PACKAGE_INSTALL[int]} virt-what >/dev/null 2>&1
-    command -v virt-what >/dev/null 2>&1 && VIRT=$(virt-what | sed -n 1p) || VIRT=unknown
+    VIRT=unknown
+  fi
+
+  # 判断是否支持 TUN（无 TUN 的 Hax / OpenVZ / 部分 LXC、Docker 容器无法创建 wireguard 出站，
+  # 需跳过 WARP 相关功能，避免 sing-box 启动失败）
+  if [ -c /dev/net/tun ] || cat /dev/net/tun 2>&1 | grep -q "in bad state\|处于错误状态"; then
+    IS_TUN='is_tun'
+  else
+    IS_TUN='no_tun'
   fi
 }
 
@@ -3056,15 +3071,18 @@ sing-box_variables() {
   esac
 
   # 检测是否解锁 chatGPT：按服务器地址类型决定检测栈；域名（NAT 动态地址）交由 wget 按系统默认解析，避免域名被误判为 IPv6 栈
-  CHATGPT_OUT=warp-ep
-  if [[ "$SERVER_IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-    local CHATGPT_STACK='-4'
-  elif [[ "$SERVER_IP" =~ ^[0-9a-fA-F:]+$ && "$SERVER_IP" =~ : ]]; then
-    local CHATGPT_STACK='-6'
-  else
-    local CHATGPT_STACK=''
+  # 仅支持 TUN 时才有 warp-ep 出站与 ChatGPT 分流路由；无 TUN 时 OpenAI 直连，无需探测，也不设置 CHATGPT_OUT
+  if [ "$IS_TUN" = 'is_tun' ]; then
+    CHATGPT_OUT='warp-ep'
+    if [[ "$SERVER_IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+      local CHATGPT_STACK='-4'
+    elif [[ "$SERVER_IP" =~ ^[0-9a-fA-F:]+$ && "$SERVER_IP" =~ : ]]; then
+      local CHATGPT_STACK='-6'
+    else
+      local CHATGPT_STACK=''
+    fi
+    [ "$(check_chatgpt $CHATGPT_STACK)" = 'unlock' ] && CHATGPT_OUT=direct
   fi
-  [ "$(check_chatgpt $CHATGPT_STACK)" = 'unlock' ] && CHATGPT_OUT=direct
 
   # 如果选择有 b j k 这些 reality 协议，自定义 reality 公私钥，如果没有则自动生成
   if [ "$NONINTERACTIVE_INSTALL" != 'noninteractive_install' ] && [[ "${INSTALL_PROTOCOLS[@]}" =~ 'b'|'j'|'k' ]]; then
@@ -4015,18 +4033,21 @@ EOF
 }
 EOF
 
-  # 生成 endpoint 配置：优先复用安装期后台预注册的缓存，否则在线注册；均失败回退共享账户
-  if [ -s $TEMP_DIR/warp_account.json ] && warp_account_register "$(< "$TEMP_DIR/warp_account.json")"; then
-    rm -f "$TEMP_DIR/warp_account.json"
-  elif ! warp_account_register; then
-    WARP_ADDRESS6="2606:4700:110:8a36:df92:102a:9602:fa18"
-    WARP_PRIVATE_KEY="YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY="
-    WARP_RESERVED[1]=78
-    WARP_RESERVED[2]=135
-    WARP_RESERVED[3]=76
-  fi
+  # 生成 endpoint 配置：仅在支持 TUN 时生成 wireguard warp-ep 出站。
+  # 无 TUN（Hax / OpenVZ / 部分容器）无法创建 wireguard 出站，跳过注册与生成，避免 sing-box 启动失败。
+  if [ "$IS_TUN" = 'is_tun' ]; then
+    # 优先复用安装期后台预注册的缓存，否则在线注册；均失败回退共享账户
+    if [ -s $TEMP_DIR/warp_account.json ] && warp_account_register "$(< "$TEMP_DIR/warp_account.json")"; then
+      rm -f "$TEMP_DIR/warp_account.json"
+    elif ! warp_account_register; then
+      WARP_ADDRESS6="2606:4700:110:8a36:df92:102a:9602:fa18"
+      WARP_PRIVATE_KEY="YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY="
+      WARP_RESERVED[1]=78
+      WARP_RESERVED[2]=135
+      WARP_RESERVED[3]=76
+    fi
 
-  cat > ${WORK_DIR}/conf/02_endpoints.json << EOF
+    cat > ${WORK_DIR}/conf/02_endpoints.json << EOF
 {
     "endpoints":[
         {
@@ -4058,47 +4079,58 @@ EOF
     ]
 }
 EOF
+  fi
 
-  # 生成 route 配置
-  cat > ${WORK_DIR}/conf/03_route.json << EOF
-{
-    "route":{
-        "default_http_client": "http-client-direct",
-        "rule_set":[
+  # 生成 route 配置。OpenAI 分流依赖 warp-ep 出站，仅在支持 TUN 时添加
+  # geosite-openai 规则集与分流规则；无 TUN 时保留通用 sniff / resolve 规则即可
+  local OPENAI_RULE_SET OPENAI_RULES
+  if [ "$IS_TUN" = 'is_tun' ]; then
+    OPENAI_RULE_SET='[
             {
                 "tag":"geosite-openai",
                 "type":"remote",
                 "format":"binary",
                 "url":"https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs"
             }
-        ],
+        ]'
+    OPENAI_RULES=",
+            {
+                \"action\": \"resolve\",
+                \"domain\":[
+                    \"api.openai.com\"
+                ],
+                \"strategy\": \"prefer_ipv4\"
+            },
+            {
+                \"action\": \"resolve\",
+                \"rule_set\":[
+                    \"geosite-openai\"
+                ],
+                \"strategy\": \"prefer_ipv6\"
+            },
+            {
+                \"domain\":[
+                    \"api.openai.com\"
+                ],
+                \"rule_set\":[
+                    \"geosite-openai\"
+                ],
+                \"outbound\":\"${CHATGPT_OUT:-direct}\"
+            }"
+  else
+    OPENAI_RULE_SET='[]'
+    OPENAI_RULES=''
+  fi
+
+  cat > ${WORK_DIR}/conf/03_route.json << EOF
+{
+    "route":{
+        "default_http_client": "http-client-direct",
+        "rule_set":${OPENAI_RULE_SET},
         "rules":[
             {
                 "action": "sniff"
-            },
-            {
-                "action": "resolve",
-                "domain":[
-                    "api.openai.com"
-                ],
-                "strategy": "prefer_ipv4"
-            },
-            {
-                "action": "resolve",
-                "rule_set":[
-                    "geosite-openai"
-                ],
-                "strategy": "prefer_ipv6"
-            },
-            {
-                "domain":[
-                    "api.openai.com"
-                ],
-                "rule_set":[
-                    "geosite-openai"
-                ],
-                "outbound":"${CHATGPT_OUT:-direct}"
-            }
+            }${OPENAI_RULES}
         ]
     }
 }
@@ -4812,12 +4844,13 @@ start_pre() {
     rm -f \$pidfile
 }"
 
-    # 添加 stop_post 函数，用于在服务停止后清理 nginx 进程
-    [ -s ${WORK_DIR}/nginx.conf ] && OPENRC_SERVICE+="
+    # 添加 stop_post 函数，用于在服务停止后清理 nginx。
+    # 无论是否有 nginx 都始终生成，避免 stop() 调用未定义函数导致 command not found 误报。
+    OPENRC_SERVICE+="
 
 stop_post() {
-    # 停止 nginx：优先用内置命令
-    if command -v /usr/sbin/nginx >/dev/null 2>&1; then
+    # 仅在存在 nginx.conf 时才尝试干净地停止 nginx；无 nginx 场景直接返回成功
+    if [ -s ${WORK_DIR}/nginx.conf ] && command -v /usr/sbin/nginx >/dev/null 2>&1; then
         /usr/sbin/nginx -s quit -c ${WORK_DIR}/nginx.conf 2>/dev/null
         sleep 1 # 等待优雅关闭
         # 如果仍运行，用 SIGKILL
@@ -4826,13 +4859,19 @@ stop_post() {
             kill -KILL \$NGINX_MASTER 2>/dev/null
         fi
     fi
+    # 显式返回成功，避免 OpenRC 将 stop 流程误判为失败
+    return 0
 }
 
 stop() {
     ebegin \"Stopping \${RC_SVCNAME}\"
-    # 先停止主进程（OpenRC 会调用）
-    start-stop-daemon --stop --pidfile \$pidfile --retry 5
-    eend \$? \"Failed to stop \${RC_SVCNAME}\"
+    # pidfile 优先，进程名兜底——兼容 pidfile 残留指向已死进程的场景（无进程可杀时不误报）
+    start-stop-daemon --stop --pidfile \$pidfile --retry 5 2>/dev/null \\
+      || start-stop-daemon --stop --name sing-box --retry 5 2>/dev/null \\
+      || true
+    # 清理残留 pidfile 与已启动标记，避免后续 status 误报 started
+    rm -f \$pidfile /run/started/\${RC_SVCNAME} 2>/dev/null
+    eend 0
 
     # 然后运行 post 清理
     stop_post
@@ -5899,7 +5938,7 @@ change_protocols() {
     # 从已安装的协议中选择需要删除的协议名，并存放在 REMOVE_PROTOCOLS，把保存的协议的协议存放在 KEEP_PROTOCOLS
     reading "\n $(text 64) " REMOVE_SELECT
     # 统一为小写，去掉重复选项，处理不在可选列表里的选项，把特殊符号处理
-    REMOVE_SELECT=$(sed "s/[^a-$(asc $(( ${#EXISTED_PROTOCOLS[@]} + 96 )))]//g" <<< "${REMOVE_SELECT,,}" | awk 'BEGIN{RS=""; FS=""}{delete seen; output=""; for(i=1; i<=NF; i++){ if(!seen[$i]++){ output=output $i } } print output}')
+    REMOVE_SELECT=$(sed "s/[^a-$(asc $(( ${#EXISTED_PROTOCOLS[@]} + 96 )))]//g" <<< "${REMOVE_SELECT,,}" | grep -o . | awk '!seen[$0]++' | tr -d '\n')
 
     for ((j=0; j<${#REMOVE_SELECT}; j++)); do
       REMOVE_PROTOCOLS+=("${EXISTED_PROTOCOLS[$(( $(asc "$(awk "NR==$[j+1] {print}" <<< "$(grep -o . <<< "$REMOVE_SELECT")")") - 97 ))]}")
@@ -5918,7 +5957,7 @@ change_protocols() {
     done
     reading "\n $(text 66) " ADD_SELECT
     # 统一为小写，去掉重复选项，处理不在可选列表里的选项，把特殊符号处理
-    ADD_SELECT=$(sed "s/[^a-$(asc $(( ${#NOT_EXISTED_PROTOCOLS[@]} + 96 )))]//g" <<< "${ADD_SELECT,,}" | awk 'BEGIN{RS=""; FS=""}{delete seen; output=""; for(i=1; i<=NF; i++){ if(!seen[$i]++){ output=output $i } } print output}')
+    ADD_SELECT=$(sed "s/[^a-$(asc $(( ${#NOT_EXISTED_PROTOCOLS[@]} + 96 )))]//g" <<< "${ADD_SELECT,,}" | grep -o . | awk '!seen[$0]++' | tr -d '\n')
 
     for ((l=0; l<${#ADD_SELECT}; l++)); do
       ADD_PROTOCOLS+=("${NOT_EXISTED_PROTOCOLS[$(( $(asc "$(awk "NR==$[l+1] {print}" <<< "$(grep -o . <<< "$ADD_SELECT")")") - 97 ))]}")
@@ -6292,9 +6331,22 @@ version() {
 
   if [ "${UPDATE,,}" = 'y' ]; then
     check_system_info
-    wget --no-check-certificate --continue --tries=2 --timeout=10 ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz -qO- | tar xz -C $TEMP_DIR sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box
+    # 先下载到临时文件并校验完整性，避免中断导致损坏的压缩包直接喂给 tar 报错；失败自动重试（第2次起去掉代理直连）
+    # 直接使用文件路径，仅保留 URL 切换变量、循环计数变量
+    local SB_UP_URL UP_TRY
+    for UP_TRY in 1 2 3; do
+      rm -f "$TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz" "$TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH"
+      SB_UP_URL="${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz"
+      [ "$UP_TRY" -ge 2 ] && SB_UP_URL="https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz"
+      wget --no-check-certificate --continue --tries=2 --timeout=10 -qO "$TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz" "$SB_UP_URL" 2>/dev/null || { sleep 3; continue; }
+      [ -s "$TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz" ] || { sleep 3; continue; }
+      tar xz -C "$TEMP_DIR" -f "$TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz" "sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box" 2>/dev/null || { sleep 3; continue; }
+      [ -s "$TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box" ] || { sleep 3; continue; }
+      rm -f "$TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz"
+      break
+    done
 
-    [ -s $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box ] || error "\n $(text 42) \n"
+    [ -s "$TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box" ] || error "\n $(text 42) \n"
     if ! $TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH/sing-box check -C ${WORK_DIR}/conf >/dev/null; then
       warning "\n $(text 54) " && reading "\n $(text 111) " UPDATE_CONFIG
       [ "${UPDATE_CONFIG,,}" = 'n' ] && exit 1
@@ -6368,23 +6420,23 @@ menu_setting() {
     [ "${STATUS[0]}" = "$(text 28)" ] &&
     ACTION[2]() {
       cmd_systemctl disable sing-box
-      cmd_systemctl status sing-box &>/dev/null && error " Sing-box $(text 27) $(text 38) " || info " Sing-box $(text 27) $(text 37)"
+      cmd_systemctl status sing-box &>/dev/null && error "\n Sing-box $(text 27) $(text 38) \n" || info "\n Sing-box $(text 27) $(text 37) \n"
     } ||
     ACTION[2]() {
       cmd_systemctl enable sing-box
       sleep 2
-      cmd_systemctl status sing-box &>/dev/null && info " Sing-box $(text 28) $(text 37)" || error " Sing-box $(text 28) $(text 38) "
+      cmd_systemctl status sing-box &>/dev/null && info "\n Sing-box $(text 28) $(text 37) \n" || error "\n Sing-box $(text 28) $(text 38) \n"
     }
 
     [ "${STATUS[1]}" = "$(text 28)" ] &&
     ACTION[3]() {
       cmd_systemctl disable argo
-      cmd_systemctl status argo &>/dev/null && error " Argo $(text 27) $(text 38) " || info " Argo $(text 27) $(text 37)"
+      cmd_systemctl status argo &>/dev/null && error "\n Argo $(text 27) $(text 38) \n" || info "\n Argo $(text 27) $(text 37) \n"
     } ||
     ACTION[3]() {
       cmd_systemctl enable argo
       sleep 2
-      cmd_systemctl status argo &>/dev/null &&  info " Argo $(text 28) $(text 37)" || error " Argo $(text 28) $(text 38) "
+      cmd_systemctl status argo &>/dev/null &&  info "\n Argo $(text 28) $(text 37) \n" || error "\n Argo $(text 28) $(text 38) \n"
       grep -qs '\--url' ${ARGO_DAEMON_FILE} && fetch_quicktunnel_domain && export_list
     }
 
@@ -6575,14 +6627,14 @@ for z in ${!ALL_PARAMETER[@]}; do
     -S )
       check_install
       if [ "${STATUS[0]}" = "$(text 26)" ]; then
-        error "\n Sing-box $(text 26) "
+        error "\n Sing-box $(text 26) \n"
       elif [ "${STATUS[0]}" = "$(text 28)" ]; then
         cmd_systemctl disable sing-box
-        cmd_systemctl status sing-box &>/dev/null && error " Sing-box $(text 27) $(text 38) " || info "\n Sing-box $(text 27) $(text 37)"
+        cmd_systemctl status sing-box &>/dev/null && error "\n Sing-box $(text 27) $(text 38) \n" || info "\n Sing-box $(text 27) $(text 37) \n"
       elif [ "${STATUS[0]}" = "$(text 27)" ]; then
         cmd_systemctl enable sing-box
         sleep 2
-        cmd_systemctl status sing-box &>/dev/null && info "\n Sing-box $(text 28) $(text 37)" || error "\n Sing-box $(text 28) $(text 38)"
+        cmd_systemctl status sing-box &>/dev/null && info "\n Sing-box $(text 28) $(text 37) \n" || error "\n Sing-box $(text 28) $(text 38) \n"
       fi
       exit 0
       ;;
@@ -6592,11 +6644,11 @@ for z in ${!ALL_PARAMETER[@]}; do
         error "\n Argo $(text 26) "
       elif [ "${STATUS[1]}" = "$(text 28)" ]; then
         cmd_systemctl disable argo
-        cmd_systemctl status argo &>/dev/null && error " Argo $(text 27) $(text 38) " || info "\n Argo $(text 27) $(text 37)"
+        cmd_systemctl status argo &>/dev/null && error "\n Argo $(text 27) $(text 38) \n" || info "\n Argo $(text 27) $(text 37) \n"
       elif [ "${STATUS[1]}" = "$(text 27)" ]; then
         cmd_systemctl enable argo
         sleep 2
-        cmd_systemctl status argo &>/dev/null && info "\n Argo $(text 28) $(text 37)" || error "\n Argo $(text 28) $(text 38) "
+        cmd_systemctl status argo &>/dev/null && info "\n Argo $(text 28) $(text 37) \n" || error "\n Argo $(text 28) $(text 38) \n"
         grep -qs '\--url' ${ARGO_DAEMON_FILE} && fetch_quicktunnel_domain && export_list
       fi
       exit 0
