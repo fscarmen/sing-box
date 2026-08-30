@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.24 (2026.08.21)'
+VERSION='v1.3.24 (2026.08.30)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
@@ -5432,12 +5432,12 @@ http3://$(echo -n "${UUID[22]}:${UUID[22]}@${SERVER_IP_2}:${PORT_NAIVE}" | base6
 vless://${UUID[11]}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?encryption=none${VISION_FLOW}&security=reality&sni=${TLS_SERVER}&fp=${FINGER_PRINT}&pbk=${REALITY_PUBLIC[11]}&type=tcp&headerType=none#${NODE_NAME[11]// /%20}%20${NODE_TAG[0]}"
 
   if [ -n "$PORT_HYSTERIA2" ]; then
-    [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && local V2RAYN_PARAMS=",\"Ports\":\"${PORT_HOPPING_START}-${PORT_HOPPING_END}\",\"HopInterval\":\"30s\""
+    [[ -n "$PORT_HOPPING_START" && -n "$PORT_HOPPING_END" ]] && local HOPPING_PARAMS=",\"Ports\":\"${PORT_HOPPING_START}-${PORT_HOPPING_END}\",\"HopInterval\":\"30s\""
     local REALM_PARAMS=""
     [ "$IS_HY2_REALM" = 'is_hy2_realm' ] && REALM_PARAMS="\"Hy2RealmUrl\":\"realm://public@realm.hy2.io:443/${UUID[12]}?stun=stun.nextcloud.com:3478&stun=stun.sip.us:3478&stun=turn.cloudflare.com:3478&stun=global.stun.twilio.com:3478\","
     local V2RAYN_SUBSCRIBE+="
 ----------------------------
-v2rayn://hysteria2/$(echo -n "{\"ConfigType\":7,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME[12]} ${NODE_TAG[1]}\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_HYSTERIA2},\"Password\":\"${UUID[12]}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"${TLS_SERVER}\",\"Cert\":\"${CERT_URL_2}\",\"ProtoExtraObj\":{"${REALM_PARAMS}"\"UpMbps\":${HY2_UP:-200},\"DownMbps\":${HY2_DOWN:-1000}}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
+v2rayn://hysteria2/$(echo -n "{\"ConfigType\":7,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME[12]} ${NODE_TAG[1]}\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_HYSTERIA2},\"Password\":\"${UUID[12]}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"${TLS_SERVER}\",\"Cert\":\"${CERT_URL_2}\",\"ProtoExtraObj\":{"${REALM_PARAMS}"\"UpMbps\":${HY2_UP:-200},\"DownMbps\":${HY2_DOWN:-1000}${HOPPING_PARAMS}}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
   fi
 
   [ -n "$PORT_TUIC" ] && local V2RAYN_SUBSCRIBE+="
