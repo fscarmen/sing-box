@@ -423,8 +423,8 @@ C[190]="已关闭。当设置 up/down 时，禁止客户端使用 BBR 拥塞控�
 
 E[191]="Modify multiplexing"
 C[191]="修改多路复用功能"
-E[192]="Select protocols to modify (e.g. bcf; asked in input order; blank = no change):\n a. all (default)"
-C[192]="多选需要修改多路复用的协议（如 bcf，询问顺序与输入顺序一致，留空表示不修改）:\n a. all (默认)"
+E[192]="Select protocols to modify (e.g. bcf; asked in input order; blank = no change):\n a. all"
+C[192]="多选需要修改多路复用的协议（如 bcf，询问顺序与输入顺序一致，留空表示不修改）:\n a. all"
 E[193]="1: Enable multiplexing\n 2: Disable multiplexing"
 C[193]="1：开启多路复用\n 2：关闭多路复用"
 E[194]="enabled"
