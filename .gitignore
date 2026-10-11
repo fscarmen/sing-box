@@ -1,0 +1,6 @@
+# JetBrains IDE
+.idea/
+
+# Python cache
+__pycache__/
+*.pyc
