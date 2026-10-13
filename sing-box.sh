@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.25 (2026.09.18)'
+VERSION='v1.3.26 (2026.10.13)'
 
 # Github 反代加速代理
-GITHUB_PROXY=('https://hub.glowp.xyz/' 'https://proxy.vvvv.ee/')
+GITHUB_PROXY=('https://ghproxy.lvedong.eu.org/' 'https://accel.cloudflare.nyc.mn/')
 
 # 各变量默认值
 TEMP_DIR='/tmp/sing-box'
@@ -22,7 +22,7 @@ NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
 CDN_DOMAIN=("skk.moe" "ip.sb" "time.is" "cfip.xxxxxxxx.tk" "bestcf.top" "cdn.2020111.xyz" "xn--b6gac.eu.org" "cf.090227.xyz")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
-DEFAULT_NEWEST_VERSION='1.15.0-alpha.6'
+DEFAULT_NEWEST_VERSION='1.15.0-alpha.12'
 FINGER_PRINT='chrome'
 STEP_NUM=0      # 当前步骤编号（安装流程中动态递增）
 TOTAL_STEPS=''  # 总步骤数（协议确定后动态计算）
@@ -40,8 +40,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="Add Hysteria2 ignore_client_bandwidth toggle in [sb -d], default off"
-C[1]="[sb -d] 新增 Hysteria2 ignore_client_bandwidth 开关，新安装默认关闭"
+E[1]="1. Fix the firewall allow rules being appended after an existing REJECT/DROP rule on the INPUT chain, which left node and nginx ports unreachable on images such as Oracle OCI and OpenVZ; the rules are now inserted before the first REJECT/DROP rule. ufw / firewalld hosts are not affected, as those place allow rules ahead of any terminal rule by design. 2. Fix occasional empty version detection when checking for sing-box updates, which could abort installation or upgrade; the version is now read from the lightweight releases.atom feed first, with the GitHub API as fallback. 3. Enable readline line editing on interactive inputs: ← / → move the cursor, Home / End and Ctrl+A / Ctrl+E jump to line start / end, Ctrl+W deletes the previous word, Ctrl+U clears to line start, Ctrl+K deletes to line end, Ctrl+Y undoes the last deletion, Ctrl+L clears the screen; editing keys are no longer inserted into the value. 4. Make the uninstall path fully offline: sb -u no longer runs CDN detection and no longer pre-downloads subscription templates, binaries or cloudflared, so it completes immediately on hosts that cannot reach GitHub; 5. update GitHub proxy CDN endpoints"
+C[1]="1. 修复入站放行规则被追加到 INPUT 链已有的 REJECT/DROP 规则之后，导致甲骨文 OCI、OpenVZ 等镜像上节点端口与 nginx 端口无法访问的问题；放行规则现改为插入到第一条 REJECT/DROP 规则之前。ufw / firewalld 机器不受影响，这类防火墙本身就把放行规则放在终结规则之前; 2. 修复检测 sing-box 更新时偶尔取不到最新版本号、导致安装或升级中断的问题；改为优先从体积很小的 releases.atom 获取，github api 作为兜底; 3. 交互输入启用 readline 行编辑：← / → 移动光标，Home / End 与 Ctrl+A / Ctrl+E 跳到行首 / 行尾，Ctrl+W 删除光标前一个词，Ctrl+U 清空到行首，Ctrl+K 删除到行尾，Ctrl+Y 撤销上一次删除，Ctrl+L 清屏；方向键等编辑键不再被当作内容插入输入值; 4. 卸载流程完全离线化：sb -u 不再执行 CDN 探测，也不再预下载订阅模板、二进制与 cloudflared，GitHub 不可达时也能立即完成卸载; 5. 更换 GitHub 代理与 CDN 加速节点"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -420,13 +420,29 @@ E[189]="Enabled. ignore_client_bandwidth: true -> commands clients to use the BB
 C[189]="已启用。ignore_client_bandwidth: true —— 命令客户端使用 BBR 拥塞控制而非 Hysteria CC（未设置 up/down）。客户端订阅不再包含 up/down。"
 E[190]="Disabled. When up_mbps/down_mbps are set, clients are denied to use the BBR CC"
 C[190]="已关闭。当设置 up/down 时，禁止客户端使用 BBR 拥塞控制"
+E[191]="Firewall: the allow rules were inserted before the final REJECT/DROP rule on the INPUT chain, so they now take effect."
+C[191]="防火墙：入站放行规则已插入到 INPUT 链末尾的 REJECT/DROP 规则之前，现已生效。"
+E[192]="Firewall: that REJECT/DROP rule carries match conditions, so the allow rules are not restricted by them. Adjust it manually if this is not intended."
+C[192]="防火墙：该 REJECT/DROP 规则带有匹配条件，放行规则不受其限制。如非预期，请自行调整该规则。"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
 error() { echo -e "\033[31m\033[01m$*\033[0m" && exit 1; } # 红色
 info() { echo -e "\033[32m\033[01m$*\033[0m"; }   # 绿色
 hint() { echo -e "\033[33m\033[01m$*\033[0m"; }   # 黄色
-reading() { read -rp "$(info "$1")" "$2"; }
+# readline 需要用 SOH / STX 包裹不可打印的 ANSI 转义才会算对光标位置，配色与 info 保持一致
+INFO_PROMPT_HEAD=$'\001\033[32m\033[01m\002'
+INFO_PROMPT_TAIL=$'\001\033[0m\002'
+# 交互终端下启用 readline 行编辑：方向键移动光标、Home / End、Delete、Ctrl+A / Ctrl+E / Ctrl+W；
+reading() {
+  local prompt
+  if [[ -t 0 ]]; then
+    printf -v prompt '%b' "$1"
+    read -er -p "$INFO_PROMPT_HEAD$prompt$INFO_PROMPT_TAIL" "$2"
+  else
+    read -rp "$(info "$1")" "$2"
+  fi
+}
 
 # 预处理：扫描 E/C 数组，把含 $ 的条目下标记录到关联数组，避免 text() 每次调用都启动 grep 子进程
 declare -A TEXT_NEEDS_EVAL
@@ -2275,15 +2291,18 @@ check_install() {
   fi
 
   # 并发下载订阅模板 (clash, clash2, sing-box-template)，在新安装和更换协议时会用到
-  {
-    wget --no-check-certificate --continue --tries=2 --timeout=10 -qO $TEMP_DIR/clash ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/clash 2>/dev/null &
-    wget --no-check-certificate --continue --tries=2 --timeout=10 -qO $TEMP_DIR/clash2 ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/clash2 2>/dev/null &
-    wget --no-check-certificate --continue --tries=2 --timeout=10 -qO $TEMP_DIR/sing-box-template ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/sing-box 2>/dev/null &
-    wait
-  } &
+  # 卸载模式跳过：纯浪费，且网络不通时会白白等待
+  if [ "$IS_UNINSTALL" != 'is_uninstall' ]; then
+    {
+      wget --no-check-certificate --continue --tries=2 --timeout=10 -qO $TEMP_DIR/clash ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/clash 2>/dev/null &
+      wget --no-check-certificate --continue --tries=2 --timeout=10 -qO $TEMP_DIR/clash2 ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/clash2 2>/dev/null &
+      wget --no-check-certificate --continue --tries=2 --timeout=10 -qO $TEMP_DIR/sing-box-template ${GH_PROXY}${SUBSCRIBE_TEMPLATE}/sing-box 2>/dev/null &
+      wait
+    } &
+  fi
 
-  # 如果有需要，后台静默下载 sing-box
-  if [ "${STATUS[0]}" = "$(text 26)" ] && [ ! -s ${WORK_DIR}/sing-box ]; then
+  # 如果有需要，后台静默下载 sing-box（卸载模式跳过）
+  if [ "${STATUS[0]}" = "$(text 26)" ] && [ ! -s ${WORK_DIR}/sing-box ] && [ "$IS_UNINSTALL" != 'is_uninstall' ]; then
     # 任务 1: 下载 sing-box
     {
       local ONLINE=$(get_sing_box_version)
@@ -2356,8 +2375,8 @@ check_install() {
     fi
   fi
 
-  # 如果有需要，后台静默下载 cloudflared
-  if [[ "${STATUS[1]}" = "$(text 26)" || "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]] && [ ! -s ${WORK_DIR}/cloudflared ]; then
+  # 如果有需要，后台静默下载 cloudflared（卸载模式跳过）
+  if [[ "${STATUS[1]}" = "$(text 26)" || "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]] && [ ! -s ${WORK_DIR}/cloudflared ] && [ "$IS_UNINSTALL" != 'is_uninstall' ]; then
     {
       wget --no-check-certificate --tries=2 --timeout=10 -qO $TEMP_DIR/cloudflared ${GH_PROXY}https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$ARGO_ARCH >/dev/null 2>&1 && chmod +x $TEMP_DIR/cloudflared >/dev/null 2>&1
     }&
@@ -2512,8 +2531,11 @@ check_system_info() {
 
   # 判断虚拟化
   if [ "$SYSTEM" = 'Alpine' ]; then
-    command -v virt-what >/dev/null 2>&1 || ${PACKAGE_INSTALL[int]} virt-what >/dev/null 2>&1
-    command -v virt-what >/dev/null 2>&1 && VIRT=$(virt-what | sed -n 1p) || VIRT=unknown
+    # 卸载时 VIRT 仅用于菜单展示，不显示菜单，故无需联网装 virt-what
+    if [ "$IS_UNINSTALL" != 'is_uninstall' ]; then
+      command -v virt-what >/dev/null 2>&1 || ${PACKAGE_INSTALL[int]} virt-what >/dev/null 2>&1
+      command -v virt-what >/dev/null 2>&1 && VIRT=$(virt-what | sed -n 1p) || VIRT=unknown
+    fi
   elif command -v systemd-detect-virt >/dev/null 2>&1; then
     VIRT=$(systemd-detect-virt)
   elif command -v hostnamectl >/dev/null 2>&1; then
@@ -2537,18 +2559,18 @@ check_system_info() {
 
 # 获取 sing-box 最新版本
 get_sing_box_version() {
+  local FORCE_VERSION RESULT_VERSION
   # FORCE_VERSION 用于在 sing-box 某个主程序出现 bug 时，强制为指定版本，以防止运行出错
-  local FORCE_VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://raw.githubusercontent.com/fscarmen/sing-box/refs/heads/main/force_version | sed 's/^[vV]//g; s/\r//g')
+  FORCE_VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- "${GH_PROXY}https://raw.githubusercontent.com/fscarmen/sing-box/refs/heads/main/force_version" 2>&1 | sed 's/^[vV]//g; s/\r//g')
   if grep -q '.' <<< "$FORCE_VERSION"; then
-    local RESULT_VERSION="$FORCE_VERSION"
+    RESULT_VERSION="$FORCE_VERSION"
   else
-    # 先判断 github api 返回 http 状态码是否为 200，有时候 IP 会被限制，导致获取不到最新版本
-    local API_RESPONSE=$(wget --no-check-certificate --server-response --tries=2 --timeout=3 -qO- "${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases" 2>&1 | grep -E '^[ ]+HTTP/|tag_name')
-    if grep -q 'HTTP.* 200' <<< "$API_RESPONSE"; then
-      local VERSION_LATEST=$(awk -F '["v-]' '/tag_name/{print $5}' <<< "$API_RESPONSE" | sort -Vr | sed -n '1p')
-      local RESULT_VERSION=$(awk -F '["v]' -v var="tag_name.*$VERSION_LATEST" '$0 ~ var {print $5; exit}' <<< "$API_RESPONSE")
-    else
-      local RESULT_VERSION="$DEFAULT_NEWEST_VERSION"
+    # 取最新版本（含 alpha / beta / rc 等预发布版）：releases.atom → 失败则 GitHub API → 仍失败则 DEFAULT_NEWEST_VERSION
+    RESULT_VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- "${GH_PROXY}https://github.com/SagerNet/sing-box/releases.atom" 2>&1 | sed -n '/alternate/ s#.*/tag/v\([^"]\+\)".*#\1#gp' | sort -Vr | sed -n '1p')
+
+    if grep -q '^$' <<< "$RESULT_VERSION"; then
+      RESULT_VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- "${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases" 2>&1 | awk -F '["v]' '/"tag_name"/ {print $5}' | sort -Vr | sed -n '1p')
+      grep -q '^$' <<< "$RESULT_VERSION" && RESULT_VERSION="$DEFAULT_NEWEST_VERSION"
     fi
   fi
   echo "$RESULT_VERSION"
@@ -3540,19 +3562,65 @@ del_service_port_rule_firewalld() {
   firewall-cmd --zone=public --remove-port=${PORT}/${PROTO} --permanent >/dev/null 2>&1
 }
 
+# 判断一条 iptables 规则是否带匹配条件，返回 0 = 带条件
+# $1 = iptables -S 输出的单行完整 spec，例如 "-A INPUT -i eth0 -j DROP"
+rule_spec_has_condition() {
+  local SPEC=$1
+  local REST=$(printf '%s\n' "$SPEC" | sed -E 's/^-A INPUT //; s/^-j (REJECT|DROP)( --reject-with [^ ]+)?$//')
+  [ -n "$REST" ]
+}
+
+# 定位 INPUT 链第一条终止规则（REJECT / DROP）
+# $1 = iptables | ip6tables
+# 通过全局变量回传，不能用 stdout + 命令替换，否则赋值会落在子 shell 中丢失：
+# 行号取空后调用方会静默退回链尾追加，修复失效且无任何报错
+# 全局输出:TERMINAL_LINE / TERMINAL_RULE_SPEC / TERMINAL_HAS_CONDITION
+# 返回:0 = 找到；1 = 无终止规则或命令不可用（调用方退回链尾追加）
+iptables_input_terminal_line() {
+  local CMD=$1 OUT
+  TERMINAL_LINE=''; TERMINAL_RULE_SPEC=''; TERMINAL_HAS_CONDITION=no
+
+  command -v "$CMD" >/dev/null 2>&1 || return 1
+  OUT=$("$CMD" -S INPUT 2>/dev/null | awk '
+    /^-A INPUT/ {
+      n++
+      if (!found && $0 ~ /-j (REJECT|DROP)( |$)/) { found = n; spec = $0 }
+    }
+    END { if (found) printf "%d\t%s\n", found, spec }
+  ') || return 1
+  [ -n "$OUT" ] || return 1
+
+  TERMINAL_LINE=${OUT%%$'\t'*}
+  TERMINAL_RULE_SPEC=${OUT#*$'\t'}
+  rule_spec_has_condition "$TERMINAL_RULE_SPEC" && TERMINAL_HAS_CONDITION=yes
+  return 0
+}
+
 # iptables 普通端口规则备注
+# 优先插入到 INPUT 链第一条 REJECT / DROP 之前；链上无终止规则或插入失败时退回链尾追加。
+# -C / -D 按规则内容匹配，与规则在链内的位置无关，因此插入位置改变后幂等与清理逻辑依然成立。
 add_service_port_rule_iptables() {
   local PROTO=$1
   local PORT=$2
   local COMMENT="Sing-box Family Bucket PORT ${PROTO} ${PORT}"
+  local CMD
 
   [ -z "$PROTO" ] || [ -z "$PORT" ] && return 1
 
-  iptables -C INPUT -p ${PROTO} --dport ${PORT} -m comment --comment "$COMMENT" -j ACCEPT >/dev/null 2>&1 || \
-  iptables -A INPUT -p ${PROTO} --dport ${PORT} -m comment --comment "$COMMENT" -j ACCEPT >/dev/null 2>&1
+  # v4 / v6 分别独立判断：两套链的原有规则可能不同，锚点必须各自计算
+  for CMD in iptables ip6tables; do
+    "$CMD" -C INPUT -p ${PROTO} --dport ${PORT} -m comment --comment "$COMMENT" -j ACCEPT >/dev/null 2>&1 && continue
 
-  ip6tables -C INPUT -p ${PROTO} --dport ${PORT} -m comment --comment "$COMMENT" -j ACCEPT >/dev/null 2>&1 || \
-  ip6tables -A INPUT -p ${PROTO} --dport ${PORT} -m comment --comment "$COMMENT" -j ACCEPT >/dev/null 2>&1
+    if iptables_input_terminal_line "$CMD"; then
+      if "$CMD" -I INPUT "$TERMINAL_LINE" -p ${PROTO} --dport ${PORT} -m comment --comment "$COMMENT" -j ACCEPT >/dev/null 2>&1; then
+        IPTABLES_INSERTED_BEFORE_TERMINAL=yes
+        [ "$TERMINAL_HAS_CONDITION" = 'yes' ] && IPTABLES_TERMINAL_CONDITIONAL=yes
+        continue
+      fi
+    fi
+
+    "$CMD" -A INPUT -p ${PROTO} --dport ${PORT} -m comment --comment "$COMMENT" -j ACCEPT >/dev/null 2>&1 || true
+  done
 }
 
 # 删除 iptables 普通端口规则
@@ -3720,6 +3788,9 @@ sync_firewall_rules() {
   : > "$SERVICE_FIREWALL_STATE_FILE"
   reload_or_save_firewall_rules
 
+  IPTABLES_INSERTED_BEFORE_TERMINAL=no
+  IPTABLES_TERMINAL_CONDITIONAL=no
+
   case "$FW_BACKEND" in
     ufw )
       for PORT in "${EXPOSED_TCP_PORTS[@]}"; do
@@ -3754,6 +3825,14 @@ sync_firewall_rules() {
   for PORT in "${EXPOSED_UDP_PORTS[@]}"; do
     [ -n "$PORT" ] && echo "udp $PORT" >> "$SERVICE_FIREWALL_STATE_FILE"
   done
+
+  case "$FW_BACKEND" in
+    alpine-iptables|iptables )
+      [ "$IPTABLES_INSERTED_BEFORE_TERMINAL" = 'yes' ] && hint "\n $(text 191) \n"
+      [ "$IPTABLES_TERMINAL_CONDITIONAL" = 'yes' ] && hint " $(text 192) \n"
+      ;;
+  esac
+
   reload_or_save_firewall_rules
 
   HY2_TARGET=$(awk -F '[:,]' '/"listen_port"/{gsub(/[[:space:]]/, "", $2); print $2; exit}' ${HY2_FILE} 2>/dev/null)
@@ -6384,7 +6463,7 @@ uninstall() {
     [ -s ${ARGO_DAEMON_FILE} ] && cmd_systemctl disable argo &>/dev/null
     [ -s ${SINGBOX_DAEMON_FILE} ] && cmd_systemctl disable sing-box &>/dev/null
     nginx_stop
-    sleep 1
+    sleep 0.5
     [[ -s ${WORK_DIR}/nginx.conf && "$(ps -ef | grep -c '[n]ginx')" = 0 ]] && reading "\n $(text 83) " REMOVE_NGINX
     [ "${REMOVE_NGINX,,}" = 'y' ] && ${PACKAGE_UNINSTALL[int]} nginx >/dev/null 2>&1
     purge_service_firewall_rules
@@ -6395,7 +6474,6 @@ uninstall() {
     error "\n $(text 15) \n"
   fi
 }
-
 
 # Sing-box 的最新版本
 version() {
@@ -6596,10 +6674,18 @@ menu() {
   fi
 }
 
-check_cdn
+# 卸载是纯本地操作：-U / -u 时置位，作为下方所有网络动作的总开关
+# 首尾补空格并用 [[:space:]] 锚定，避免 -UUID / --HY2_WARP 等含 -U 的长参数被误判
+[[ " ${*^^} " =~ [[:space:]]-U([[:space:]]|$) ]] && IS_UNINSTALL='is_uninstall'
+
+# 卸载是纯本地操作：跳过 CDN 探测，保证离线 / 弱网下立即进入卸载流程
+# 注：statistics_of_run_times 为运行统计，后台执行不阻塞卸载，必须与守卫分开成行保留
+[ "$IS_UNINSTALL" != 'is_uninstall' ] && check_cdn
 statistics_of_run_times update sing-box.sh 2>/dev/null
 
 ###### 为了给旧版本 04_experimental.json 补全 clash_api 配置并剥离 v2ray_api，将于 2026年12月31日移除
+# 卸载模式跳过：块内含服务重载 / kill -HUP，对即将删除的服务做无意义操作
+[ "$IS_UNINSTALL" != 'is_uninstall' ] && \
 if [ -x "$WORK_DIR/jq" ] && [ -s "$WORK_DIR/conf/04_experimental.json" ] && [ -x "$WORK_DIR/sing-box" ] && [[ "$(date +%Y%m%d)" < "20261231" ]]; then
   # 旧版本 04_experimental.json 可能缺 clash_api、或含 v2ray_api（旧版脚本注入的）。
   # clash_api 是官方 release 二进制默认编译功能（with_clash_api），直接补全；
@@ -6642,14 +6728,6 @@ if [ -x "$WORK_DIR/jq" ] && [ -s "$WORK_DIR/conf/04_experimental.json" ] && [ -x
       fi
     }
   fi
-fi
-
-###### 为了把原来的 nekobox 换成 Throne 做的处理，将于 2026年9月30日移除
-if [ -s $WORK_DIR/nginx.conf ] && grep -q 'Neko|Throne' $WORK_DIR/nginx.conf; then
-  sed -i 's@~\*Neko|Throne.*@~*Throne|Neko              /throne;         # 匹配 Throne / Neko 客户端@g' "$WORK_DIR/nginx.conf"
-  [ -s $WORK_DIR/subscribe/neko ] && rm -f $WORK_DIR/subscribe/neko
-  cmd_systemctl restart sing-box
-  export_list >/dev/null 2>&1
 fi
 
 # 传参
@@ -6738,6 +6816,7 @@ for z in ${!ALL_PARAMETER[@]}; do
       change_config; exit 0
       ;;
     -U )
+      # 归属校验复用 check_install()（含非本脚本安装的拦截）；卸载模式下其预下载已被 IS_UNINSTALL 守卫跳过
       check_install; uninstall; exit 0
       ;;
     -N )
