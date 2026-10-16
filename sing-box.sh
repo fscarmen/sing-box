@@ -1916,23 +1916,34 @@ custom_route_menu() {
 
 # 获取 WARP 账户并解析到全局变量 WARP_ADDRESS6 / WARP_PRIVATE_KEY / WARP_RESERVED[1..3]
 # $1 为空则在线注册；非空则直接解析该 JSON（如安装期后台预注册的缓存）
-# 返回 0 成功 / 1 失败（接口无 id 或解析字段缺失），失败时调用方自行兜底
+# 返回 0 成功 / 1 失败（数据缺失、格式错误或 reserved 超出 0-255），失败时调用方自行兜底
 warp_account_register() {
-  local WARP_ACCOUNT="$1"
+  local WARP_ACCOUNT="${1:-}" WARP_PARSED ADDRESS6 PRIVATE_KEY R1 R2 R3
+  unset WARP_ADDRESS6 WARP_PRIVATE_KEY WARP_RESERVED
   [ -n "$WARP_ACCOUNT" ] || WARP_ACCOUNT=$(timeout 15 bash <(wget -qO- --timeout=5 --tries=1 "https://gitlab.com/fscarmen/warp/-/raw/main/api.sh") --register)
 
-  grep -q '"id"' <<< "$WARP_ACCOUNT" || return 1
+  # WARP API 返回的 JSON 排版可能变化；按字段读取，避免 AWK 把同一行的多个数字拼接。
+  # reserved 和 private_key 可能嵌套在 config 内，按字段查找，不依赖行数。
+  WARP_PARSED=$(jq_exec -er '
+    select((.id | type) == "string" and (.id | length) > 0)
+    | (.config.interface.addresses.v6 // .interface.addresses.v6 // .addresses.v6 // .v6) as $v6
+    | ([.. | objects | .private_key? // empty] | first) as $key
+    | ([.. | objects | .reserved? // empty] | first) as $reserved
+    | select(($v6 | type) == "string" and ($v6 | test("^[0-9A-Fa-f:]+$")) and ($v6 | contains(":")))
+    | select(($key | type) == "string" and ($key | test("^[A-Za-z0-9+/_-]{43}=$")))
+    | select(($reserved | type) == "array" and ($reserved | length) == 3)
+    | select(all($reserved[]; type == "number" and . == floor and . >= 0 and . <= 255))
+    | [$v6, $key, $reserved[0], $reserved[1], $reserved[2]] | @tsv
+  ' <<< "$WARP_ACCOUNT" 2>/dev/null) || return 1
 
-  WARP_ADDRESS6=$(awk -F'"' '/"v6":/ && $4 !~ /^\[/ {print $4}' <<< "$WARP_ACCOUNT")
-  WARP_PRIVATE_KEY=$(awk -F'"' '/"private_key"/{print $4}' <<< "$WARP_ACCOUNT")
-  WARP_RESERVED[1]=$(awk '/"reserved":/ {getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
-  WARP_RESERVED[2]=$(awk '/"reserved":/ {getline; getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
-  WARP_RESERVED[3]=$(awk '/"reserved":/ {getline; getline; getline; gsub(/[^0-9]/, ""); print}' <<< "$WARP_ACCOUNT")
+  IFS=$'\t' read -r ADDRESS6 PRIVATE_KEY R1 R2 R3 <<< "$WARP_PARSED"
+  [ -n "$ADDRESS6" ] && [ -n "$PRIVATE_KEY" ] && [ -n "$R1" ] && [ -n "$R2" ] && [ -n "$R3" ] || return 1
 
-  if [ -z "$WARP_ADDRESS6" ] || [ -z "$WARP_PRIVATE_KEY" ] || [ -z "${WARP_RESERVED[1]}" ] || [ -z "${WARP_RESERVED[2]}" ] || [ -z "${WARP_RESERVED[3]}" ]; then
-    unset WARP_ADDRESS6 WARP_PRIVATE_KEY WARP_RESERVED
-    return 1
-  fi
+  WARP_ADDRESS6="$ADDRESS6"
+  WARP_PRIVATE_KEY="$PRIVATE_KEY"
+  WARP_RESERVED[1]="$R1"
+  WARP_RESERVED[2]="$R2"
+  WARP_RESERVED[3]="$R3"
   return 0
 }
 
