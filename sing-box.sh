@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.26 (2026.10.13)'
+VERSION='v1.3.27 (2026.10.19)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://ghproxy.lvedong.eu.org/' 'https://accel.cloudflare.nyc.mn/')
@@ -40,8 +40,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. Fix the firewall allow rules being appended after an existing REJECT/DROP rule on the INPUT chain, which left node and nginx ports unreachable on images such as Oracle OCI and OpenVZ; the rules are now inserted before the first REJECT/DROP rule. ufw / firewalld hosts are not affected, as those place allow rules ahead of any terminal rule by design. 2. Fix occasional empty version detection when checking for sing-box updates, which could abort installation or upgrade; the version is now read from the lightweight releases.atom feed first, with the GitHub API as fallback. 3. Enable readline line editing on interactive inputs: ← / → move the cursor, Home / End and Ctrl+A / Ctrl+E jump to line start / end, Ctrl+W deletes the previous word, Ctrl+U clears to line start, Ctrl+K deletes to line end, Ctrl+Y undoes the last deletion, Ctrl+L clears the screen; editing keys are no longer inserted into the value. 4. Make the uninstall path fully offline: sb -u no longer runs CDN detection and no longer pre-downloads subscription templates, binaries or cloudflared, so it completes immediately on hosts that cannot reach GitHub; 5. update GitHub proxy CDN endpoints"
-C[1]="1. 修复入站放行规则被追加到 INPUT 链已有的 REJECT/DROP 规则之后，导致甲骨文 OCI、OpenVZ 等镜像上节点端口与 nginx 端口无法访问的问题；放行规则现改为插入到第一条 REJECT/DROP 规则之前。ufw / firewalld 机器不受影响，这类防火墙本身就把放行规则放在终结规则之前; 2. 修复检测 sing-box 更新时偶尔取不到最新版本号、导致安装或升级中断的问题；改为优先从体积很小的 releases.atom 获取，github api 作为兜底; 3. 交互输入启用 readline 行编辑：← / → 移动光标，Home / End 与 Ctrl+A / Ctrl+E 跳到行首 / 行尾，Ctrl+W 删除光标前一个词，Ctrl+U 清空到行首，Ctrl+K 删除到行尾，Ctrl+Y 撤销上一次删除，Ctrl+L 清屏；方向键等编辑键不再被当作内容插入输入值; 4. 卸载流程完全离线化：sb -u 不再执行 CDN 探测，也不再预下载订阅模板、二进制与 cloudflared，GitHub 不可达时也能立即完成卸载; 5. 更换 GitHub 代理与 CDN 加速节点"
+E[1]="[sb -d]: switch XTLS reality between xtls-rprx-vision and multiplex"
+C[1]="[sb -d] 添加 XTLS reality 的 xtls-rprx-vision 与多路复用相互切换"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -424,6 +424,10 @@ E[191]="Firewall: the allow rules were inserted before the final REJECT/DROP rul
 C[191]="防火墙：入站放行规则已插入到 INPUT 链末尾的 REJECT/DROP 规则之前，现已生效。"
 E[192]="Firewall: that REJECT/DROP rule carries match conditions, so the allow rules are not restricted by them. Adjust it manually if this is not intended."
 C[192]="防火墙：该 REJECT/DROP 规则带有匹配条件，放行规则不受其限制。如非预期，请自行调整该规则。"
+E[193]="Switch XTLS reality to Multiplex (current: vision)"
+C[193]="XTLS reality 切换为多路复用（当前：vision）"
+E[194]="Switch XTLS reality to Vision (current: multiplex)"
+C[194]="XTLS reality 切换为 vision（当前：多路复用）"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -819,6 +823,16 @@ change_config() {
     MENU_IDX+=(139) && MENU_KEY+=(hy2hopping) && MENU_VAL+=("${HY2_PORT_HOPPING_RANGE}")
   fi
 
+  # XTLS + reality 的 vision / 多路复用切换（仅在已安装 XTLS+reality 时显示）
+  # 以服务端 multiplex.enabled 为唯一真相源：true → 当前多路复用，显示“切换为 vision”；否则显示“切换为多路复用”
+  if ls ${WORK_DIR}/conf/*_${NODE_TAG[0]}_inbounds.json >/dev/null 2>&1; then
+    if awk '/"multiplex"[[:space:]]*:/{m=1} m&&/"enabled"[[:space:]]*:/{if(match($0,/true|false/)) print substr($0,RSTART,RLENGTH); exit}' ${WORK_DIR}/conf/*_${NODE_TAG[0]}_inbounds.json 2>/dev/null | grep -q '^true$'; then
+      MENU_IDX+=(194) && MENU_KEY+=(xtlsmux) && MENU_VAL+=("multiplex")
+    else
+      MENU_IDX+=(193) && MENU_KEY+=(xtlsmux) && MENU_VAL+=("vision")
+    fi
+  fi
+
   # 自定义路由规则（仅支持 TUN 且 warp-ep 出站存在时显示；无 TUN 时无该出站，隐藏入口）
   [ "$IS_TUN" = 'is_tun' ] && grep -q '"warp-ep"' ${WORK_DIR}/conf/02_endpoints.json 2>/dev/null && {
     CUSTOM_ROUTE_COUNT=$(custom_route_count)
@@ -997,6 +1011,32 @@ change_config() {
       fi
     done
 
+    export_list
+    return
+  elif [ "$KEY" = "xtlsmux" ]; then
+    # XTLS + reality 的 vision / 多路复用互斥切换：改写服务端 flow 与 multiplex 后 reload
+    local XTLS_CONF
+    XTLS_CONF=$(ls ${WORK_DIR}/conf/*_${NODE_TAG[0]}_inbounds.json 2>/dev/null | sed -n '1p')
+    [ -z "$XTLS_CONF" ] && error " $(text 107) "
+    # 以 multiplex.enabled 为唯一真相源判断当前模式，取反后逐行改写（awk 保留注释行与整体结构），无需 check / 回滚
+    if awk '/"multiplex"[[:space:]]*:/{m=1} m&&/"enabled"[[:space:]]*:/{if(match($0,/true|false/)) print substr($0,RSTART,RLENGTH); exit}' "$XTLS_CONF" 2>/dev/null | grep -q '^true$'; then
+      # 当前多路复用 → 切回 vision：flow 恢复 xtls-rprx-vision，multiplex 三项归 false
+      local NEW_FLOW='xtls-rprx-vision' NEW_ENABLED=false NEW_PADDING=false NEW_BRUTAL=false
+      unset IS_XTLS_MULTIPLEX
+    else
+      # 当前 vision → 切到多路复用：flow 留空，multiplex.enabled/padding 置 true，brutal 跟随 IS_BRUTAL
+      local NEW_FLOW='' NEW_ENABLED=true NEW_PADDING=true NEW_BRUTAL="${IS_BRUTAL}"
+      IS_XTLS_MULTIPLEX='is_xtls_multiplex'
+    fi
+    # 逐行改写：flow / multiplex.enabled / padding / brutal.enabled 精确锚定 key，注释行与结构原样保留
+    awk -v flow="$NEW_FLOW" -v en="$NEW_ENABLED" -v pad="$NEW_PADDING" -v bru="$NEW_BRUTAL" '
+      /"flow"[[:space:]]*:/        { sub(/"flow"[[:space:]]*:[[:space:]]*"[^"]*"/, "\"flow\":\"" flow "\""); print; next }
+      /"multiplex"[[:space:]]*:/   { mux=1; print; next }
+      mux && /"enabled"[[:space:]]*:/ { n++; v = (n == 1 ? en : bru); sub(/"enabled"[[:space:]]*:[[:space:]]*(true|false)/, "\"enabled\": " v); print; next }
+      mux && /"padding"[[:space:]]*:/ { sub(/"padding"[[:space:]]*:[[:space:]]*(true|false)/, "\"padding\": " pad); print; next }
+                               { print }
+    ' "$XTLS_CONF" > "${XTLS_CONF}.tmp" && mv "${XTLS_CONF}.tmp" "$XTLS_CONF"
+    cmd_systemctl reload sing-box
     export_list
     return
   elif [ "$KEY" = "customroute" ]; then
@@ -4415,6 +4455,13 @@ sing-box_json() {
   CHECK_PROTOCOLS=b
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     [ -z "$PORT_XTLS_REALITY" ] && PORT_XTLS_REALITY=$(( START_PORT+$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}") ))
+    # vision 与 multiplex 在服务端互斥，二选一：IS_XTLS_MULTIPLEX 置位走多路复用（flow 留空），否则走 vision 流控
+    local XTLS_REALITY_FLOW XTLS_MUX_ENABLED XTLS_MUX_PADDING XTLS_MUX_BRUTAL
+    if [ "$IS_XTLS_MULTIPLEX" = 'is_xtls_multiplex' ]; then
+      XTLS_REALITY_FLOW='' && XTLS_MUX_ENABLED='true' && XTLS_MUX_PADDING='true' && XTLS_MUX_BRUTAL="${IS_BRUTAL}"
+    else
+      XTLS_REALITY_FLOW='xtls-rprx-vision' && XTLS_MUX_ENABLED='false' && XTLS_MUX_PADDING='false' && XTLS_MUX_BRUTAL='false'
+    fi
     NODE_NAME[11]=${NODE_NAME[11]:-"$NODE_NAME_CONFIRM"} && UUID[11]=${UUID[11]:-"$UUID_CONFIRM"} && REALITY_PRIVATE[11]=${REALITY_PRIVATE[11]:-"$REALITY_PRIVATE"} && REALITY_PUBLIC[11]=${REALITY_PUBLIC[11]:-"$REALITY_PUBLIC"} &&
     cat > ${WORK_DIR}/conf/11_${NODE_TAG[0]}_inbounds.json << EOF
 //  "public_key":"${REALITY_PUBLIC[11]}"
@@ -4428,7 +4475,7 @@ sing-box_json() {
             "users":[
                 {
                     "uuid":"${UUID[11]}",
-                    "flow":"xtls-rprx-vision"
+                    "flow":"${XTLS_REALITY_FLOW}"
                 }
             ],
             "tls":{
@@ -4447,10 +4494,10 @@ sing-box_json() {
                 }
             },
             "multiplex":{
-                "enabled":false,
-                "padding":false,
+                "enabled":${XTLS_MUX_ENABLED},
+                "padding":${XTLS_MUX_PADDING},
                 "brutal":{
-                    "enabled":false,
+                    "enabled":${XTLS_MUX_BRUTAL},
                     "up_mbps":1000,
                     "down_mbps":1000
                 }
@@ -5111,7 +5158,7 @@ EOF
 
 # 获取原有各协议的参数，先清空所有的 key-value
 fetch_nodes_value() {
-  unset NODE_NAME PORT_XTLS_REALITY UUID TLS_SERVER REALITY_PRIVATE REALITY_PUBLIC PORT_HYSTERIA2 HY2_REALM_ID IS_HY2_REALM IS_HY2_IGNORE IS_HY2_WARP PORT_TUIC TUIC_PASSWORD TUIC_CONGESTION_CONTROL PORT_SHADOWTLS SHADOWTLS_PASSWORD SHADOWSOCKS_METHOD PORT_SHADOWSOCKS PORT_TROJAN TROJAN_PASSWORD PORT_VMESS_WS VMESS_WS_PATH WS_SERVER_IP WS_SERVER_IP_SHOW VMESS_HOST_DOMAIN CDN CDN_PORT PORT_VLESS_WS VLESS_WS_PATH VLESS_HOST_DOMAIN PORT_H2_REALITY PORT_GRPC_REALITY ARGO_DOMAIN PORT_ANYTLS PORT_NAIVE SELF_SIGNED_FINGERPRINT_SHA256 SELF_SIGNED_FINGERPRINT_BASE64
+  unset NODE_NAME PORT_XTLS_REALITY UUID TLS_SERVER REALITY_PRIVATE REALITY_PUBLIC PORT_HYSTERIA2 HY2_REALM_ID IS_HY2_REALM IS_HY2_IGNORE IS_HY2_WARP PORT_TUIC TUIC_PASSWORD TUIC_CONGESTION_CONTROL PORT_SHADOWTLS SHADOWTLS_PASSWORD SHADOWSOCKS_METHOD PORT_SHADOWSOCKS PORT_TROJAN TROJAN_PASSWORD PORT_VMESS_WS VMESS_WS_PATH WS_SERVER_IP WS_SERVER_IP_SHOW VMESS_HOST_DOMAIN CDN CDN_PORT PORT_VLESS_WS VLESS_WS_PATH VLESS_HOST_DOMAIN PORT_H2_REALITY PORT_GRPC_REALITY ARGO_DOMAIN PORT_ANYTLS PORT_NAIVE SELF_SIGNED_FINGERPRINT_SHA256 SELF_SIGNED_FINGERPRINT_BASE64 IS_XTLS_MULTIPLEX
 
   # 获取公共数据
   ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && SERVER_IP=$(awk -F '"' '/"WS_SERVER_IP_SHOW"/{print $4; exit}' ${WORK_DIR}/conf/*-ws*inbounds.json) || SERVER_IP=$([ -s ${WORK_DIR}/list ] && grep -A1 '"tag"' ${WORK_DIR}/list | sed -E '/-ws(-tls)*",$/{N;d}' | awk -F '"' '/"server"/{count++; if (count == 1) {print $4; exit}}')
@@ -5144,7 +5191,12 @@ fetch_nodes_value() {
   PORT_NGINX=$(awk '/listen/{print $2; exit}' ${WORK_DIR}/nginx.conf)
 
   # 获取 XTLS + Reality key-value
-  [ -s ${WORK_DIR}/conf/*_${NODE_TAG[0]}_inbounds.json ] && local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[0]}_inbounds.json) && NODE_NAME[11]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[0]}.*/\1/p" <<< "$JSON") && PORT_XTLS_REALITY=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[11]=$(awk -F '"' '/"uuid"/{print $4}' <<< "$JSON") && REALITY_PRIVATE[11]=$(awk -F '"' '/"private_key"/{print $4}' <<< "$JSON") && REALITY_PUBLIC[11]=$(awk -F '"' '/"public_key"/{print $4}' <<< "$JSON")
+  # 同时按服务端 multiplex.enabled 回读当前模式（true → 多路复用，否则 vision），供重装 / 改协议保留用户选择
+  if [ -s ${WORK_DIR}/conf/*_${NODE_TAG[0]}_inbounds.json ]; then
+    local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[0]}_inbounds.json)
+    NODE_NAME[11]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[0]}.*/\1/p" <<< "$JSON") && PORT_XTLS_REALITY=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[11]=$(awk -F '"' '/"uuid"/{print $4}' <<< "$JSON") && REALITY_PRIVATE[11]=$(awk -F '"' '/"private_key"/{print $4}' <<< "$JSON") && REALITY_PUBLIC[11]=$(awk -F '"' '/"public_key"/{print $4}' <<< "$JSON")
+    awk '/"multiplex"[[:space:]]*:/{m=1} m&&/"enabled"[[:space:]]*:/{if(match($0,/true|false/)) print substr($0,RSTART,RLENGTH); exit}' ${WORK_DIR}/conf/*_${NODE_TAG[0]}_inbounds.json 2>/dev/null | grep -q '^true$' && IS_XTLS_MULTIPLEX='is_xtls_multiplex' || unset IS_XTLS_MULTIPLEX
+  fi
 
   # 获取 Hysteria2 key-value
   if [ -s ${WORK_DIR}/conf/*_${NODE_TAG[1]}_inbounds.json ]; then
@@ -5339,9 +5391,9 @@ export_list() {
     local FLOW="$(awk -F '"' '/"flow"/{print $4}' ${WORK_DIR}/conf/*_${NODE_TAG[0]}_inbounds.json)"
 
     if [ "${FLOW}" = 'xtls-rprx-vision' ]; then
-      local VISION_OR_MUX_SHADOWROCKET='xtls=2' && local VISION_FLOW='&flow=xtls-rprx-vision' && local VISION_OR_MUX_CLASH=', flow: xtls-rprx-vision' && local MULTIPLEX_PADDING_ENABLED='false' && local VISION_BRUTAL_ENABLED='false'
+      local VISION_OR_MUX_SHADOWROCKET='xtls=2' && local VISION_FLOW='&flow=xtls-rprx-vision' && local VISION_OR_MUX_CLASH=', flow: xtls-rprx-vision' && local MULTIPLEX_PADDING_ENABLED='false' && local VISION_BRUTAL_ENABLED='false' && local THRONE_MUX_PARAMS=''
     else
-      local VISION_OR_MUX_SHADOWROCKET='mux=1' && local MULTIPLEX_PADDING_ENABLED='true' && local VISION_BRUTAL_ENABLED="${IS_BRUTAL}"
+      local VISION_OR_MUX_SHADOWROCKET='mux=1' && local MULTIPLEX_PADDING_ENABLED='true' && local VISION_BRUTAL_ENABLED="${IS_BRUTAL}" && local THRONE_MUX_PARAMS='&mux=true&mux_xudp_concurrency=16'
     fi
   fi
 
@@ -5715,7 +5767,7 @@ v2rayn://naive/$(echo -n "{\"ConfigType\":12,\"CoreType\":24,\"ConfigVersion\":4
   # 生成 Throne 订阅文件
   [ -n "$PORT_XTLS_REALITY" ] && local THRONE_SUBSCRIBE+="
 ----------------------------
-vless://${UUID[11]}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?security=reality&sni=${TLS_SERVER}&fp=${FINGER_PRINT}&pbk=${REALITY_PUBLIC[11]}&type=tcp${VISION_FLOW}&encryption=none#${NODE_NAME[11]// /%20}%20${NODE_TAG[0]}"
+vless://${UUID[11]}@${SERVER_IP_1}:${PORT_XTLS_REALITY}?security=reality&sni=${TLS_SERVER}&fp=${FINGER_PRINT}&pbk=${REALITY_PUBLIC[11]}&type=tcp${VISION_FLOW}${THRONE_MUX_PARAMS}&encryption=none#${NODE_NAME[11]// /%20}%20${NODE_TAG[0]}"
 
   if [ -n "$PORT_HYSTERIA2" ]; then
     local THRONE_PARAMS="allowInsecure=false&alpn&security=tls&sni=${TLS_SERVER}"

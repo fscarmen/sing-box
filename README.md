@@ -25,18 +25,20 @@
 
 * * *
 ## 1.更新信息
+2026.10.13 v1.3.27 [sb -d]: switch XTLS reality between xtls-rprx-vision and multiplex; [sb -d] 添加 XTLS reality 的 xtls-rprx-vision 与多路复用相互切换
+
 2026.10.13 v1.3.26 1. Fix the firewall allow rules being appended after an existing `REJECT`/`DROP` rule on the `INPUT` chain, which left node and `nginx` ports unreachable on images such as Oracle OCI and OpenVZ; the rules are now inserted before the first `REJECT`/`DROP` rule https://github.com/fscarmen/sing-box/issues/353; 2. Fix occasional empty version detection when checking for `sing-box` updates, which could abort installation or upgrade; the version is now read from the lightweight `releases.atom` feed first, with the GitHub API as fallback https://github.com/fscarmen/sing-box/issues/355; 3. Enable `readline` line editing on interactive inputs: arrow keys move the cursor, `Home` / `End` and `Ctrl+A` / `Ctrl+E` jump to line start / end, `Ctrl+W` deletes the previous word, `Ctrl+U` clears to line start, `Ctrl+K` deletes to line end, `Ctrl+Y` undoes the last deletion, `Ctrl+L` clears the screen; editing keys are no longer inserted into the value https://github.com/fscarmen/sing-box/pull/357#issuecomment-6137941771; 4. Make the uninstall path fully offline: `sb -u` no longer runs CDN detection and no longer pre-downloads subscription templates, binaries or `cloudflared`, so it completes immediately on hosts that cannot reach GitHub https://github.com/fscarmen/sing-box/issues/358; 5. update GitHub proxy CDN endpoints https://github.com/fscarmen/sing-box/issues/359; 1. 修复入站放行规则被追加到 `INPUT` 链已有的 `REJECT`/`DROP` 规则之后，导致甲骨文 OCI、OpenVZ 等镜像上节点端口与 `nginx` 端口无法访问的问题；放行规则现改为插入到第一条 `REJECT`/`DROP` 规则之前 https://github.com/fscarmen/sing-box/issues/353; 2. 修复检测 `sing-box` 更新时偶尔取不到最新版本号、导致安装或升级中断的问题；改为优先从体积很小的 `releases.atom` 获取，GitHub API 作为兜底 https://github.com/fscarmen/sing-box/issues/355; 3. 交互输入启用 `readline` 行编辑：方向键移动光标，`Home` / `End` 与 `Ctrl+A` / `Ctrl+E` 跳到行首 / 行尾，`Ctrl+W` 删除光标前一个词，`Ctrl+U` 清空到行首，`Ctrl+K` 删除到行尾，`Ctrl+Y` 撤销上一次删除，`Ctrl+L` 清屏；编辑键不再被当作内容插入输入值 https://github.com/fscarmen/sing-box/pull/357#issuecomment-6137941771; 4. 卸载流程完全离线化：`sb -u` 不再执行 CDN 探测，也不再预下载订阅模板、二进制与 `cloudflared`，GitHub 不可达时也能立即完成卸载 https://github.com/fscarmen/sing-box/issues/358; 5. 更换 GitHub 代理与 CDN 加速节点 https://github.com/fscarmen/sing-box/issues/359
 
 2026.09.16 v1.3.25 Add Hysteria2 ignore_client_bandwidth toggle in [sb -d], default off; [sb -d] 新增 Hysteria2 ignore_client_bandwidth 开关，新安装默认关闭
-
-2026.08.21 v1.3.24 1. Add no-TUN environment support; 2. Fix Alpine OpenRC service stop error; 1. 新增无 TUN 环境支持; 2. 修复 Alpine OpenRC 服务停止误报
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
 <br>
 
+>2026.08.21 v1.3.24 1. Add no-TUN environment support; 2. Fix Alpine OpenRC service stop error; 1. 新增无 TUN 环境支持; 2. 修复 Alpine OpenRC 服务停止误报
+>
 >2026.08.14 v1.3.23 Force HTTP/2 transport for cloudflared tunnels; cloudflared 隧道统一使用 HTTP/2 传>输
-
+>
 >2026.08.11 v1.3.22 make Hysteria2 Realm and port hopping mutually exclusive with confirm prompts in install and [sb -d]; 安装与 [sb -d] 修改链路中 Realm 与端口跳跃互斥，切换前均先提示确认
 >
 >2026.08.11 v1.3.21 1. Pre-register a fresh WARP account during install with shared-key fallback; 2. [sb -d] Change WARP account with register / manual input, hot-reload via sing-box check + SIGHUP and exit after success; 1. 安装期后台预注册 WARP 账户，失败回退共享密钥; 2. [sb -d] 菜单新增「更换 WARP 账户」，支持重新注册 / 手动输入，sing-box check + SIGHUP 热更成功后退出
