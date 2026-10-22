@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.27 (2026.10.19)'
+VERSION='v1.3.28 (2026.10.22)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://ghproxy.lvedong.eu.org/' 'https://accel.cloudflare.nyc.mn/')
@@ -40,8 +40,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="[sb -d]: switch XTLS reality between xtls-rprx-vision and multiplex"
-C[1]="[sb -d] 添加 XTLS reality 的 xtls-rprx-vision 与多路复用相互切换"
+E[1]="1. [sb -d]: switch XTLS reality between xtls-rprx-vision and multiplex; 2. [sb -v]: sync cloudflared (Argo) to the latest version, independently from Sing-box (checked first, then Sing-box)"
+C[1]="1. [sb -d] 添加 XTLS reality 的 xtls-rprx-vision 与多路复用相互切换; 2. [sb -v] 支持同步升级 cloudflared (Argo)，与 Sing-box 相互独立（先检查 cloudflared，再检查 Sing-box）"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -100,8 +100,8 @@ E[29]="View links (sb -n)"
 C[29]="查看节点信息 (sb -n)"
 E[30]="Listen ports  (current: \${VAL_ITEM})"
 C[30]="监听端口  (当前: \${VAL_ITEM})"
-E[31]="Sync Sing-box to the latest version (sb -v)"
-C[31]="同步 Sing-box 至最新版本 (sb -v)"
+E[31]="Sync Sing-box and Argo to the latest version (sb -v)"
+C[31]="同步 Sing-box 和 Argo 至最新版本 (sb -v)"
 E[32]="Upgrade kernel, turn on BBR, change Linux system (sb -b)"
 C[32]="升级内核、安装BBR、DD脚本 (sb -b)"
 E[33]="Uninstall (sb -u)"
@@ -118,8 +118,8 @@ E[38]="failed"
 C[38]="失败"
 E[39]="Sing-box is not installed and cannot change the Argo tunnel."
 C[39]="Sing-box 未安装，不能更换 Argo 隧道"
-E[40]="Sing-box local verion: \$LOCAL\\\t The newest verion: \$ONLINE"
-C[40]="Sing-box 本地版本: \$LOCAL\\\t 最新版本: \$ONLINE"
+E[40]="\${APP} local version: \${LOCAL}.\\\t The newest version: \${ONLINE}"
+C[40]="\${APP} 本地版本: \${LOCAL}.\\\t 最新版本: \${ONLINE}"
 E[41]="No upgrade required."
 C[41]="不需要升级"
 E[42]="Downloading the latest version Sing-box failed, script exits. Feedback:[https://github.com/fscarmen/sing-box/issues]"
@@ -428,6 +428,8 @@ E[193]="Switch XTLS reality to Multiplex (current: vision)"
 C[193]="XTLS reality 切换为多路复用（当前：vision）"
 E[194]="Switch XTLS reality to Vision (current: multiplex)"
 C[194]="XTLS reality 切换为 vision（当前：多路复用）"
+E[195]="Downloading the latest version \${APP} failed, script exits. Feedback:[https://github.com/fscarmen/sing-box/issues]"
+C[195]="下载最新版本 \${APP} 失败，脚本退出，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -6527,18 +6529,43 @@ uninstall() {
   fi
 }
 
-# Sing-box 的最新版本
+# 两者各自独立询问、独立升级：UPDATE[0]=Argo(cloudflared)，UPDATE[1]=Sing-box。
 version() {
-  # 获取需要下载的 sing-box 版本
-  local ONLINE=$(get_sing_box_version)
+  # Argo (cloudflared) 版本检测：仅在已部署 Argo（守护进程文件存在）时进行
+  local ARGO_ONLINE ARGO_LOCAL
+  if [ -s ${ARGO_DAEMON_FILE} ]; then
+    ARGO_ONLINE=$(wget --no-check-certificate --tries=2 --timeout=10 -qO- "${GH_PROXY}https://api.github.com/repos/cloudflare/cloudflared/releases/latest" | grep "tag_name" | cut -d \" -f4)
+    grep -q '.' <<< "$ARGO_ONLINE" || error " $(text 100) \n"
+    ARGO_LOCAL=$(${WORK_DIR}/cloudflared -v | awk '{for (i=1; i<NF; i++) if ($i=="version") {print $(i+1); exit}}')
+    local APP=Argo LOCAL="$ARGO_LOCAL" ONLINE="$ARGO_ONLINE"
+    info "\n $(text 40) "
+    [[ -n "$ARGO_ONLINE" && "$ARGO_ONLINE" != "$ARGO_LOCAL" ]] && reading "\n $(text 9) " UPDATE[0] || info " $(text 41) "
+  fi
 
+  # Sing-box 版本检测
+  local ONLINE=$(get_sing_box_version)
   grep -q '.' <<< "$ONLINE" || error " $(text 100) \n"
   local LOCAL=$(${WORK_DIR}/sing-box version | awk '/version/{print $NF}')
-  info "\n $(text 40) "
-  [[ -n "$ONLINE" && "$ONLINE" != "$LOCAL" ]] && reading "\n $(text 9) " UPDATE || info " $(text 41) "
+  local APP=Sing-box && info "\n $(text 40) "
+  [[ -n "$ONLINE" && "$ONLINE" != "$LOCAL" ]] && reading "\n $(text 9) " UPDATE[1] || info " $(text 41) "
 
-  if [ "${UPDATE,,}" = 'y' ]; then
-    check_system_info
+  [[ "${UPDATE[*],,}" =~ y ]] && check_system_info
+
+  # 升级 Argo (cloudflared)
+  if [ "${UPDATE[0],,}" = 'y' ]; then
+    wget --no-check-certificate --continue --tries=2 --timeout=10 -qO $TEMP_DIR/cloudflared ${GH_PROXY}https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$ARGO_ARCH 2>/dev/null
+    if [ -s $TEMP_DIR/cloudflared ]; then
+      cmd_systemctl disable argo
+      chmod +x $TEMP_DIR/cloudflared && mv $TEMP_DIR/cloudflared ${WORK_DIR}/cloudflared
+      cmd_systemctl enable argo
+      cmd_systemctl status argo &>/dev/null && info " Argo $(text 28) $(text 37)" || error " Argo $(text 28) $(text 38) "
+    else
+      local APP=Argo && error "\n $(text 195) "
+    fi
+  fi
+
+  # 升级 Sing-box
+  if [ "${UPDATE[1],,}" = 'y' ]; then
     # 先下载到临时文件并校验完整性，避免中断导致损坏的压缩包直接喂给 tar 报错；失败自动重试（第2次起去掉代理直连）
     # 直接使用文件路径，仅保留 URL 切换变量、循环计数变量
     local SB_UP_URL UP_TRY
@@ -6604,6 +6631,12 @@ version() {
 
       cmd_systemctl status sing-box &>/dev/null && info "\n $(text 105) \n" || error "\n $(text 106) \n"
     fi
+  fi
+
+  # 全部升级完成后统一处理：仅当升级过 Argo 且当前是临时隧道（--url）时，重启后隧道域名会变化，需重新获取并刷新节点信息；未升级 Argo 或为固定隧道（Token / Json）时域名不变，无需处理
+  if [ "${UPDATE[0],,}" = 'y' ] && grep -qs '\--url' ${ARGO_DAEMON_FILE} && cmd_systemctl status argo &>/dev/null; then
+    fetch_quicktunnel_domain
+    export_list
   fi
 }
 

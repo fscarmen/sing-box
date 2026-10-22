@@ -25,6 +25,8 @@
 
 * * *
 ## 1.更新信息
+2026.10.22 v1.3.28 sync cloudflared (Argo) in [sb -v], independent from sing-box https://github.com/fscarmen/sing-box/issues/364; [sb -v] 支持同步升级 cloudflared (Argo)，与 Sing-box 相互独立 https://github.com/fscarmen/sing-box/issues/364
+
 2026.10.13 v1.3.27 [sb -d]: switch XTLS reality between xtls-rprx-vision and multiplex; [sb -d] 添加 XTLS reality 的 xtls-rprx-vision 与多路复用相互切换
 
 2026.10.13 v1.3.26 1. Fix the firewall allow rules being appended after an existing `REJECT`/`DROP` rule on the `INPUT` chain, which left node and `nginx` ports unreachable on images such as Oracle OCI and OpenVZ; the rules are now inserted before the first `REJECT`/`DROP` rule https://github.com/fscarmen/sing-box/issues/353; 2. Fix occasional empty version detection when checking for `sing-box` updates, which could abort installation or upgrade; the version is now read from the lightweight `releases.atom` feed first, with the GitHub API as fallback https://github.com/fscarmen/sing-box/issues/355; 3. Enable `readline` line editing on interactive inputs: arrow keys move the cursor, `Home` / `End` and `Ctrl+A` / `Ctrl+E` jump to line start / end, `Ctrl+W` deletes the previous word, `Ctrl+U` clears to line start, `Ctrl+K` deletes to line end, `Ctrl+Y` undoes the last deletion, `Ctrl+L` clears the screen; editing keys are no longer inserted into the value https://github.com/fscarmen/sing-box/pull/357#issuecomment-6137941771; 4. Make the uninstall path fully offline: `sb -u` no longer runs CDN detection and no longer pre-downloads subscription templates, binaries or `cloudflared`, so it completes immediately on hosts that cannot reach GitHub https://github.com/fscarmen/sing-box/issues/358; 5. update GitHub proxy CDN endpoints https://github.com/fscarmen/sing-box/issues/359; 1. 修复入站放行规则被追加到 `INPUT` 链已有的 `REJECT`/`DROP` 规则之后，导致甲骨文 OCI、OpenVZ 等镜像上节点端口与 `nginx` 端口无法访问的问题；放行规则现改为插入到第一条 `REJECT`/`DROP` 规则之前 https://github.com/fscarmen/sing-box/issues/353; 2. 修复检测 `sing-box` 更新时偶尔取不到最新版本号、导致安装或升级中断的问题；改为优先从体积很小的 `releases.atom` 获取，GitHub API 作为兜底 https://github.com/fscarmen/sing-box/issues/355; 3. 交互输入启用 `readline` 行编辑：方向键移动光标，`Home` / `End` 与 `Ctrl+A` / `Ctrl+E` 跳到行首 / 行尾，`Ctrl+W` 删除光标前一个词，`Ctrl+U` 清空到行首，`Ctrl+K` 删除到行尾，`Ctrl+Y` 撤销上一次删除，`Ctrl+L` 清屏；编辑键不再被当作内容插入输入值 https://github.com/fscarmen/sing-box/pull/357#issuecomment-6137941771; 4. 卸载流程完全离线化：`sb -u` 不再执行 CDN 探测，也不再预下载订阅模板、二进制与 `cloudflared`，GitHub 不可达时也能立即完成卸载 https://github.com/fscarmen/sing-box/issues/358; 5. 更换 GitHub 代理与 CDN 加速节点 https://github.com/fscarmen/sing-box/issues/359
@@ -209,7 +211,7 @@ sb
   | -d              | Change config 修改参数 |
   | -s              | Stop / Start the Sing-box service 停止/开启 Sing-box 服务 |
   | -a              | Stop / Start the Argo Tunnel service 停止/开启 Argo Tunnel 服务 |
-  | -v              | Sync Argo Xray to the newest 同步 Argo Xray 到最新版本 |
+  | -v              | Sync Sing-box and Cloudflared to the newest 同步 Sing-box 和 Cloudflared 到最新版本 |
   | -b              | Upgrade kernel, turn on BBR, change Linux system 升级内核、安装BBR、DD脚本 |
   | -r              | Add and remove protocols 添加和删除协议 |
 
