@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.28 (2026.10.22)'
+VERSION='v1.3.28 (2026.10.26)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://ghproxy.lvedong.eu.org/' 'https://accel.cloudflare.nyc.mn/')
@@ -22,7 +22,7 @@ NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
 CDN_DOMAIN=("skk.moe" "ip.sb" "time.is" "cfip.xxxxxxxx.tk" "bestcf.top" "cdn.2020111.xyz" "xn--b6gac.eu.org" "cf.090227.xyz")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
-DEFAULT_NEWEST_VERSION='1.15.0-alpha.12'
+DEFAULT_NEWEST_VERSION='1.15.0-alpha.13'
 FINGER_PRINT='chrome'
 STEP_NUM=0      # 当前步骤编号（安装流程中动态递增）
 TOTAL_STEPS=''  # 总步骤数（协议确定后动态计算）
@@ -2229,7 +2229,7 @@ change_argo() {
 }
 
 check_root() {
-  [ "$(id -u)" != 0 ] && error "\n $(text 43) \n"
+  [ "$(id -u)" != 0 ] && error "\n ${E[43]}\n\n ${C[43]} \n"
 }
 
 # 判断处理器架构
