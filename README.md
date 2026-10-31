@@ -25,18 +25,20 @@
 
 * * *
 ## 1.更新信息
+2026.10.31 v1.3.29 Hysteria2 流量不再通过 WARP 出站，存量 Hysteria2 专属 WARP 路由自动清理；Hysteria2 Realm 功能保持不变
+
 2026.10.22 v1.3.28 sync cloudflared (Argo) in [sb -v], independent from sing-box https://github.com/fscarmen/sing-box/issues/364; [sb -v] 支持同步升级 cloudflared (Argo)，与 Sing-box 相互独立 https://github.com/fscarmen/sing-box/issues/364
 
 2026.10.13 v1.3.27 [sb -d]: switch XTLS reality between xtls-rprx-vision and multiplex; [sb -d] 添加 XTLS reality 的 xtls-rprx-vision 与多路复用相互切换
-
-2026.10.13 v1.3.26 1. Fix the firewall allow rules being appended after an existing `REJECT`/`DROP` rule on the `INPUT` chain, which left node and `nginx` ports unreachable on images such as Oracle OCI and OpenVZ; the rules are now inserted before the first `REJECT`/`DROP` rule https://github.com/fscarmen/sing-box/issues/353; 2. Fix occasional empty version detection when checking for `sing-box` updates, which could abort installation or upgrade; the version is now read from the lightweight `releases.atom` feed first, with the GitHub API as fallback https://github.com/fscarmen/sing-box/issues/355; 3. Enable `readline` line editing on interactive inputs: arrow keys move the cursor, `Home` / `End` and `Ctrl+A` / `Ctrl+E` jump to line start / end, `Ctrl+W` deletes the previous word, `Ctrl+U` clears to line start, `Ctrl+K` deletes to line end, `Ctrl+Y` undoes the last deletion, `Ctrl+L` clears the screen; editing keys are no longer inserted into the value https://github.com/fscarmen/sing-box/pull/357#issuecomment-6137941771; 4. Make the uninstall path fully offline: `sb -u` no longer runs CDN detection and no longer pre-downloads subscription templates, binaries or `cloudflared`, so it completes immediately on hosts that cannot reach GitHub https://github.com/fscarmen/sing-box/issues/358; 5. update GitHub proxy CDN endpoints https://github.com/fscarmen/sing-box/issues/359; 1. 修复入站放行规则被追加到 `INPUT` 链已有的 `REJECT`/`DROP` 规则之后，导致甲骨文 OCI、OpenVZ 等镜像上节点端口与 `nginx` 端口无法访问的问题；放行规则现改为插入到第一条 `REJECT`/`DROP` 规则之前 https://github.com/fscarmen/sing-box/issues/353; 2. 修复检测 `sing-box` 更新时偶尔取不到最新版本号、导致安装或升级中断的问题；改为优先从体积很小的 `releases.atom` 获取，GitHub API 作为兜底 https://github.com/fscarmen/sing-box/issues/355; 3. 交互输入启用 `readline` 行编辑：方向键移动光标，`Home` / `End` 与 `Ctrl+A` / `Ctrl+E` 跳到行首 / 行尾，`Ctrl+W` 删除光标前一个词，`Ctrl+U` 清空到行首，`Ctrl+K` 删除到行尾，`Ctrl+Y` 撤销上一次删除，`Ctrl+L` 清屏；编辑键不再被当作内容插入输入值 https://github.com/fscarmen/sing-box/pull/357#issuecomment-6137941771; 4. 卸载流程完全离线化：`sb -u` 不再执行 CDN 探测，也不再预下载订阅模板、二进制与 `cloudflared`，GitHub 不可达时也能立即完成卸载 https://github.com/fscarmen/sing-box/issues/358; 5. 更换 GitHub 代理与 CDN 加速节点 https://github.com/fscarmen/sing-box/issues/359
-
-2026.09.16 v1.3.25 Add Hysteria2 ignore_client_bandwidth toggle in [sb -d], default off; [sb -d] 新增 Hysteria2 ignore_client_bandwidth 开关，新安装默认关闭
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
 <br>
 
+>2026.10.13 v1.3.26 1. Fix the firewall allow rules being appended after an existing `REJECT`/`DROP` rule on the `INPUT` chain, which left node and `nginx` ports unreachable on images such as Oracle OCI and OpenVZ; the rules are now inserted before the first `REJECT`/`DROP` rule https://github.com/fscarmen/sing-box/issues/353; 2. Fix occasional empty version detection when checking for `sing-box` updates, which could abort installation or upgrade; the version is now read from the lightweight `releases.atom` feed first, with the GitHub API as fallback https://github.com/fscarmen/sing-box/issues/355; 3. Enable `readline` line editing on interactive inputs: arrow keys move the cursor, `Home` / `End` and `Ctrl+A` / `Ctrl+E` jump to line start / end, `Ctrl+W` deletes the previous word, `Ctrl+U` clears to line start, `Ctrl+K` deletes to line end, `Ctrl+Y` undoes the last deletion, `Ctrl+L` clears the screen; editing keys are no longer inserted into the value https://github.com/fscarmen/sing-box/pull/357#issuecomment-6137941771; 4. Make the uninstall path fully offline: `sb -u` no longer runs CDN detection and no longer pre-downloads subscription templates, binaries or `cloudflared`, so it completes immediately on hosts that cannot reach GitHub https://github.com/fscarmen/sing-box/issues/358; 5. update GitHub proxy CDN endpoints https://github.com/fscarmen/sing-box/issues/359; 1. 修复入站放行规则被追加到 `INPUT` 链已有的 `REJECT`/`DROP` 规则之后，导致甲骨文 OCI、OpenVZ 等镜像上节点端口与 `nginx` 端口无法访问的问题；放行规则现改为插入到第一条 `REJECT`/`DROP` 规则之前 https://github.com/fscarmen/sing-box/issues/353; 2. 修复检测 `sing-box` 更新时偶尔取不到最新版本号、导致安装或升级中断的问题；改为优先从体积很小的 `releases.atom` 获取，GitHub API 作为兜底 https://github.com/fscarmen/sing-box/issues/355; 3. 交互输入启用 `readline` 行编辑：方向键移动光标，`Home` / `End` 与 `Ctrl+A` / `Ctrl+E` 跳到行首 / 行尾，`Ctrl+W` 删除光标前一个词，`Ctrl+U` 清空到行首，`Ctrl+K` 删除到行尾，`Ctrl+Y` 撤销上一次删除，`Ctrl+L` 清屏；编辑键不再被当作内容插入输入值 https://github.com/fscarmen/sing-box/pull/357#issuecomment-6137941771; 4. 卸载流程完全离线化：`sb -u` 不再执行 CDN 探测，也不再预下载订阅模板、二进制与 `cloudflared`，GitHub 不可达时也能立即完成卸载 https://github.com/fscarmen/sing-box/issues/358; 5. 更换 GitHub 代理与 CDN 加速节点 https://github.com/fscarmen/sing-box/issues/359
+>
+>2026.09.16 v1.3.25 Add Hysteria2 ignore_client_bandwidth toggle in [sb -d], default off; [sb -d] 新增 Hysteria2 ignore_client_bandwidth 开关，新安装默认关闭
+>
 >2026.08.21 v1.3.24 1. Add no-TUN environment support; 2. Fix Alpine OpenRC service stop error; 1. 新增无 TUN 环境支持; 2. 修复 Alpine OpenRC 服务停止误报
 >
 >2026.08.14 v1.3.23 Force HTTP/2 transport for cloudflared tunnels; cloudflared 隧道统一使用 HTTP/2 传>输
@@ -177,7 +179,7 @@
 
 * 一键部署多协议，可以单选、多选或全选 ShadowTLS v3 / XTLS Reality / Hysteria2 / Tuic V5 / ShadowSocks / Trojan / Vmess + ws / Vless + ws + tls / H2 Reality / gRPC Reality / AnyTLS / NaiveProxy, 总有一款适合你
 * 所有协议均不需要域名，可选 Cloudflare Argo Tunnel 内网穿透以支持传统方式为 websocket 的协议
-* Hysteria2 支持 Realm 模式，适用于回国、没有公网入口、住宅 NAT、CGNAT 等无法开放入站端口的机器；有公网入口时不建议使用，并可选 WARP 辅助打洞提高严格 NAT 环境下的成功率
+* Hysteria2 支持 Realm 模式，适用于回国、没有公网入口、住宅 NAT、CGNAT 等无法开放入站端口的机器；有公网入口时不建议使用
 * 节点信息输出到 V2rayN / Clash Verge / 小火箭 / Throne / Sing-box (SFI, SFA, SFM)，订阅自动适配客户端，一个订阅 url 走天下
 * 自定义端口，适合有限开放端口的 nat 小鸡
 * 安装后通过 sb -d 可修改监听端口：修改开始端口（各协议按顺序占用）或为各协议设置独立（非连续）端口，端口变更自动同步 nginx 反代并热加载
@@ -270,7 +272,6 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --SUBSCRIBE=true \
   --HY2_PORT_HOPPING_RANGE 50000:51000 \
   --HY2_REALM=true \
-  --HY2_WARP=true \
   --REALITY_PRIVATE=UPO3FWlg6YDJbASYi7KIESibPec_K46edTvDPbqEYFk \
   --NODE_NAME_CONFIRM bucket
 ```
@@ -293,7 +294,6 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --UUID_CONFIRM 20f7fca4-86e5-4ddf-9eed-24142073d197 \
   --HY2_PORT_HOPPING_RANGE 50000:51000 \
   --HY2_REALM=true \
-  --HY2_WARP=true \
   --REALITY_PRIVATE=UPO3FWlg6YDJbASYi7KIESibPec_K46edTvDPbqEYFk \
   --NODE_NAME_CONFIRM bucket
 ```
@@ -316,7 +316,6 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --ARGO=true \
   --HY2_PORT_HOPPING_RANGE 50000:51000 \
   --HY2_REALM=true \
-  --HY2_WARP=true \
   --REALITY_PRIVATE=UPO3FWlg6YDJbASYi7KIESibPec_K46edTvDPbqEYFk \
   --NODE_NAME_CONFIRM bucket
 ```
@@ -338,7 +337,6 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --ARGO=true \
   --HY2_PORT_HOPPING_RANGE 50000:51000 \
   --HY2_REALM=true \
-  --HY2_WARP=true \
   --REALITY_PRIVATE=UPO3FWlg6YDJbASYi7KIESibPec_K46edTvDPbqEYFk \
   --NODE_NAME_CONFIRM bucket
 ```
@@ -363,7 +361,6 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --ARGO_AUTH='{"AccountTag":"9cc9e3e4d8f29d2a02e297f14f20513a","TunnelSecret":"6AYfKBOoNlPiTAuWg64ZwujsNuERpWLm6pPJ2qpN8PM=","TunnelID":"1ac55430-f4dc-47d5-a850-bdce824c4101"}' \
   --HY2_PORT_HOPPING_RANGE 50000:51000 \
   --HY2_REALM=true \
-  --HY2_WARP=true \
   --REALITY_PRIVATE=UPO3FWlg6YDJbASYi7KIESibPec_K46edTvDPbqEYFk \
   --NODE_NAME_CONFIRM bucket
 ```
@@ -387,7 +384,6 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --ARGO_AUTH='{"AccountTag":"9cc9e3e4d8f29d2a02e297f14f20513a","TunnelSecret":"6AYfKBOoNlPiTAuWg64ZwujsNuERpWLm6pPJ2qpN8PM=","TunnelID":"1ac55430-f4dc-47d5-a850-bdce824c4101"}' \
   --HY2_PORT_HOPPING_RANGE 50000:51000 \
   --HY2_REALM=true \
-  --HY2_WARP=true \
   --REALITY_PRIVATE=UPO3FWlg6YDJbASYi7KIESibPec_K46edTvDPbqEYFk \
   --NODE_NAME_CONFIRM bucket
 ```
@@ -412,7 +408,6 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --ARGO_AUTH='sudo cloudflared service install eyJhIjoiOWNjOWUzZTRkOGYyOWQyYTAyZTI5N2YxNGYyMDUxM2EiLCJ0IjoiOGNiZDA4ZjItNGM0MC00OGY1LTlmZDYtZjlmMWQ0YTcxMjUyIiwicyI6IllXWTFORGN4TW1ZdE5HTXdZUzAwT0RaakxUbGxNMkl0Wm1VMk5URTFOR0l4TkdKayJ9' \
   --HY2_PORT_HOPPING_RANGE 50000:51000 \
   --HY2_REALM=true \
-  --HY2_WARP=true \
   --REALITY_PRIVATE=UPO3FWlg6YDJbASYi7KIESibPec_K46edTvDPbqEYFk \
   --NODE_NAME_CONFIRM bucket
 ```
@@ -436,7 +431,6 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
   --ARGO_AUTH='gKyflo59sDb5bI_fNr2OWCDnpihMUBIbJ29YsrtS' \
   --HY2_PORT_HOPPING_RANGE 50000:51000 \
   --HY2_REALM=true \
-  --HY2_WARP=true \
   --REALITY_PRIVATE=UPO3FWlg6YDJbASYi7KIESibPec_K46edTvDPbqEYFk \
   --NODE_NAME_CONFIRM bucket
 ```
@@ -461,7 +455,6 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 | --ARGO_AUTH | Json, Token 隧道的内容，或者是 Cloudflare API 密钥 |
 | --HY2_PORT_HOPPING_RANGE | hysteria2 跳跃端口范围，如 50000:51000 |
 | --HY2_REALM | [true, false]，是否启用 Hysteria2 Realm，true 为启用。适用于没有公网入口、住宅 NAT、CGNAT 或需要回国打洞的机器，有公网入口时不建议使用，默认为 false |
-| --HY2_WARP | [true, false]，是否启用 Realm 的 WARP 辅助打洞，true 为启用。适用于 NAT 严格环境；设置为 true 时会自动启用 Realm，默认为 false |
 | --REALITY_PRIVATE | reality 密钥 |
 | --BIND_INTERFACE | 指定网络出口，绑定到特定网卡，如 eth0<br>值为 default 或不指定则不绑定 |
 | --NODE_NAME_CONFIRM | 节点名 |

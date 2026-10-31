@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.28 (2026.10.30)'
+VERSION='v1.3.29 (2026.10.31)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://ghproxy.lvedong.eu.org/' 'https://accel.cloudflare.nyc.mn/')
@@ -40,8 +40,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. [sb -d]: switch XTLS reality between xtls-rprx-vision and multiplex; 2. [sb -v]: sync cloudflared (Argo) to the latest version, independently from Sing-box (checked first, then Sing-box)"
-C[1]="1. [sb -d] 添加 XTLS reality 的 xtls-rprx-vision 与多路复用相互切换; 2. [sb -v] 支持同步升级 cloudflared (Argo)，与 Sing-box 相互独立（先检查 cloudflared，再检查 Sing-box）"
+E[1]="1. [sb -d]: switch XTLS reality between xtls-rprx-vision and multiplex; 2. [sb -v]: sync cloudflared (Argo) to the latest version, independently from Sing-box (checked first, then Sing-box); 3. Hysteria2 traffic no longer routes through the WARP endpoint. Existing Hysteria2-specific WARP routes are removed automatically, while Hysteria2 Realm remains available"
+C[1]="1. [sb -d] 添加 XTLS reality 的 xtls-rprx-vision 与多路复用相互切换; 2. [sb -v] 支持同步升级 cloudflared (Argo)，与 Sing-box 相互独立（先检查 cloudflared，再检查 Sing-box）; 3. Hysteria2 流量不再通过 WARP 出站，存量 Hysteria2 专属 WARP 路由自动清理；Hysteria2 Realm 功能保持不变"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -60,8 +60,8 @@ E[9]="Whether to upgrade [y/N] (default is N):"
 C[9]="是否升级 [y/N] (默认为 N):"
 E[10]="Please enter server address, IP or domain (Default: \${SERVER_IP_DEFAULT}):"
 C[10]="请输入服务器地址（IP 或域名）(默认为: \${SERVER_IP_DEFAULT}):"
-E[11]="Please enter the starting port number. Must be \${MIN_PORT} - \${MAX_PORT}, consecutive \${NUM} free ports are required (Default: \${START_PORT_DEFAULT}):"
-C[11]="请输入开始的端口号，必须是 \${MIN_PORT} - \${MAX_PORT}，需要连续\${NUM}个空闲的端口 (默认为: \${START_PORT_DEFAULT}):"
+E[11]="Please enter the starting port number.\n Must be \${MIN_PORT} - \${MAX_PORT}, consecutive \${NUM} free ports are required (Default: \${START_PORT_DEFAULT}):"
+C[11]="请输入开始的端口号。\n 必须是 \${MIN_PORT} - \${MAX_PORT}，需要连续\${NUM}个空闲的端口 (默认为: \${START_PORT_DEFAULT}):"
 E[12]="Please enter UUID (Default: \${UUID_DEFAULT}):"
 C[12]="请输入 UUID (默认为: \${UUID_DEFAULT}):"
 E[13]="Please enter the node name. (Default: \${NODE_NAME_DEFAULT}):"
@@ -260,8 +260,8 @@ E[109]="Disable subscription"
 C[109]="关闭订阅"
 E[110]="Port hopping is enabled. Enabling Realm will disable port hopping. Continue? [y/N] (default N):"
 C[110]="端口跳跃已开启，启用 Realm 将关闭端口跳跃。是否继续？[y/N]（默认 N）:"
-E[111]="Update base configuration? (Node configs will remain unaffected; only log, outbounds, endpoints, route, experimental, dns, ntp, http_clients, etc., will be reset) [Y/n]:"
-C[111]="是否更新基础配置？（不影响节点配置，仅重置 log、outbounds、endpoints、route、experimental、dns、ntp、http_clients）[Y/n]:"
+E[111]="Update base configuration? (Node configs will remain unaffected.)\n Only log, outbounds, endpoints, route, experimental, dns, ntp,\n http_clients, etc., will be reset.\n [Y/n]:"
+C[111]="是否更新基础配置？（不影响节点配置。）\n 仅重置 log、outbounds、endpoints、route、experimental、dns、ntp、\n http_clients 等。\n [Y/n]:"
 E[112]="Change complete"
 C[112]="修改完成"
 E[113]="Failed to change CDN, using random privateKey"
@@ -278,8 +278,8 @@ E[118]="Please enter [Token, Json, API] value:"
 C[118]="请输入 [Token, Json, API] 的值:"
 E[119]="Using Cloudflare API to create Tunnel and handle DNS config..."
 C[119]="使用 Cloudflare API 创建 Tunnel 和处理 DNS 配置..."
-E[120]="Found existing tunnel with the same name. Tunnel ID: \$EXISTING_TUNNEL_ID. Status: \$EXISTING_TUNNEL_STATUS. Overwrite? [Y/n] (default is Y):"
-C[120]="发现同名隧道已创建，隧道 ID: \$EXISTING_TUNNEL_ID，状态: \$EXISTING_TUNNEL_STATUS。是否覆盖? [Y/n] (默认为 Y):"
+E[120]="Found existing tunnel with the same name.\n Tunnel ID: \$EXISTING_TUNNEL_ID. Status: \$EXISTING_TUNNEL_STATUS.\n Overwrite? [Y/n] (default is Y):"
+C[120]="发现同名隧道已创建。\n 隧道 ID: \$EXISTING_TUNNEL_ID，状态: \$EXISTING_TUNNEL_STATUS。\n 是否覆盖? [Y/n] (默认为 Y):"
 E[121]="Change node configuration (sb -d)"
 C[121]="修改节点配置 (sb -d)"
 E[122]="Invalid access token. Please roll at https://dash.cloudflare.com/profile/api-tokens to re-generate."
@@ -332,10 +332,10 @@ E[145]="UFW is not active. PortHopping forwarding rules were written, but you sh
 C[145]="UFW 未处于激活状态。PortHopping 转发规则已写入，但建议手动启用 UFW 以确保策略生效"
 E[146]="Failed to update UFW PortHopping forwarding rules. Please check UFW configuration files manually."
 C[146]="更新 UFW 的 PortHopping 转发规则失败，请手动检查 UFW 配置文件"
-E[147]="Hysteria2 Realm is useful for China-back routing or machines without public inbound access. It is not recommended when the server already has a public inbound IP/port. Enable Realm? [y/N] (default is N):"
-C[147]="Hysteria2 Realm 适用于回国或者没有公网入口的机器；有公网入口时不建议使用。是否启用？[y/N] (默认为 N):"
-E[148]="WARP-assisted hole punching is useful in strict NAT environments. When direct hole punching fails, Cloudflare WARP can provide a CF egress path to improve success. Enable it? [y/N]:"
-C[148]="WARP 辅助打洞（适用于 NAT 严格环境）：当 NAT 类型较严格（如对称 NAT）导致直连打洞失败时，可借助 Cloudflare WARP 获取一个 CF 出口 IP 作为中转，提升打洞成功率。是否启用？[y/N]:"
+E[147]="Hysteria2 Realm is useful for China-back routing or machines without public inbound access.\n It is not recommended when the server already has a public inbound IP/port. Enable Realm? [y/N] (default is N):"
+C[147]="Hysteria2 Realm 适用于回国或者没有公网入口的机器；\n 有公网入口时不建议使用。是否启用？[y/N] (默认为 N):"
+E[148]=""
+C[148]=""
 E[149]="Invalid domain format: \${DOMAIN}"
 C[149]="无效的域名格式: \${DOMAIN}"
 E[150]="Custom warp-ep outbounds rules  (rules: \${CUSTOM_ROUTE_COUNT:-0})"
@@ -410,8 +410,8 @@ E[184]="Invalid private key format. Please enter a 43-character base64 key endin
 C[184]="Private Key 格式错误，请输入 43 位 base64 密钥且以 \"=\" 结尾"
 E[185]="New WARP endpoint:\n IPv6: \${ADDRESS6}\n Private Key: \${PRIVATE_KEY}\n Reserved: [\${R1}, \${R2}, \${R3}]"
 C[185]="新 WARP 端点:\n IPv6: \${ADDRESS6}\n Private Key: \${PRIVATE_KEY}\n Reserved: [\${R1}, \${R2}, \${R3}]"
-E[186]="Hysteria2 Realm and port hopping cannot be used together (choose one). Realm is for NAT VPS without public inbound access. If you enable Realm, port hopping will be skipped."
-C[186]="Hysteria2 Realm 与端口跳跃不能同时使用（二选一）。Realm 适用于没有公网入站的 NAT 机器；启用 Realm 后将跳过端口跳跃。"
+E[186]="Hysteria2 Realm and port hopping cannot be used together (choose one).\n Realm is for NAT VPS without public inbound access.\n If you enable Realm, port hopping will be skipped."
+C[186]="Hysteria2 Realm 与端口跳跃不能同时使用（二选一）。\n Realm 适用于没有公网入站的 NAT 机器；启用 Realm 后将跳过端口跳跃。"
 E[187]="Hysteria2 force clients to use the BBR CC -> the declared up/down, i.e. Hysteria CC (\"ignore_client_bandwidth\": false)"
 C[187]="Hysteria2 强制客户端使用 BBR 拥塞控制 -> 声明的 up/down，即 Hysteria CC (\"ignore_client_bandwidth\": false)"
 E[188]="Hysteria2 the declared up/down, i.e. Hysteria CC (default) -> force clients to use the BBR CC (\"ignore_client_bandwidth\": true)"
@@ -934,9 +934,8 @@ change_config() {
     if grep -q 'realm-opts' <<< "$HY2_LINE"; then
       # 已开启 → 直接关闭，不需要二次确认
       set_hy2_realm_config disable
-      sync_hy2_warp_route disable
     else
-      # 未开启 → 获取配置后开启，询问 WARP 辅助打洞
+      # 未开启 → 获取配置后开启
       fetch_nodes_value
       # Realm 与端口跳跃互斥：端口跳跃已开启时需确认，确认后先关闭端口跳跃
       check_port_hopping_nat
@@ -949,9 +948,7 @@ change_config() {
       fi
       IS_HY2_REALM=is_hy2_realm
       HY2_REALM_ID="${HY2_REALM_ID:-${UUID[12]:-${UUID_CONFIRM}}}"
-      input_hy2_warp
       set_hy2_realm_config enable
-      [ "$IS_HY2_WARP" = 'is_hy2_warp' ] && sync_hy2_warp_route enable || sync_hy2_warp_route disable
     fi
     cmd_systemctl reload sing-box
     export_list
@@ -968,7 +965,6 @@ change_config() {
       reading "\n $(text 183) " HY2_CONFIRM
       [[ "${HY2_CONFIRM,,}" =~ ^(y|yes)$ ]] || return
       set_hy2_realm_config disable
-      sync_hy2_warp_route disable
     fi
     hint "\n $(text 97) \n"
 
@@ -1464,37 +1460,23 @@ input_hopping_port() {
 input_hy2_realm() {
   HY2_REALM_ID="${HY2_REALM_ID:-${UUID[12]:-${UUID_CONFIRM}}}"
 
-  # 参数 / 快速安装模式：不交互，尊重 --HY2_REALM 和 --HY2_WARP
-  # --HY2_WARP=true 隐含启用 Realm，否则 route 规则没有意义。
+  # 参数 / 快速安装模式：不交互，尊重 --HY2_REALM
   if [[ "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' || "$IS_FAST_INSTALL" = 'is_fast_install' ]]; then
-    if [ "$IS_HY2_WARP" = 'is_hy2_warp' ]; then
-      IS_HY2_REALM=is_hy2_realm
-    fi
     if [ "$IS_HY2_REALM" = 'is_hy2_realm' ]; then
       HY2_REALM_ID="${HY2_REALM_ID:-${UUID_CONFIRM}}"
     else
-      unset IS_HY2_REALM IS_HY2_WARP HY2_REALM_ID
+      unset IS_HY2_REALM HY2_REALM_ID
     fi
     return
   fi
 
-  unset IS_HY2_REALM IS_HY2_WARP
+  unset IS_HY2_REALM
   local CHOOSE_REALM
   reading "\n $(text 147) " CHOOSE_REALM
   if [[ "${CHOOSE_REALM,,}" =~ ^(y|yes)$ ]]; then
     IS_HY2_REALM=is_hy2_realm
     HY2_REALM_ID="${HY2_REALM_ID:-${UUID_CONFIRM}}"
-    input_hy2_warp
   fi
-}
-
-# 输入 Hysteria2 Realm 的 WARP 辅助打洞选项
-input_hy2_warp() {
-  # 无 TUN 时没有 warp-ep 出站，WARP 辅助打洞不可用，不询问
-  [ "$IS_TUN" != 'is_tun' ] && return
-  local CHOOSE_WARP
-  reading "\n $(text 148) " CHOOSE_WARP
-  [[ "${CHOOSE_WARP,,}" =~ ^(y|yes)$ ]] && IS_HY2_WARP=is_hy2_warp || unset IS_HY2_WARP
 }
 
 # jq 入口，优先使用脚本自带 jq
@@ -1522,37 +1504,7 @@ set_hy2_realm_config() {
     IS_HY2_REALM=is_hy2_realm
   else
     jq_exec '.inbounds |= map(if .type == "hysteria2" then del(.realm) else . end)' "$HY2_CONF" > "$TMP_FILE" && mv "$TMP_FILE" "$HY2_CONF"
-    unset IS_HY2_REALM IS_HY2_WARP HY2_REALM_ID
-  fi
-}
-
-# Hysteria2 Realm 的 WARP 辅助路由：添加或删除 inbound -> warp-ep
-sync_hy2_warp_route() {
-  # 无 TUN 时没有 warp-ep 出站，无需同步 WARP 辅助路由
-  [ "$IS_TUN" != 'is_tun' ] && return
-  local ACTION=$1
-  local ROUTE_FILE="${WORK_DIR}/conf/03_route.json"
-  [ ! -s "$ROUTE_FILE" ] && return
-  local HY2_TAG="${NODE_NAME[12]} ${NODE_TAG[1]}"
-  [ -z "${NODE_NAME[12]}" ] && HY2_TAG=$(awk -F'"' '/"tag"[[:space:]]*:[[:space:]]*".*hysteria2"/{print $4; exit}' ${WORK_DIR}/conf/*_${NODE_TAG[1]}_inbounds.json 2>/dev/null)
-  [ -z "$HY2_TAG" ] && return
-  local TMP_FILE="${ROUTE_FILE}.tmp"
-
-  if [ "$ACTION" = 'enable' ]; then
-    jq_exec --arg tag "$HY2_TAG" '
-      .route.rules |= (
-        map(select(.inbound != [$tag] or .outbound != "warp-ep")) as $rules |
-        ($rules | map(.action == "resolve" and (.rule_set // []) == ["geosite-openai"]) | index(true)) as $idx |
-        if $idx == null then
-          $rules + [{"inbound":[$tag],"action":"route","outbound":"warp-ep"}]
-        else
-          $rules[0:$idx+1] + [{"inbound":[$tag],"action":"route","outbound":"warp-ep"}] + $rules[$idx+1:]
-        end
-      )' "$ROUTE_FILE" > "$TMP_FILE" && mv "$TMP_FILE" "$ROUTE_FILE"
-    IS_HY2_WARP=is_hy2_warp
-  else
-    jq_exec --arg tag "$HY2_TAG" '.route.rules |= map(select(.inbound != [$tag] or .outbound != "warp-ep"))' "$ROUTE_FILE" > "$TMP_FILE" && mv "$TMP_FILE" "$ROUTE_FILE"
-    unset IS_HY2_WARP
+    unset IS_HY2_REALM HY2_REALM_ID
   fi
 }
 
@@ -4567,7 +4519,6 @@ EOF_REALM
     ]
 }
 EOF
-    [ "$IS_HY2_WARP" = 'is_hy2_warp' ] && sync_hy2_warp_route enable || sync_hy2_warp_route disable
   fi
 
   # 生成 Tuic V5 配置
@@ -5160,7 +5111,7 @@ EOF
 
 # 获取原有各协议的参数，先清空所有的 key-value
 fetch_nodes_value() {
-  unset NODE_NAME PORT_XTLS_REALITY UUID TLS_SERVER REALITY_PRIVATE REALITY_PUBLIC PORT_HYSTERIA2 HY2_REALM_ID IS_HY2_REALM IS_HY2_IGNORE IS_HY2_WARP PORT_TUIC TUIC_PASSWORD TUIC_CONGESTION_CONTROL PORT_SHADOWTLS SHADOWTLS_PASSWORD SHADOWSOCKS_METHOD PORT_SHADOWSOCKS PORT_TROJAN TROJAN_PASSWORD PORT_VMESS_WS VMESS_WS_PATH WS_SERVER_IP WS_SERVER_IP_SHOW VMESS_HOST_DOMAIN CDN CDN_PORT PORT_VLESS_WS VLESS_WS_PATH VLESS_HOST_DOMAIN PORT_H2_REALITY PORT_GRPC_REALITY ARGO_DOMAIN PORT_ANYTLS PORT_NAIVE SELF_SIGNED_FINGERPRINT_SHA256 SELF_SIGNED_FINGERPRINT_BASE64 IS_XTLS_MULTIPLEX
+  unset NODE_NAME PORT_XTLS_REALITY UUID TLS_SERVER REALITY_PRIVATE REALITY_PUBLIC PORT_HYSTERIA2 HY2_REALM_ID IS_HY2_REALM IS_HY2_IGNORE PORT_TUIC TUIC_PASSWORD TUIC_CONGESTION_CONTROL PORT_SHADOWTLS SHADOWTLS_PASSWORD SHADOWSOCKS_METHOD PORT_SHADOWSOCKS PORT_TROJAN TROJAN_PASSWORD PORT_VMESS_WS VMESS_WS_PATH WS_SERVER_IP WS_SERVER_IP_SHOW VMESS_HOST_DOMAIN CDN CDN_PORT PORT_VLESS_WS VLESS_WS_PATH VLESS_HOST_DOMAIN PORT_H2_REALITY PORT_GRPC_REALITY ARGO_DOMAIN PORT_ANYTLS PORT_NAIVE SELF_SIGNED_FINGERPRINT_SHA256 SELF_SIGNED_FINGERPRINT_BASE64 IS_XTLS_MULTIPLEX
 
   # 获取公共数据
   ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && SERVER_IP=$(awk -F '"' '/"WS_SERVER_IP_SHOW"/{print $4; exit}' ${WORK_DIR}/conf/*-ws*inbounds.json) || SERVER_IP=$([ -s ${WORK_DIR}/list ] && grep -A1 '"tag"' ${WORK_DIR}/list | sed -E '/-ws(-tls)*",$/{N;d}' | awk -F '"' '/"server"/{count++; if (count == 1) {print $4; exit}}')
@@ -5217,9 +5168,6 @@ fetch_nodes_value() {
       IS_HY2_REALM=is_hy2_realm
       HY2_REALM_ID=$(awk -F '"' '/"realm_id"[[:space:]]*:/{print $4; exit}' <<< "$JSON")
       HY2_REALM_ID=${HY2_REALM_ID:-${UUID[12]}}
-    fi
-    if [ -s ${WORK_DIR}/conf/03_route.json ] && [ -n "${NODE_NAME[12]}" ] && grep -q '"outbound"[[:space:]]*:[[:space:]]*"warp-ep"' ${WORK_DIR}/conf/03_route.json && grep -q "${NODE_NAME[12]} ${NODE_TAG[1]}" ${WORK_DIR}/conf/03_route.json; then
-      IS_HY2_WARP=is_hy2_warp
     fi
     check_port_hopping_nat
   fi
@@ -6267,7 +6215,7 @@ change_protocols() {
     fi
     [ -z "${PORT_HOPPING_START}${PORT_HOPPING_END}" ] && [ "$IS_HY2_REALM" != 'is_hy2_realm' ] && input_hopping_port
   else
-    unset PORT_HYSTERIA2 IS_HY2_REALM IS_HY2_WARP HY2_REALM_ID
+    unset PORT_HYSTERIA2 IS_HY2_REALM HY2_REALM_ID
   fi
 
   # 获取 Tuic V5 端口
@@ -6760,7 +6708,7 @@ menu() {
 }
 
 # 卸载是纯本地操作：-U / -u 时置位，作为下方所有网络动作的总开关
-# 首尾补空格并用 [[:space:]] 锚定，避免 -UUID / --HY2_WARP 等含 -U 的长参数被误判
+# 首尾补空格并用 [[:space:]] 锚定，避免 -UUID 等含 -U 的长参数被误判
 [[ " ${*^^} " =~ [[:space:]]-U([[:space:]]|$) ]] && IS_UNINSTALL='is_uninstall'
 
 # 卸载是纯本地操作：跳过 CDN 探测，保证离线 / 弱网下立即进入卸载流程
@@ -6813,6 +6761,48 @@ if [ -x "$WORK_DIR/jq" ] && [ -s "$WORK_DIR/conf/04_experimental.json" ] && [ -x
       fi
     }
   fi
+fi
+
+###### Hysteria2 Realm 出站路由收敛：卸载流程无需处理，将于 2026年12月31日移除
+if [ "$IS_UNINSTALL" != 'is_uninstall' ] && [[ "$(date +%Y%m%d)" < "20270101" ]]; then
+  _hy2_route_file="${WORK_DIR}/conf/03_route.json"
+  _hy2_conf=$(ls ${WORK_DIR}/conf/*_${NODE_TAG[1]}_inbounds.json 2>/dev/null | sed -n '1p') || true
+  if [ -s "$_hy2_route_file" ] && [ -s "$_hy2_conf" ]; then
+    _hy2_tag=$(jq_exec -r '.inbounds[]? | select(.tag | endswith("hysteria2")) | .tag // empty' "$_hy2_conf" 2>/dev/null | head -1)
+    if [ -n "$_hy2_tag" ] && jq_exec -e --arg tag "$_hy2_tag" \
+      '.route.rules // [] | any((.inbound // []) == [$tag] and .outbound == "warp-ep")' \
+      "$_hy2_route_file" >/dev/null 2>&1; then
+      _hy2_bak="${_hy2_route_file}.bak"
+      _hy2_tmp="${_hy2_route_file}.tmp"
+      cp "$_hy2_route_file" "$_hy2_bak"
+      if jq_exec --arg tag "$_hy2_tag" \
+        '.route.rules |= map(select((.inbound // []) != [$tag] or .outbound != "warp-ep"))' \
+        "$_hy2_route_file" > "$_hy2_tmp" 2>/dev/null && [ -s "$_hy2_tmp" ]; then
+        if [ -x "${WORK_DIR}/sing-box" ] && ! "${WORK_DIR}/sing-box" check -C "${WORK_DIR}/conf" >/dev/null 2>&1; then
+          mv -f "$_hy2_bak" "$_hy2_route_file"
+        else
+          mv "$_hy2_tmp" "$_hy2_route_file"
+          if [ -d /run/openrc ] || command -v rc-service >/dev/null 2>&1; then
+            _sb_pid=$(cat /var/run/sing-box.pid 2>/dev/null)
+            if [ -n "$_sb_pid" ] && kill -0 "$_sb_pid" 2>/dev/null; then
+              kill -HUP "$_sb_pid" 2>/dev/null || rc-service sing-box restart >/dev/null 2>&1 || true
+            else
+              rc-service sing-box restart >/dev/null 2>&1 || true
+            fi
+          else
+            if systemctl is-active --quiet sing-box >/dev/null 2>&1; then
+              systemctl kill -s HUP sing-box >/dev/null 2>&1 || systemctl restart sing-box >/dev/null 2>&1 || true
+            fi
+          fi
+        fi
+      else
+        mv -f "$_hy2_bak" "$_hy2_route_file"
+      fi
+      rm -f "$_hy2_tmp" "$_hy2_bak"
+    fi
+  fi
+  rm -f "$_hy2_tmp" "$_hy2_bak"
+  unset _hy2_route_file _hy2_conf _hy2_tag _hy2_tmp _hy2_bak _sb_pid
 fi
 
 # 传参
@@ -6968,9 +6958,6 @@ for z in ${!ALL_PARAMETER[@]}; do
       ;;
     --HY2_REALM|--REALM )
       ((z++)); [[ "${ALL_PARAMETER[z],,}" =~ ^(true|1|y|yes)$ ]] && IS_HY2_REALM=is_hy2_realm
-      ;;
-    --HY2_WARP|--REALM_WARP|--WARP_REALM )
-      ((z++)); [[ "${ALL_PARAMETER[z],,}" =~ ^(true|1|y|yes)$ ]] && IS_HY2_WARP=is_hy2_warp && IS_HY2_REALM=is_hy2_realm
       ;;
     --BIND_INTERFACE )
       ((z++)); BIND_INTERFACE=${ALL_PARAMETER[z]}
