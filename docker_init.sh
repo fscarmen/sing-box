@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 脚本更新日期 2026.08.14
+# 脚本更新日期 2026.11.08
 set -e
 
 WORK_DIR=/sing-box
@@ -713,6 +713,23 @@ EOF
 }
 EOF
 
+  # 生成 Snell v6 配置
+  [ "${SNELL}" = 'true' ] && ((PORT++)) && PORT_SNELL=$PORT && cat > ${WORK_DIR}/conf/23_snell-v6_inbounds.json << EOF
+{
+    "inbounds":[
+        {
+            "type":"snell",
+            "tag":"${NODE_NAME} snell-v6",
+            "listen":"::",
+            "listen_port":${PORT_SNELL},
+            "version":6,
+            "psk":"${UUID}",
+            "mode":"default"
+        }
+    ]
+}
+EOF
+
   # 判断 argo 隧道类型
   if [[ -n "$ARGO_DOMAIN" && -n "$ARGO_AUTH" ]]; then
     # 根据 ARGO_AUTH 的内容，自行判断是 Json， Token 还是 API 申请
@@ -1055,6 +1072,11 @@ EOF
   $CLASH_ANYTLS
 "
 
+  [ "${SNELL}" = 'true' ] && local CLASH_SNELL="- {name: \"${NODE_NAME} snell-v6\", type: snell, server: ${SERVER_IP}, port: ${PORT_SNELL}, psk: \"${UUID}\", version: 6, mode: default, udp: true }" &&
+  local CLASH_SUBSCRIBE+="
+  $CLASH_SNELL
+"
+
   echo -n "${CLASH_SUBSCRIBE}" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' > ${WORK_DIR}/subscribe/proxies
 
   # 生成 clash 订阅配置文件
@@ -1097,6 +1119,9 @@ vless://$(echo -n "auto:${UUID}@${SERVER_IP_2}:${PORT_GRPC_REALITY}" | base64 -w
 "
   [ "${ANYTLS}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
 anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?peer=addons.mozilla.org&udp=1&hpkp=${SELF_SIGNED_FINGERPRINT_SHA256}#${NODE_NAME// /%20}%20anytls
+"
+  [ "${SNELL}" = 'true' ] && local SHADOWROCKET_SUBSCRIBE+="
+snell://$(echo -n "chacha20-ietf-poly1305:${UUID}@${SERVER_IP_1}:${PORT_SNELL}" | base64 -w0)?version=6&mode=default&udp=1#${NODE_NAME// /%20}%20snell-v6
 "
   echo -n "$SHADOWROCKET_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/shadowrocket
 
@@ -1243,6 +1268,11 @@ vless://${UUID}@${SERVER_IP_1}:${PORT_GRPC_REALITY}?security=reality&sni=addons.
 ----------------------------
 anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?idle_session_check_interval=30s&idle_session_timeout=30s&min_idle_session=5&insecure=0&security=tls&sni=addons.mozilla.org&tls_certificate=${CERT_URL_1}&fp=firefox#${NODE_NAME// /%20}%20anytls"
 
+  [ "${SNELL}" = 'true' ] && local THRONE_SUBSCRIBE+="
+----------------------------
+snell://${UUID}@${SERVER_IP_1}:${PORT_SNELL}?version=6&mode=default#${NODE_NAME// /%20}%20snell-v6
+"
+
   echo -n "$THRONE_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/throne
 
   # 生成 Sing-box 订阅文件
@@ -1292,6 +1322,10 @@ anytls://${UUID}@${SERVER_IP_1}:${PORT_ANYTLS}?idle_session_check_interval=30s&i
   local OUTBOUND_REPLACE+=" { \"type\": \"anytls\", \"tag\": \"${NODE_NAME} anytls\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_ANYTLS}, \"password\": \"${UUID}\", \"idle_session_check_interval\": \"30s\", \"idle_session_timeout\": \"30s\", \"min_idle_session\": 5, \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\": \"addons.mozilla.org\", \"utls\": { \"enabled\": true, \"fingerprint\": \"firefox\" } } }," &&
   local NODE_REPLACE+="\"${NODE_NAME} anytls\","
 
+  [ "${SNELL}" = 'true' ] &&
+  local OUTBOUND_REPLACE+=" { \"type\": \"snell\", \"tag\": \"${NODE_NAME} snell-v6\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_SNELL}, \"version\": 6, \"psk\": \"${UUID}\", \"mode\": \"default\" }," &&
+  local NODE_REPLACE+="\"${NODE_NAME} snell-v6\","
+
   # 模板
   local SING_BOX_JSON=$(wget -qO- --tries=3 --timeout=2 ${SUBSCRIBE_TEMPLATE}/sing-box)
 
@@ -1332,7 +1366,7 @@ $(hint "${SHADOWROCKET_SUBSCRIBE}")
 *******************************************
 ┌────────────────┐
 │                │
-│   $(warning "Clash Verge")  │
+│  $(warning "Clash Mihomo")  │
 │                │
 └────────────────┘
 ----------------------------

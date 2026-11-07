@@ -25,16 +25,18 @@
 
 * * *
 ## 1.更新信息
+2026.11.07 v1.3.30 Add Snell v6 inbound with Throne, Clash Mihomo, Shadowrocket and sing-box client configuration output; 新增 Snell v6 入站，并输出 Throne、Clash Mihomo、Shadowrocket 和 sing-box 客户端配置
+
 2026.10.31 v1.3.29 Hysteria2 流量不再通过 WARP 出站，存量 Hysteria2 专属 WARP 路由自动清理；Hysteria2 Realm 功能保持不变
 
 2026.10.22 v1.3.28 sync cloudflared (Argo) in [sb -v], independent from sing-box https://github.com/fscarmen/sing-box/issues/364; [sb -v] 支持同步升级 cloudflared (Argo)，与 Sing-box 相互独立 https://github.com/fscarmen/sing-box/issues/364
-
-2026.10.13 v1.3.27 [sb -d]: switch XTLS reality between xtls-rprx-vision and multiplex; [sb -d] 添加 XTLS reality 的 xtls-rprx-vision 与多路复用相互切换
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
 <br>
 
+>2026.10.13 v1.3.27 [sb -d]: switch XTLS reality between xtls-rprx-vision and multiplex; [sb -d] 添加 XTLS reality 的 xtls-rprx-vision 与多路复用相互切换
+>
 >2026.10.13 v1.3.26 1. Fix the firewall allow rules being appended after an existing `REJECT`/`DROP` rule on the `INPUT` chain, which left node and `nginx` ports unreachable on images such as Oracle OCI and OpenVZ; the rules are now inserted before the first `REJECT`/`DROP` rule https://github.com/fscarmen/sing-box/issues/353; 2. Fix occasional empty version detection when checking for `sing-box` updates, which could abort installation or upgrade; the version is now read from the lightweight `releases.atom` feed first, with the GitHub API as fallback https://github.com/fscarmen/sing-box/issues/355; 3. Enable `readline` line editing on interactive inputs: arrow keys move the cursor, `Home` / `End` and `Ctrl+A` / `Ctrl+E` jump to line start / end, `Ctrl+W` deletes the previous word, `Ctrl+U` clears to line start, `Ctrl+K` deletes to line end, `Ctrl+Y` undoes the last deletion, `Ctrl+L` clears the screen; editing keys are no longer inserted into the value https://github.com/fscarmen/sing-box/pull/357#issuecomment-6137941771; 4. Make the uninstall path fully offline: `sb -u` no longer runs CDN detection and no longer pre-downloads subscription templates, binaries or `cloudflared`, so it completes immediately on hosts that cannot reach GitHub https://github.com/fscarmen/sing-box/issues/358; 5. update GitHub proxy CDN endpoints https://github.com/fscarmen/sing-box/issues/359; 1. 修复入站放行规则被追加到 `INPUT` 链已有的 `REJECT`/`DROP` 规则之后，导致甲骨文 OCI、OpenVZ 等镜像上节点端口与 `nginx` 端口无法访问的问题；放行规则现改为插入到第一条 `REJECT`/`DROP` 规则之前 https://github.com/fscarmen/sing-box/issues/353; 2. 修复检测 `sing-box` 更新时偶尔取不到最新版本号、导致安装或升级中断的问题；改为优先从体积很小的 `releases.atom` 获取，GitHub API 作为兜底 https://github.com/fscarmen/sing-box/issues/355; 3. 交互输入启用 `readline` 行编辑：方向键移动光标，`Home` / `End` 与 `Ctrl+A` / `Ctrl+E` 跳到行首 / 行尾，`Ctrl+W` 删除光标前一个词，`Ctrl+U` 清空到行首，`Ctrl+K` 删除到行尾，`Ctrl+Y` 撤销上一次删除，`Ctrl+L` 清屏；编辑键不再被当作内容插入输入值 https://github.com/fscarmen/sing-box/pull/357#issuecomment-6137941771; 4. 卸载流程完全离线化：`sb -u` 不再执行 CDN 探测，也不再预下载订阅模板、二进制与 `cloudflared`，GitHub 不可达时也能立即完成卸载 https://github.com/fscarmen/sing-box/issues/358; 5. 更换 GitHub 代理与 CDN 加速节点 https://github.com/fscarmen/sing-box/issues/359
 >
 >2026.09.16 v1.3.25 Add Hysteria2 ignore_client_bandwidth toggle in [sb -d], default off; [sb -d] 新增 Hysteria2 ignore_client_bandwidth 开关，新安装默认关闭
@@ -177,7 +179,7 @@
 
 ## 2.项目特点:
 
-* 一键部署多协议，可以单选、多选或全选 ShadowTLS v3 / XTLS Reality / Hysteria2 / Tuic V5 / ShadowSocks / Trojan / Vmess + ws / Vless + ws + tls / H2 Reality / gRPC Reality / AnyTLS / NaiveProxy, 总有一款适合你
+* 一键部署多协议，可以单选、多选或全选 ShadowTLS v3 / XTLS Reality / Hysteria2 / Tuic V5 / ShadowSocks / Trojan / Vmess + ws / Vless + ws + tls / H2 Reality / gRPC Reality / AnyTLS / NaiveProxy / Snell v6, 总有一款适合你
 * 所有协议均不需要域名，可选 Cloudflare Argo Tunnel 内网穿透以支持传统方式为 websocket 的协议
 * Hysteria2 支持 Realm 模式，适用于回国、没有公网入口、住宅 NAT、CGNAT 等无法开放入站端口的机器；有公网入口时不建议使用
 * 节点信息输出到 V2rayN / Clash Verge / 小火箭 / Throne / Sing-box (SFI, SFA, SFM)，订阅自动适配客户端，一个订阅 url 走天下
@@ -187,7 +189,7 @@
 * 内置 warp 链式代理解锁 chatGPT
 * 智能判断操作系统: Ubuntu 、Debian 、CentOS 、Alpine 、Armbian 和 Arch Linux,请务必选择 LTS 系统
 * 支持硬件结构类型: AMD 和 ARM，支持 IPv4 和 IPv6
-* 无交互极速安排模式: 一个回车完成 11 个协议的安装
+* 无交互极速安排模式: 一个回车完成 13 个协议的安装
 
 
 ## 3.Sing-box for VPS 运行脚本:
@@ -220,7 +222,7 @@ sb
 
 ### 交互输入快捷键
 
-脚本在**交互终端**下为所有输入启用 readline 行编辑，安装与 `sb -d` 修改等提示均支持下列按键；管道、`bash <(...)` 等非交互场景保持原 read 语义，不受影响。
+在交互终端中输入内容时，可以使用方向键、Home/End、Ctrl+A 等常用快捷键快速修改。
 
 | 按键 | 作用 |
 | --- | --- |
@@ -442,14 +444,14 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 | Key 大小写不敏感（Case Insensitive）| Value |
 | --------------- | ----------- |
 | --LANGUAGE | c=中文;  e=英文 |
-| --CHOOSE_PROTOCOLS | 可多选，如 bcdfk<br> a=全部<br> b=XTLS + reality<br> c=hysteria2<br> d=tuic<br> e=ShadowTLS<br> f=shadowsocks<br> g=trojan<br> h=vmess + ws<br> i=vless + ws + tls<br> j=H2 + reality<br> k=gRPC + reality<br> l=AnyTLS<br> m=NaiveProxy |
+| --CHOOSE_PROTOCOLS | 可多选，如 bcdfk<br> a=全部<br> b=XTLS + reality<br> c=hysteria2<br> d=tuic<br> e=ShadowTLS<br> f=shadowsocks<br> g=trojan<br> h=vmess + ws<br> i=vless + ws + tls<br> j=H2 + reality<br> k=gRPC + reality<br> l=AnyTLS<br> m=NaiveProxy<br> n=Snell v6 |
 | --START_PORT | 100 - 65520 |
 | --PORT_NGINX | n=不需要订阅，或者 100 - 65520 |
 | --SERVER_IP | IPv4 或 IPv6 地址，不需要中括号 |
 | --CDN | 优选 IP 或者域名，如 --CHOOSE_PROTOCOLS 是 [a,h,i] 时需要 |
 | --VMESS_HOST_DOMAIN | vmess sni 域名，如 --CHOOSE_PROTOCOLS 是 [a,h] 时需要 |
 | --VLESS_HOST_DOMAIN | vless sni 域名，如 --CHOOSE_PROTOCOLS 是 [a,i] 时需要 |
-| --UUID_CONFIRM | 协议的 uuid 或者 password |
+| --UUID_CONFIRM | 全局 UUID；作为协议 UUID/password/PSK |
 | --ARGO | 是否使用 Argo Tunnel，如果是填 true，如果使用 Origin rules，则可以忽略本 Key |
 | --ARGO_DOMAIN | 固定 Argo 域名，即是 Json 或者 Token 隧道的域名 |
 | --ARGO_AUTH | Json, Token 隧道的内容，或者是 Cloudflare API 密钥 |
@@ -505,7 +507,7 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 
 ### 说明:
 * 支持三种 Argo 类型隧道: 临时 (不需要域名) / Json / Token
-* 需要20个连续可用的端口，以 `START_PORT` 开始第一个
+* 最多需要14个连续可用的端口，即 `START_PORT` 至 `START_PORT+13`
 
 <details>
     <summary> Docker 部署（点击即可展开或收起）</summary>
@@ -529,6 +531,7 @@ docker run -dit \
     -e H2_REALITY=true \
     -e GRPC_REALITY=true \
     -e ANYTLS=true \
+    -e SNELL=true \
     -e UUID=20f7fca4-86e5-4ddf-9eed-24142073d197 \
     -e CDN=www.csgo.com \
     -e NODE_NAME=sing-box \
@@ -568,6 +571,7 @@ services:
             - H2_REALITY=true
             - GRPC_REALITY=true
             - ANYTLS=true
+            - SNELL=true
             - UUID=20f7fca4-86e5-4ddf-9eed-24142073d197
             - CDN=www.csgo.com
             - NODE_NAME=sing-box
@@ -607,6 +611,7 @@ services:
 | -e H2_REALITY | 是 |      true 为启用 H2 over reality 协议，不需要的话删除本参数或填 false |
 | -e GRPC_REALITY | 是 |    true 为启用 gRPC over reality 协议，不需要的话删除本参数或填 false |
 | -e ANYTLS | 是 |          true 为启用 AnyTLS 协议，不需要的话删除本参数或填 false |
+| -e SNELL | 是 |           true 为启用 Snell v6 协议，不需要的话删除本参数或填 false |
 | -e UUID | 否 | 不指定的话 UUID 将默认随机生成 |
 | -e CDN | 否 | 优选域名，不指定的话将使用 skk.moe |
 | -e NODE_NAME | 否 | 节点名称，不指定的话将使用 sing-box |
@@ -655,7 +660,8 @@ services:
 |   |-- 19_h2-reality_inbounds.json          # Reality http2 协议配置文件
 |   |-- 20_grpc-reality_inbounds.json        # Reality gRPC 协议配置文件
 |   |-- 21_anytls_inbounds.json              # AnyTLS 协议配置文件
-|   `-- 22_naive_inbounds.json               # NaiveProxy 协议配置文件
+|   |-- 22_naive_inbounds.json               # NaiveProxy 协议配置文件
+|   `-- 23_snell-v6_inbounds.json            # Snell v6 协议配置文件
 |-- logs
 |   `-- box.log                              # sing-box 运行日志文件
 |-- subscribe                                # sing-box server 配置文件目录
