@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.29 (2026.10.31)'
+VERSION='v1.3.30 (2026.11.07)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://ghproxy.lvedong.eu.org/' 'https://accel.cloudflare.nyc.mn/')
@@ -17,8 +17,8 @@ MAX_PORT=65520
 MIN_HOPPING_PORT=10000
 MAX_HOPPING_PORT=65535
 TLS_SERVER_DEFAULT=addons.mozilla.org
-PROTOCOL_LIST=("XTLS + reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess + ws" "vless + ws + tls" "H2 + reality" "gRPC + reality" "AnyTLS" "naive")
-NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess-ws" "vless-ws-tls" "h2-reality" "grpc-reality" "anytls" "naive")
+PROTOCOL_LIST=("XTLS + reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess + ws" "vless + ws + tls" "H2 + reality" "gRPC + reality" "AnyTLS" "naive" "Snell v6")
+NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess-ws" "vless-ws-tls" "h2-reality" "grpc-reality" "anytls" "naive" "snell-v6")
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
 CDN_DOMAIN=("skk.moe" "ip.sb" "time.is" "cfip.xxxxxxxx.tk" "bestcf.top" "cdn.2020111.xyz" "xn--b6gac.eu.org" "cf.090227.xyz")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
@@ -40,8 +40,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. [sb -d]: switch XTLS reality between xtls-rprx-vision and multiplex; 2. [sb -v]: sync cloudflared (Argo) to the latest version, independently from Sing-box (checked first, then Sing-box); 3. Hysteria2 traffic no longer routes through the WARP endpoint. Existing Hysteria2-specific WARP routes are removed automatically, while Hysteria2 Realm remains available"
-C[1]="1. [sb -d] 添加 XTLS reality 的 xtls-rprx-vision 与多路复用相互切换; 2. [sb -v] 支持同步升级 cloudflared (Argo)，与 Sing-box 相互独立（先检查 cloudflared，再检查 Sing-box）; 3. Hysteria2 流量不再通过 WARP 出站，存量 Hysteria2 专属 WARP 路由自动清理；Hysteria2 Realm 功能保持不变"
+E[1]="1. Add Snell v6 inbound with Throne, Clash Verge, Shadowrocket and sing-box client output; 2. [sb -d]: switch XTLS reality between xtls-rprx-vision and multiplex; 3. [sb -v]: sync cloudflared (Argo) to the latest version, independently from Sing-box (checked first, then Sing-box); 4. Hysteria2 traffic no longer routes through the WARP endpoint. Existing Hysteria2-specific WARP routes are removed automatically, while Hysteria2 Realm remains available"
+C[1]="1. 新增 Snell v6 入站，并输出 Throne、Clash Verge、Shadowrocket 和 sing-box 客户端配置; 2. [sb -d] 添加 XTLS reality 的 xtls-rprx-vision 与多路复用相互切换; 3. [sb -v] 支持同步升级 cloudflared (Argo)，与 Sing-box 相互独立（先检查 cloudflared，再检查 Sing-box）; 4. Hysteria2 流量不再通过 WARP 出站，存量 Hysteria2 专属 WARP 路由自动清理；Hysteria2 Realm 功能保持不变"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -300,8 +300,8 @@ E[129]="Reality SNI  (current: \${VAL_ITEM})"
 C[129]="Reality SNI  (当前: \${VAL_ITEM})"
 E[130]="Node name  (current: \${VAL_ITEM})"
 C[130]="节点名称  (当前: \${VAL_ITEM})"
-E[131]="UUID / Password  (current: \${VAL_ITEM})"
-C[131]="UUID / 密码  (当前: \${VAL_ITEM})"
+E[131]="UUID / Password / PSK  (current: \${VAL_ITEM})"
+C[131]="UUID / 密码 / PSK  (当前: \${VAL_ITEM})"
 E[132]="Server address  (current: \${VAL_ITEM})"
 C[132]="服务器地址  (当前: \${VAL_ITEM})"
 E[133]="Invalid server address (IPv4 / IPv6 / domain)"
@@ -754,8 +754,9 @@ change_config() {
   local NAME_NOW=$(awk '/"tag"/{gsub(/^.*"tag": *"/,""); gsub(/".*/,""); sub(/ [^ ]*$/,""); print; exit}' ${WORK_DIR}/conf/*_inbounds.json 2>/dev/null)
   [ -n "$NAME_NOW" ] && MENU_IDX+=(130) && MENU_KEY+=(name) && MENU_VAL+=("$NAME_NOW")
 
-  # UUID / Password
-  local UUID_NOW="$(awk -F'"' '/"uuid"[[:space:]]*:[[:space:]]*"/ || /"id"[[:space:]]*:[[:space:]]*"/ {print $4; exit}' ${WORK_DIR}/conf/*_inbounds.json 2>/dev/null)"
+  # UUID / Password / PSK
+  # 读取优先级：psk → uuid/id → password；Snell 单独安装时只能从 psk 取得认证值
+  local UUID_NOW="$(awk -F '"' '/"psk"[[:space:]]*:[[:space:]]*"/ && !psk {psk=$4} /"uuid"[[:space:]]*:[[:space:]]*"/ && !uuid {uuid=$4} /"id"[[:space:]]*:[[:space:]]*"/ && !uuid {uuid=$4} /"password"[[:space:]]*:[[:space:]]*"/ && !password {password=$4} END {print psk ? psk : (uuid ? uuid : password)}' ${WORK_DIR}/conf/*_inbounds.json 2>/dev/null)"
   [ -n "$UUID_NOW" ] && MENU_IDX+=(131) && MENU_KEY+=(uuid) && MENU_VAL+=("$UUID_NOW")
 
   # 服务器 IP
@@ -3032,7 +3033,12 @@ sing-box_variables() {
   STEP_NUM=0
   # 预先用全选协议计算最大总步骤数，用于协议选择提示时显示 (1/?)
   local SAVED_PROTOCOLS=("${INSTALL_PROTOCOLS[@]}")
-  INSTALL_PROTOCOLS=(b c d e f g h i j k l m)
+  local -a ALL_PROTOCOLS=()
+  local protocol_index
+  for protocol_index in "${!PROTOCOL_LIST[@]}"; do
+    ALL_PROTOCOLS+=("$(asc $((protocol_index + 98)))")
+  done
+  INSTALL_PROTOCOLS=("${ALL_PROTOCOLS[@]}")
   calc_install_steps
   INSTALL_PROTOCOLS=("${SAVED_PROTOCOLS[@]}")
 
@@ -3736,6 +3742,9 @@ sync_firewall_rules() {
         ;;
       *vmess-ws_inbounds.json|*vless-ws-tls_inbounds.json )
         [ "$HAS_NGINX" = false ] && append_unique_port EXPOSED_TCP_PORTS "$PORT"
+        ;;
+      *snell-v6_inbounds.json )
+        append_unique_port EXPOSED_TCP_PORTS "$PORT"
         ;;
       * )
         append_unique_port EXPOSED_TCP_PORTS "$PORT"
@@ -4938,6 +4947,29 @@ EOF
 }
 EOF
   fi
+
+  # 生成 Snell v6 配置
+  CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
+  if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
+    [ -z "$PORT_SNELL" ] && PORT_SNELL=$[START_PORT+$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")]
+    NODE_NAME[23]=${NODE_NAME[23]:-"$NODE_NAME_CONFIRM"} && UUID[23]=${UUID[23]:-"$UUID_CONFIRM"}
+
+    cat > ${WORK_DIR}/conf/23_${NODE_TAG[12]}_inbounds.json << EOF
+{
+    "inbounds":[
+        {
+            "type":"snell",
+            "tag":"${NODE_NAME[23]} ${NODE_TAG[12]}",
+            "listen":"::",
+            "listen_port":$PORT_SNELL,
+            "version":6,
+            "psk":"${UUID[23]}",
+            "mode":"default"
+        }
+    ]
+}
+EOF
+  fi
 }
 
 # Sing-box 生成守护进程文件
@@ -5111,7 +5143,7 @@ EOF
 
 # 获取原有各协议的参数，先清空所有的 key-value
 fetch_nodes_value() {
-  unset NODE_NAME PORT_XTLS_REALITY UUID TLS_SERVER REALITY_PRIVATE REALITY_PUBLIC PORT_HYSTERIA2 HY2_REALM_ID IS_HY2_REALM IS_HY2_IGNORE PORT_TUIC TUIC_PASSWORD TUIC_CONGESTION_CONTROL PORT_SHADOWTLS SHADOWTLS_PASSWORD SHADOWSOCKS_METHOD PORT_SHADOWSOCKS PORT_TROJAN TROJAN_PASSWORD PORT_VMESS_WS VMESS_WS_PATH WS_SERVER_IP WS_SERVER_IP_SHOW VMESS_HOST_DOMAIN CDN CDN_PORT PORT_VLESS_WS VLESS_WS_PATH VLESS_HOST_DOMAIN PORT_H2_REALITY PORT_GRPC_REALITY ARGO_DOMAIN PORT_ANYTLS PORT_NAIVE SELF_SIGNED_FINGERPRINT_SHA256 SELF_SIGNED_FINGERPRINT_BASE64 IS_XTLS_MULTIPLEX
+  unset NODE_NAME PORT_XTLS_REALITY UUID TLS_SERVER REALITY_PRIVATE REALITY_PUBLIC PORT_HYSTERIA2 HY2_REALM_ID IS_HY2_REALM IS_HY2_IGNORE PORT_TUIC TUIC_PASSWORD TUIC_CONGESTION_CONTROL PORT_SHADOWTLS SHADOWTLS_PASSWORD SHADOWSOCKS_METHOD PORT_SHADOWSOCKS PORT_TROJAN TROJAN_PASSWORD PORT_VMESS_WS VMESS_WS_PATH WS_SERVER_IP WS_SERVER_IP_SHOW VMESS_HOST_DOMAIN CDN CDN_PORT PORT_VLESS_WS VLESS_WS_PATH VLESS_HOST_DOMAIN PORT_H2_REALITY PORT_GRPC_REALITY ARGO_DOMAIN PORT_ANYTLS PORT_NAIVE PORT_SNELL SELF_SIGNED_FINGERPRINT_SHA256 SELF_SIGNED_FINGERPRINT_BASE64 IS_XTLS_MULTIPLEX
 
   # 获取公共数据
   ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && SERVER_IP=$(awk -F '"' '/"WS_SERVER_IP_SHOW"/{print $4; exit}' ${WORK_DIR}/conf/*-ws*inbounds.json) || SERVER_IP=$([ -s ${WORK_DIR}/list ] && grep -A1 '"tag"' ${WORK_DIR}/list | sed -E '/-ws(-tls)*",$/{N;d}' | awk -F '"' '/"server"/{count++; if (count == 1) {print $4; exit}}')
@@ -5124,13 +5156,16 @@ fetch_nodes_value() {
 
   # 获取 UUID_CONFIRM（从 JSON 配置文件读取，不依赖 nginx）
   # 如 UUID_CONFIRM 已有值（例如上层已交互输入），跳过 JSON 读取，避免重复弹窗
-  [ -z "$UUID_CONFIRM" ] && UUID_CONFIRM=$(awk -F '"' '/"uuid"[[:space:]]*:[[:space:]]*"/ || /"id"[[:space:]]*:[[:space:]]*"/ {print $4; exit}' ${WORK_DIR}/conf/1*.json 2>/dev/null)
+  # 读取优先级：psk → uuid/id → password；password 还必须通过下方 UUID 格式校验
+  [ -z "$UUID_CONFIRM" ] && UUID_CONFIRM=$(awk -F '"' '/"psk"[[:space:]]*:[[:space:]]*"/ && !psk {psk=$4} /"uuid"[[:space:]]*:[[:space:]]*"/ && !uuid {uuid=$4} /"id"[[:space:]]*:[[:space:]]*"/ && !uuid {uuid=$4} /"password"[[:space:]]*:[[:space:]]*"/ && !password {password=$4} END {print psk ? psk : (uuid ? uuid : password)}' ${WORK_DIR}/conf/*_inbounds.json 2>/dev/null)
+  # 仅接受 UUID 格式，避免把 Shadowsocks 等协议的独立 password 当成全局 UUID
+  [[ "${UUID_CONFIRM,,}" =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ ]] || unset UUID_CONFIRM
   # JSON 中提取不到时，尝试从 nginx.conf 提取订阅 / WS 路径段（订阅开启 / 关闭时 nginx.conf 一定含有 UUID；
   # 用 sed 抓路径段而非 match 量词正则，兼容 BusyBox / mawk）
   [ -z "$UUID_CONFIRM" ] && [ -s "${WORK_DIR}/nginx.conf" ] && \
     UUID_CONFIRM=$(sed -n 's#.*location ~ \^/\([^/]*\)/auto.*#\1#p; s#.*location /\([^/]*\)-vmess.*#\1#p; s#.*location /\([^/]*\)-vless.*#\1#p' ${WORK_DIR}/nginx.conf 2>/dev/null | sed -n '1p')
   # 提取不到时，仅在安装相关流程走交互式输入；其余只读流程（如 sb -n 查看节点信息）用随机 UUID 兜底，避免无谓弹窗
-  # 说明：仅安装 shadowsocks / trojan / anytls / naive 等"凭证非 UUID 格式"协议时，以上提取必然为空，
+  # 说明：部分协议使用独立生成的 password，UUID 格式校验后仍为空；
   #       此时导出节点信息不需要 UUID，不应阻塞用户交互
   if [ -z "$UUID_CONFIRM" ]; then
     if [ "$IS_INSTALL" = 'install' ] || [ "$IS_FAST_INSTALL" = 'is_fast_install' ] || [ "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]; then
@@ -5201,6 +5236,9 @@ fetch_nodes_value() {
 
   # 获取 naive key-value
   [ -s ${WORK_DIR}/conf/*_${NODE_TAG[11]}_inbounds.json ] && local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[11]}_inbounds.json) && NODE_NAME[22]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[11]}.*/\1/p" <<< "$JSON") && PORT_NAIVE=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[22]=$(awk -F '"' '/"username"/{print $4; exit}' <<< "$JSON")
+
+  # 获取 Snell v6 key-value
+  [ -s ${WORK_DIR}/conf/*_${NODE_TAG[12]}_inbounds.json ] && local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[12]}_inbounds.json) && NODE_NAME[23]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[12]}.*/\1/p" <<< "$JSON") && PORT_SNELL=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[23]=$(sed -n 's/.*"psk"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' <<< "$JSON")
 
   # 兜底：极早期版本 04_experimental.json 无 clash_api（cache_file-only），补全注入。
   # 同时剥离可能残留的 v2ray_api（官方 release 二进制默认不编译该功能，
@@ -5474,6 +5512,11 @@ export_list() {
   $CLASH_ANYTLS
 "
 
+  [ -n "$PORT_SNELL" ] && local CLASH_SNELL="- {name: \"${NODE_NAME[23]} ${NODE_TAG[12]}\", type: snell, server: ${SERVER_IP}, port: ${PORT_SNELL}, psk: \"${UUID[23]}\", version: 6, mode: default, udp: true, reuse: true }" &&
+  local CLASH_SUBSCRIBE+="
+  $CLASH_SNELL
+"
+
   echo -n "${CLASH_SUBSCRIBE}" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' > ${WORK_DIR}/subscribe/proxies
 
   # 后台生成 clash 订阅配置文件
@@ -5482,9 +5525,9 @@ export_list() {
     cat ${TEMP_DIR}/clash | sed "s#NODE_NAME#${NODE_NAME_CONFIRM}#g; s#PROXY_PROVIDERS_URL#$SUBSCRIBE_ADDRESS/${UUID_CONFIRM}/proxies#" > ${WORK_DIR}/subscribe/clash
 
     # 模板2: 不使用 proxy providers
-    CLASH2_PORT=("$PORT_XTLS_REALITY" "$PORT_HYSTERIA2" "$PORT_TUIC" "$PORT_SHADOWTLS" "$PORT_SHADOWSOCKS" "$PORT_TROJAN" "$PORT_VMESS_WS" "$PORT_VLESS_WS" "$PORT_GRPC_REALITY" "$PORT_ANYTLS")
-    CLASH2_PROXY_INSERT=("$CLASH_XTLS_REALITY" "$CLASH_HYSTERIA2" "$CLASH_TUIC" "$CLASH_SHADOWTLS" "$CLASH_SHADOWSOCKS" "$CLASH_TROJAN" "$CLASH_VMESS_WS" "$CLASH_VLESS_WS" "$CLASH_GRPC_REALITY" "$CLASH_ANYTLS")
-    CLASH2_PROXY_GROUPS_INSERT=("- ${NODE_NAME[11]} ${NODE_TAG[0]}" "- ${NODE_NAME[12]} ${NODE_TAG[1]}" "- ${NODE_NAME[13]} ${NODE_TAG[2]}" "- ${NODE_NAME[14]} ${NODE_TAG[3]}" "- ${NODE_NAME[15]} ${NODE_TAG[4]}" "- ${NODE_NAME[16]} ${NODE_TAG[5]}" "- ${NODE_NAME[17]} ${NODE_TAG[6]}" "- ${NODE_NAME[18]} ${NODE_TAG[7]}" "- ${NODE_NAME[20]} ${NODE_TAG[9]}" "- ${NODE_NAME[21]} ${NODE_TAG[10]}")
+    CLASH2_PORT=("$PORT_XTLS_REALITY" "$PORT_HYSTERIA2" "$PORT_TUIC" "$PORT_SHADOWTLS" "$PORT_SHADOWSOCKS" "$PORT_TROJAN" "$PORT_VMESS_WS" "$PORT_VLESS_WS" "$PORT_GRPC_REALITY" "$PORT_ANYTLS" "$PORT_SNELL")
+    CLASH2_PROXY_INSERT=("$CLASH_XTLS_REALITY" "$CLASH_HYSTERIA2" "$CLASH_TUIC" "$CLASH_SHADOWTLS" "$CLASH_SHADOWSOCKS" "$CLASH_TROJAN" "$CLASH_VMESS_WS" "$CLASH_VLESS_WS" "$CLASH_GRPC_REALITY" "$CLASH_ANYTLS" "$CLASH_SNELL")
+    CLASH2_PROXY_GROUPS_INSERT=("- ${NODE_NAME[11]} ${NODE_TAG[0]}" "- ${NODE_NAME[12]} ${NODE_TAG[1]}" "- ${NODE_NAME[13]} ${NODE_TAG[2]}" "- ${NODE_NAME[14]} ${NODE_TAG[3]}" "- ${NODE_NAME[15]} ${NODE_TAG[4]}" "- ${NODE_NAME[16]} ${NODE_TAG[5]}" "- ${NODE_NAME[17]} ${NODE_TAG[6]}" "- ${NODE_NAME[18]} ${NODE_TAG[7]}" "- ${NODE_NAME[20]} ${NODE_TAG[9]}" "- ${NODE_NAME[21]} ${NODE_TAG[10]}" "- ${NODE_NAME[23]} ${NODE_TAG[12]}")
 
     CLASH2_YAML=$(cat ${TEMP_DIR}/clash2)
     for x in ${!CLASH2_PORT[@]}; do
@@ -5576,6 +5619,10 @@ http2://$(echo -n "${UUID[22]}:${UUID[22]}@${SERVER_IP_2}:${PORT_NAIVE}" | base6
 
 http3://$(echo -n "${UUID[22]}:${UUID[22]}@${SERVER_IP_2}:${PORT_NAIVE}" | base64 -w0)?peer=${TLS_SERVER}&alpn=h3&padding=1&hpkp=${SELF_SIGNED_200_FINGERPRINT_SHA256}#${NODE_NAME[22]// /%20}%20${NODE_TAG[11]}%20http3
 "
+
+  [ -n "$PORT_SNELL" ] && local SHADOWROCKET_SUBSCRIBE+="
+snell://$(echo -n "chacha20-ietf-poly1305:${UUID[23]}@${SERVER_IP_1}:${PORT_SNELL}" | base64 -w0)?version=6&mode=default&reuse=1&udp=1#${NODE_NAME[23]// /%20}%20${NODE_TAG[12]}
+"
   echo -n "$SHADOWROCKET_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/shadowrocket
 
   # 生成 V2rayN 订阅文件
@@ -5601,51 +5648,9 @@ v2rayn://tuic/$(echo -n "{\"ConfigType\":8,\"CoreType\":24,\"ConfigVersion\":4,\
 
   [ -n "$PORT_SHADOWTLS" ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
-{
-    \"log\": {
-        \"level\": \"warn\"
-    },
-    \"inbounds\": [
-        {
-            \"listen\": \"127.0.0.1\",
-            \"listen_port\": ${PORT_SHADOWTLS},
-            \"tag\": \"${PROTOCOL_LIST[3]}\",
-            \"type\": \"mixed\"
-        }
-    ],
-    \"outbounds\": [
-        {
-            \"detour\": \"shadowtls-out\",
-            \"method\": \"$SHADOWTLS_METHOD\",
-            \"password\": \"$SHADOWTLS_PASSWORD\",
-            \"type\": \"shadowsocks\",
-            \"udp_over_tcp\": false,
-            \"multiplex\": {
-              \"enabled\": true,
-              \"protocol\": \"h2mux\",
-              \"max_connections\": 8,
-              \"min_streams\": 16,
-              \"padding\": true
-            }
-        },
-        {
-            \"password\": \"${UUID[14]}\",
-            \"server\": \"${SERVER_IP}\",
-            \"server_port\": ${PORT_SHADOWTLS},
-            \"tag\": \"shadowtls-out\",
-            \"tls\": {
-                \"enabled\": true,
-                \"server_name\": \"${TLS_SERVER}\",
-                \"utls\": {
-                  \"enabled\": true,
-                  \"fingerprint\": \"${FINGER_PRINT}\"
-                }
-            },
-            \"type\": \"shadowtls\",
-            \"version\": 3
-        }
-    ]
-}"
+v2rayn://shadowtls/$(echo -n "{\"IndexId\":\"shadowtls-${UUID[14]}-1-tls\",\"ConfigType\":13,\"CoreType\":24,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME[14]} 1-tls-not-use\",\"CustomOutboundObj\":{\"type\":\"shadowtls\",\"tag\":\"${NODE_NAME[14]} 1-tls-not-use\",\"server\":\"${SERVER_IP}\",\"server_port\":${PORT_SHADOWTLS},\"version\":3,\"password\":\"${UUID[14]}\",\"tls\":{\"enabled\":true,\"server_name\":\"${TLS_SERVER}\",\"utls\":{\"enabled\":true,\"fingerprint\":\"${FINGER_PRINT}\"}}}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')
+v2rayn://shadowsocks/$(echo -n "{\"IndexId\":\"shadowtls-${UUID[14]}-2-ss\",\"ConfigType\":13,\"CoreType\":24,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME[14]} 2-ss-not-use\",\"CustomOutboundObj\":{\"type\":\"shadowsocks\",\"tag\":\"${NODE_NAME[14]} 2-ss-not-use\",\"method\":\"$SHADOWTLS_METHOD\",\"password\":\"$SHADOWTLS_PASSWORD\",\"udp_over_tcp\":false,\"multiplex\":{\"enabled\":true,\"protocol\":\"h2mux\",\"max_connections\":8,\"min_streams\":16,\"padding\":true}}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')
+v2rayn://proxychain/$(echo -n "{\"IndexId\":\"shadowtls-${UUID[14]}-chain\",\"ConfigType\":102,\"CoreType\":24,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME[14]} ${NODE_TAG[3]}\",\"ProtoExtraObj\":{\"ChildItems\":\"shadowtls-${UUID[14]}-1-tls,shadowtls-${UUID[14]}-2-ss\"}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
   [ -n "$PORT_SHADOWSOCKS" ] && local V2RAYN_SUBSCRIBE+="
 ----------------------------
 ss://$(echo -n "${SHADOWSOCKS_METHOD}:${SHADOWSOCKS_PASSWORD}@${SERVER_IP_1}:$PORT_SHADOWSOCKS" | base64 -w0)#${NODE_NAME[15]// /%20}%20${NODE_TAG[4]}"
@@ -5712,6 +5717,10 @@ v2rayn://naive/$(echo -n "{\"ConfigType\":12,\"CoreType\":24,\"ConfigVersion\":4
 ----------------------------
 v2rayn://naive/$(echo -n "{\"ConfigType\":12,\"CoreType\":24,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME[22]} ${NODE_TAG[11]} quic\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_NAIVE},\"Password\":\"${UUID[22]}\",\"Username\":\"${UUID[22]}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"${TLS_SERVER}\",\"Cert\":\"${CERT_200_URL_2}\",\"ProtoExtraObj\":{\"CongestionControl\":\"bbr\",\"NaiveQuic\":true}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
 
+  [ -n "$PORT_SNELL" ] && local V2RAYN_SUBSCRIBE+="
+----------------------------
+v2rayn://snell/$(echo -n "{\"ConfigType\":13,\"CoreType\":24,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME[23]} ${NODE_TAG[12]}\",\"CustomOutboundObj\":{\"type\":\"snell\",\"tag\":\"${NODE_NAME[23]} ${NODE_TAG[12]}\",\"server\":\"${SERVER_IP}\",\"server_port\":${PORT_SNELL},\"version\":6,\"psk\":\"${UUID[23]}\",\"mode\":\"default\",\"reuse\":true}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
+
   echo -n "$V2RAYN_SUBSCRIBE" | sed '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/d' | sed -E '/^[ ]*#|^[ ]+|^\{|^\}/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/v2rayn
 
   # 生成 Throne 订阅文件
@@ -5738,7 +5747,7 @@ tuic://${TUIC_PASSWORD}:${UUID[13]}@${SERVER_IP_1}:${PORT_TUIC}?congestion_contr
 ----------------------------
 shadowtls://:${UUID[14]}@${SERVER_IP_1}:${PORT_SHADOWTLS}?version=3&security=tls&sni=${TLS_SERVER}&fp=chrome#1-tls-not-use
 
-ss://${SHADOWTLS_METHOD}:${SHADOWTLS_PASSWORD}@127.0.0.1:0#2-ss-not-use"
+ss://${SHADOWTLS_METHOD}:${SHADOWTLS_PASSWORD//\//%2F}@127.0.0.1:0#2-ss-not-use"
 
   [ -n "$PORT_SHADOWSOCKS" ] && local THRONE_SUBSCRIBE+="
 ----------------------------
@@ -5805,6 +5814,10 @@ naive+https://${UUID[22]}:${UUID[22]}@${SERVER_IP_1}:${PORT_NAIVE}?uot=1&securit
 ----------------------------
 naive+quic://${UUID[22]}:${UUID[22]}@${SERVER_IP_1}:${PORT_NAIVE}?congestion_control=bbr&security=tls&sni=${TLS_SERVER}&tls_certificate=${CERT_200_URL_1}#${NODE_NAME[22]// /%20}%20${NODE_TAG[11]}%20quic"
   }
+
+  [ -n "$PORT_SNELL" ] && local THRONE_SUBSCRIBE+="
+----------------------------
+snell://${UUID[23]}@${SERVER_IP_1}:${PORT_SNELL}?version=6&mode=default&reuse=1#${NODE_NAME[23]// /%20}%20${NODE_TAG[12]}"
 
   echo -n "$THRONE_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/throne
 
@@ -5901,6 +5914,10 @@ naive+quic://${UUID[22]}:${UUID[22]}@${SERVER_IP_1}:${PORT_NAIVE}?congestion_con
   local OUTBOUND_REPLACE+=" { \"type\": \"naive\", \"tag\": \"${NODE_NAME[22]} ${NODE_TAG[11]} http2\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_NAIVE}, \"username\": \"${UUID[22]}\", \"password\": \"${UUID[22]}\", \"udp_over_tcp\": true, \"quic\": false, \"tls\": { \"enabled\": true, \"certificate\": [$(tr -d '\n' <<< "$CERT200_JSON")], \"server_name\": \"${TLS_SERVER}\" } }, { \"type\": \"naive\", \"tag\": \"${NODE_NAME[22]} ${NODE_TAG[11]} quic\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_NAIVE}, \"username\": \"${UUID[22]}\", \"password\": \"${UUID[22]}\", \"udp_over_tcp\": false, \"quic\": true, \"quic_congestion_control\": \"bbr\", \"tls\": { \"enabled\": true, \"certificate\": [$(tr -d '\n' <<< "$CERT200_JSON")], \"server_name\": \"${TLS_SERVER}\" } }," &&
   local NODE_REPLACE+="\"${NODE_NAME[22]} ${NODE_TAG[11]} http2\",\"${NODE_NAME[22]} ${NODE_TAG[11]} quic\","
 
+  [ -n "$PORT_SNELL" ] &&
+  local OUTBOUND_REPLACE+=" { \"type\": \"snell\", \"tag\": \"${NODE_NAME[23]} ${NODE_TAG[12]}\", \"server\":\"${SERVER_IP}\", \"server_port\": ${PORT_SNELL}, \"version\": 6, \"psk\": \"${UUID[23]}\", \"mode\": \"default\", \"reuse\": true }," &&
+  local NODE_REPLACE+="\"${NODE_NAME[23]} ${NODE_TAG[12]}\","
+
   {
     # 生成 sing-box SFM SFA SFI 订阅文件
     [ ! -s "$TEMP_DIR/sing-box-template" ] && wget --no-check-certificate --continue --tries=2 --timeout=10 -qO "$TEMP_DIR/sing-box-template" "${GH_PROXY}${SUBSCRIBE_TEMPLATE}/sing-box" 2>/dev/null
@@ -5952,7 +5969,7 @@ $(hint "${SHADOWROCKET_SUBSCRIBE}")
 *******************************************
 ┌────────────────┐
 │                │
-│   $(warning "Clash Verge")  │
+│  $(warning "Clash Mihomo")  │
 │                │
 └────────────────┘
 ----------------------------
@@ -6157,9 +6174,15 @@ change_protocols() {
     [ -n "$v" ] && NODE_NAME_CONFIRM="$v" && break
   done
 
-  # 无既有协议（0 协议或全部删除后重新添加）时，像新安装一样询问节点名称；已有节点名称则沿用
+  # 无既有协议（0 协议或全部删除后重新添加）时，像新安装时一样询问起始端口和节点名称
   if [ "${#REINSTALL_PROTOCOLS[@]}" -gt 0 ] && [ "${#KEEP_PROTOCOLS[@]}" -eq 0 ]; then
-    unset NODE_NAME_CONFIRM
+    unset NODE_NAME_CONFIRM START_PORT
+    (( STEP_NUM++ )) || true
+    hint "\n $(text 60) "
+    for w in "${!INSTALL_PROTOCOLS[@]}"; do
+      [ "$w" -ge 9 ] && hint " $(( w+1 )). ${PROTOCOL_LIST[$(($(asc ${INSTALL_PROTOCOLS[w]}) - 98))]} " || hint " $(( w+1 )) . ${PROTOCOL_LIST[$(($(asc ${INSTALL_PROTOCOLS[w]}) - 98))]} "
+    done
+    input_start_port ${#INSTALL_PROTOCOLS[@]}
     input_node_name
   fi
 
@@ -6407,6 +6430,15 @@ change_protocols() {
     PORT_NAIVE=${REINSTALL_PORTS[POSITION]}
   else
     unset PORT_NAIVE
+  fi
+
+  # 获取 Snell v6 端口
+  CHECK_PROTOCOLS=$(asc "$CHECK_PROTOCOLS" ++)
+  if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
+    POSITION=$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")
+    PORT_SNELL=${REINSTALL_PORTS[POSITION]}
+  else
+    unset PORT_SNELL
   fi
 
   # 生成各协议的 json 文件
