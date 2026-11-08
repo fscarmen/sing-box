@@ -447,7 +447,10 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 | --CHOOSE_PROTOCOLS | 可多选，如 bcdfk<br> a=全部<br> b=XTLS + reality<br> c=hysteria2<br> d=tuic<br> e=ShadowTLS<br> f=shadowsocks<br> g=trojan<br> h=vmess + ws<br> i=vless + ws + tls<br> j=H2 + reality<br> k=gRPC + reality<br> l=AnyTLS<br> m=NaiveProxy<br> n=Snell v6 |
 | --START_PORT | 100 - 65520 |
 | --PORT_NGINX | n=不需要订阅，或者 100 - 65520 |
-| --SERVER_IP | IPv4 或 IPv6 地址，不需要中括号 |
+| --SERVER_IP | 手动指定服务器 IP 或域名；IPv6 不需要中括号 |
+| --SHARE_STACK | 直连节点分享地址：ipv4、ipv6、dual 或 manual；不指定时保持原有默认行为 |
+| --SHARE_IPV4 | 可选，手动指定 IPv4 分享地址；默认使用检测结果 |
+| --SHARE_IPV6 | 可选，手动指定 IPv6 分享地址，不需要中括号；默认使用检测结果 |
 | --CDN | 优选 IP 或者域名，如 --CHOOSE_PROTOCOLS 是 [a,h,i] 时需要 |
 | --VMESS_HOST_DOMAIN | vmess sni 域名，如 --CHOOSE_PROTOCOLS 是 [a,h] 时需要 |
 | --VLESS_HOST_DOMAIN | vless sni 域名，如 --CHOOSE_PROTOCOLS 是 [a,i] 时需要 |
@@ -460,6 +463,8 @@ bash <(wget -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-b
 | --REALITY_PRIVATE | reality 密钥 |
 | --BIND_INTERFACE | 指定网络出口，绑定到特定网卡，如 eth0<br>值为 default 或不指定则不绑定 |
 | --NODE_NAME_CONFIRM | 节点名 |
+
+交互安装时可选择 IPv4、IPv6、双栈或手动地址，安装后可在修改服务器 IP 的菜单中切换。`dual` 会为直连协议分别生成 IPv4 和 IPv6 节点；Argo/CDN 节点不受影响。检测结果是出口地址，请确认客户端能通过所选地址访问服务器。`--SERVER_IP` 可与 `--SHARE_STACK=manual` 一起使用，不可与其他分享模式组合。双栈模式需要两个有效地址。以上分享模式适用于主脚本；Docker 版本仍使用 `SERVER_IP` 指定单个地址。
 
 
 ## 5.Json Argo Tunnel 获取 (推荐)

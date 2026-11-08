@@ -656,6 +656,143 @@ format_uri_host() {
   fi
 }
 
+# 分享地址是客户端连接的入站地址；出口探测仅提供候选，不能证明入站可达。
+valid_share_family() {
+  local family=$1 address=$2 part
+  if [ "$family" = ipv4 ]; then
+    [[ "$address" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
+    local -a octets
+    IFS=. read -r -a octets <<< "$address"
+    for part in "${octets[@]}"; do
+      [[ "$part" =~ ^[0-9]+$ ]] && (( 10#$part <= 255 )) || return 1
+    done
+  elif [ "$family" = ipv6 ]; then
+    [[ "$address" =~ ^[0-9a-fA-F:]+$ && "$address" != *:::* ]] || return 1
+    local left right groups=0 compressed=false
+    local -a hextets
+    if [[ "$address" = *::* ]]; then
+      compressed=true
+      left=${address%%::*}; right=${address#*::}
+      [[ "$right" != *::* ]] || return 1
+      address="${left}${left:+:}${right}"
+    else
+      [[ "$address" != :* && "$address" != *: ]] || return 1
+    fi
+    if [ -n "$address" ]; then
+      IFS=: read -r -a hextets <<< "$address"
+      for part in "${hextets[@]}"; do
+        [[ "$part" =~ ^[0-9a-fA-F]{1,4}$ ]] || return 1
+        ((groups++)) || true
+      done
+    fi
+    if $compressed; then [ "$groups" -lt 8 ]; else [ "$groups" -eq 8 ]; fi || return 1
+  else
+    return 1
+  fi
+}
+
+select_share_addresses() {
+  local selection default_mode missing choice
+  SHARE_IPV4=${SHARE_IPV4:-$WAN4}
+  SHARE_IPV6=${SHARE_IPV6:-$WAN6}
+  # 不把格式错误的探测响应写入配置文件。
+  [ -z "$SHARE_IPV4" ] || valid_share_family ipv4 "$SHARE_IPV4" || SHARE_IPV4=''
+  [ -z "$SHARE_IPV6" ] || valid_share_family ipv6 "$SHARE_IPV6" || SHARE_IPV6=''
+  if [[ -n "$SERVER_IP" && -n "$SHARE_MODE" && "$SHARE_MODE" != manual ]]; then
+    warning "--SERVER_IP cannot be combined with --SHARE_STACK $SHARE_MODE"
+    return 1
+  fi
+  if [ -z "$SHARE_MODE" ] && [ -n "$SERVER_IP" ]; then
+    SHARE_MODE=manual
+    SHARE_MANUAL=$SERVER_IP
+  fi
+  if [ -z "$SHARE_MODE" ]; then
+    if [[ "$NONINTERACTIVE_INSTALL" = noninteractive_install || "$IS_FAST_INSTALL" = is_fast_install ]]; then
+      SHARE_MODE=manual
+      SHARE_MANUAL=$SERVER_IP_DEFAULT
+    else
+      if [ "$L" = C ]; then
+        missing='未检测到'
+        hint "\n 出口检测仅供参考，请确认地址可从客户端访问。"
+        hint " 1. IPv4 (${SHARE_IPV4:-$missing})"
+        hint " 2. IPv6 (${SHARE_IPV6:-$missing})"
+        hint " 3. 双栈 (${SHARE_IPV4:-$missing}, ${SHARE_IPV6:-$missing})"
+        hint " 4. 手动输入地址"
+      else
+        missing='not detected'
+        hint "\n Detected outbound addresses are candidates; confirm inbound reachability."
+        hint " 1. IPv4 (${SHARE_IPV4:-$missing})"
+        hint " 2. IPv6 (${SHARE_IPV6:-$missing})"
+        hint " 3. Dual stack (${SHARE_IPV4:-$missing}, ${SHARE_IPV6:-$missing})"
+        hint " 4. Enter an address manually"
+      fi
+      default_mode=1
+      [[ "$SERVER_IP_DEFAULT" = "$SHARE_IPV6" && -n "$SHARE_IPV6" ]] && default_mode=2
+      [[ -z "$SHARE_IPV4$SHARE_IPV6" ]] && default_mode=4
+      while true; do
+        reading " (${STEP_NUM}/${TOTAL_STEPS:-?}) $(text 24) [${default_mode}]: " choice || return 1
+        case "${choice:-$default_mode}" in
+          1) SHARE_MODE=ipv4 ;;
+          2) SHARE_MODE=ipv6 ;;
+          3) SHARE_MODE=dual ;;
+          4) SHARE_MODE=manual ;;
+          *) warning " $(text 36) "; continue ;;
+        esac
+        if [[ ( "$SHARE_MODE" = ipv4 || "$SHARE_MODE" = dual ) && -z "$SHARE_IPV4" ]] ||
+           [[ ( "$SHARE_MODE" = ipv6 || "$SHARE_MODE" = dual ) && -z "$SHARE_IPV6" ]]; then
+          warning " $(text 47) "
+          unset SHARE_MODE
+          continue
+        fi
+        break
+      done
+    fi
+  fi
+  case "$SHARE_MODE" in
+    ipv4) valid_share_family ipv4 "$SHARE_IPV4" || return 1; SERVER_IP=$SHARE_IPV4 ;;
+    ipv6) valid_share_family ipv6 "$SHARE_IPV6" || return 1; SERVER_IP=$SHARE_IPV6 ;;
+    dual) valid_share_family ipv4 "$SHARE_IPV4" && valid_share_family ipv6 "$SHARE_IPV6" || return 1; SERVER_IP=$SHARE_IPV4 ;;
+    manual)
+      SHARE_MANUAL=${SHARE_MANUAL:-$SERVER_IP}
+      if [ -z "$SHARE_MANUAL" ] && [[ "$NONINTERACTIVE_INSTALL" != noninteractive_install && "$IS_FAST_INSTALL" != is_fast_install ]]; then
+        local attempts=5
+        while [ "$attempts" -gt 0 ]; do
+          reading " $(text 10) " SHARE_MANUAL || return 1
+          SHARE_MANUAL=${SHARE_MANUAL:-$SERVER_IP_DEFAULT}
+          is_valid_server_addr "$SHARE_MANUAL" && break
+          warning " $(text 133) "
+          SHARE_MANUAL=''
+          ((attempts--)) || true
+        done
+      fi
+      is_valid_server_addr "$SHARE_MANUAL" || return 1
+      SERVER_IP=$SHARE_MANUAL ;;
+    *) return 1 ;;
+  esac
+  WS_SERVER_IP_SHOW=$SERVER_IP
+}
+
+save_share_addresses() {
+  local tmp
+  tmp=$(mktemp "$WORK_DIR/.share-addresses.XXXXXX") || return 1
+  chmod 600 "$tmp" || { rm -f "$tmp"; return 1; }
+  printf '%s\n%s\n%s\n%s\n' "$SHARE_MODE" "$SHARE_IPV4" "$SHARE_IPV6" "$SHARE_MANUAL" > "$tmp" && mv -f "$tmp" "$WORK_DIR/share-addresses" || { rm -f "$tmp"; return 1; }
+}
+
+load_share_addresses() {
+  local file="$WORK_DIR/share-addresses" mode ipv4 ipv6 manual
+  [ -f "$file" ] || return 0
+  { IFS= read -r mode && IFS= read -r ipv4 && IFS= read -r ipv6 && IFS= read -r manual; } < "$file" || return 1
+  case "$mode" in
+    ipv4) valid_share_family ipv4 "$ipv4" || return 1; SERVER_IP=$ipv4 ;;
+    ipv6) valid_share_family ipv6 "$ipv6" || return 1; SERVER_IP=$ipv6 ;;
+    dual) valid_share_family ipv4 "$ipv4" && valid_share_family ipv6 "$ipv6" || return 1; SERVER_IP=$ipv4 ;;
+    manual) is_valid_server_addr "$manual" || return 1; SERVER_IP=$manual ;;
+    *) return 1 ;;
+  esac
+  SHARE_MODE=$mode SHARE_IPV4=$ipv4 SHARE_IPV6=$ipv6 SHARE_MANUAL=$manual
+}
+
 # 输入优选 CDN
 input_cdn() {
   echo ""
@@ -873,6 +1010,17 @@ change_config() {
 
     ls ${WORK_DIR}/conf/*vless-ws*inbounds.json >/dev/null 2>&1 && sed -i "s|CDN\": \".*\"|CDN\": \"${CDN}\"|g; s|CDN_PORT\": \".*\"|CDN_PORT\": \"${CDN_PORT[18]}\"|g" ${WORK_DIR}/conf/*vless-ws*inbounds.json 2>/dev/null
 
+    export_list
+    return
+  elif [ "$KEY" = "serverip" ]; then
+    # 分享地址独立持久化，避免对订阅中 Base64/URI 数据做文本替换。
+    unset SERVER_IP SHARE_MODE SHARE_IPV4 SHARE_IPV6 SHARE_MANUAL
+    SERVER_IP_DEFAULT=${WAN4:-$WAN6}
+    select_share_addresses || { warning " $(text 133) "; return; }
+    save_share_addresses || error "Failed to save share addresses"
+    for file in ${WORK_DIR}/conf/*-ws*inbounds.json; do
+      [ -f "$file" ] && sed -i "s|\(\"WS_SERVER_IP_SHOW\": \"\).*\"|\1${SERVER_IP}\"|" "$file"
+    done
     export_list
     return
   elif [ "$KEY" = "ports" ]; then
@@ -1174,12 +1322,12 @@ change_config() {
   # 批量替换，更换服务IP和指纹不需重启服务
   if [[ "$KEY" =~ ^(serverip|cdn)$ ]]; then
     # IP 在配置里出现的形式有多种，逐一替换
-    find ${WORK_DIR} -type f | xargs -P 50 sed -i -e "s|\"server\": \"${OLD}\"|\"server\": \"${NEW_VAL}\"|g; s|\"WS_SERVER_IP_SHOW\": \"${OLD}\"|\"WS_SERVER_IP_SHOW\": \"${NEW_VAL}\"|g" 2>/dev/null
+    find "${WORK_DIR}" -type f ! -path "${WORK_DIR}/share-addresses" | xargs -P 50 sed -i -e "s|\"server\": \"${OLD}\"|\"server\": \"${NEW_VAL}\"|g; s|\"WS_SERVER_IP_SHOW\": \"${OLD}\"|\"WS_SERVER_IP_SHOW\": \"${NEW_VAL}\"|g" 2>/dev/null
 
     # 同时更新 subscribe/list 等文本文件中可能出现的裸 IP
     find ${WORK_DIR}/subscribe -type f 2>/dev/null | xargs -P 50 sed -i "s|${OLD}|${NEW_VAL}|g" 2>/dev/null
   else
-    find ${WORK_DIR} -type f | xargs -P 50 sed -i "s|${OLD}|${NEW_VAL}|g" 2>/dev/null
+    find "${WORK_DIR}" -type f ! -path "${WORK_DIR}/share-addresses" | xargs -P 50 sed -i "s|${OLD}|${NEW_VAL}|g" 2>/dev/null
     [[ ! "$KEY" =~ ^(fingerprint)$ ]] && cmd_systemctl reload sing-box
   fi
   export_list
@@ -3048,15 +3196,8 @@ sing-box_variables() {
     elif grep -qi 'cloudflare' <<< "$ASNORG4" && [ -n "$WAN6" ] && ! grep -qi 'cloudflare' <<< "$ASNORG6"; then
       SERVER_IP_DEFAULT=$WAN6
     else
-      # 双栈均为 Cloudflare（或唯一出口为 CF），无法自动反选真实出口，需交互确认
+      # 出口检测不能证明入站可达，留待分享地址选择时确认。
       SERVER_IP_DEFAULT="${SERVER_IP_DEFAULT:-${WAN4:-$WAN6}}"
-      local a=6
-      until [ -n "$SERVER_IP" ] && is_valid_server_addr "$SERVER_IP"; do
-        ((a--)) || true
-        [ "$a" = 0 ] && error "\n $(text 3) \n"
-        reading "\n (${STEP_NUM}/${TOTAL_STEPS:-?}) $(text 10) " SERVER_IP
-        [ -z "$SERVER_IP" ] && SERVER_IP="$SERVER_IP_DEFAULT"
-      done
     fi
   elif [ -n "$WAN4" ]; then
     SERVER_IP_DEFAULT=$WAN4
@@ -3097,28 +3238,9 @@ sing-box_variables() {
     input_nginx_port
   fi
 
-  # 输入服务器 IP,默认为检测到的服务器 IP，如果全部为空，则提示并退出脚本
-  if [ "$IS_FAST_INSTALL" = 'is_fast_install' ]; then
-    grep -q '^$' <<< "$SERVER_IP" && SERVER_IP="$SERVER_IP_DEFAULT"
-  fi
-  if [ -z "$SERVER_IP" ]; then
-    if [[ "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' || "$IS_FAST_INSTALL" = 'is_fast_install' ]]; then
-      SERVER_IP="$SERVER_IP_DEFAULT"
-    else
-      (( STEP_NUM++ )) || true
-      local IP_ERROR_TIME=6
-      while true; do
-        reading "\n (${STEP_NUM}/${TOTAL_STEPS}) $(text 10) " SERVER_IP
-        [ -z "$SERVER_IP" ] && break
-        is_valid_server_addr "$SERVER_IP" && break
-        (( IP_ERROR_TIME-- )) || true
-        [ "$IP_ERROR_TIME" = 0 ] && error "\n $(text 3) \n"
-        warning " $(text 133) "
-      done
-    fi
-  fi
-  SERVER_IP=${SERVER_IP:-"$SERVER_IP_DEFAULT"} && WS_SERVER_IP_SHOW=$SERVER_IP
-  [ -z "$SERVER_IP" ] && error " $(text 47) "
+  # 选择订阅中的直连地址；显式 SERVER_IP 和非交互默认保持兼容。
+  (( STEP_NUM++ )) || true
+  select_share_addresses || error " $(text 133) "
 
   # 根据 IPv4 和 IPv6 的网络状态，使不同的 DNS 策略
   command -v ping >/dev/null 2>&1 && for i in {1..3}; do
@@ -4091,8 +4213,8 @@ is_port_in_use() {
 # 校验服务器地址：IPv4 / IPv6 / 域名（域名须含至少一个点，NAT 场景可用 DDNS 域名）
 is_valid_server_addr() {
   local _ADDR="$1"
-  [[ "$_ADDR" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] && return 0
-  [[ "$_ADDR" =~ ^[0-9a-fA-F:]+$ && "$_ADDR" =~ : ]] && return 0
+  [[ "$_ADDR" =~ ^[0-9.]+$ ]] && { valid_share_family ipv4 "$_ADDR"; return $?; }
+  [[ "$_ADDR" == *:* ]] && { valid_share_family ipv6 "$_ADDR"; return $?; }
   [[ "$_ADDR" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$ ]] && return 0
   return 1
 }
@@ -5147,6 +5269,7 @@ fetch_nodes_value() {
 
   # 获取公共数据
   ls ${WORK_DIR}/conf/*-ws*inbounds.json >/dev/null 2>&1 && SERVER_IP=$(awk -F '"' '/"WS_SERVER_IP_SHOW"/{print $4; exit}' ${WORK_DIR}/conf/*-ws*inbounds.json) || SERVER_IP=$([ -s ${WORK_DIR}/list ] && grep -A1 '"tag"' ${WORK_DIR}/list | sed -E '/-ws(-tls)*",$/{N;d}' | awk -F '"' '/"server"/{count++; if (count == 1) {print $4; exit}}')
+  load_share_addresses || error "Invalid share address configuration: ${WORK_DIR}/share-addresses"
   EXISTED_PORTS=$(awk -F ':|,' '/listen_port/{print $2}' ${WORK_DIR}/conf/*_inbounds.json 2>/dev/null)
   START_PORT=$(awk 'NR == 1 { min = $0 } { if ($0 < min) min = $0; count++ } END {print min}' <<< "$EXISTED_PORTS")
   [[ -z "$NODE_NAME_CONFIRM" && -s ${WORK_DIR}/subscribe/clash ]] && NODE_NAME_CONFIRM=$(awk -F "'" '/u: &u/{print $2; exit}' ${WORK_DIR}/subscribe/clash)
@@ -5292,6 +5415,7 @@ install_sing-box() {
     cmd_systemctl disable nginx
   fi
   [ ! -d ${WORK_DIR}/logs ] && mkdir -p ${WORK_DIR}/logs
+  save_share_addresses || error "Failed to save share addresses"
   [ ! -d ${TEMP_DIR} ] && mkdir -p $TEMP_DIR
   ssl_certificate $TLS_SERVER_DEFAULT
   hint "\n $(text 2) " && wait
@@ -5410,6 +5534,32 @@ export_list() {
     local SELF_SIGNED_200_FINGERPRINT_SHA256=$(openssl x509 -fingerprint -noout -sha256 -in ${WORK_DIR}/cert/cert_200.pem | awk -F '=' '{print $NF}')
   fi
 
+  # 两次调用同一生成器，避免修改各客户端特有的 URI/Base64 编码。
+  # WS 的 CDN 节点仅在第一轮生成；分享地址只作用于直连协议。
+  local SHARE_CLASH='' SHARE_SHADOWROCKET='' SHARE_V2RAYN='' SHARE_THRONE=''
+  local SHARE_OUTBOUND='' SHARE_NODES='' SHARE_PROMPT=''
+  local -a SHARE_CLASH2_PORT=() SHARE_CLASH2_PROXY=() SHARE_CLASH2_GROUP=()
+  build_share_nodes() {
+    local SHARE_ADDRESS="$1" SHARE_LABEL="$2" SHARE_SECOND="$3"
+    local -a SHARE_SOURCE_NAMES=()
+    local share_i
+    for share_i in "${!NODE_NAME[@]}"; do SHARE_SOURCE_NAMES[share_i]="${NODE_NAME[share_i]}"; done
+    local -a NODE_NAME=()
+    for share_i in "${!SHARE_SOURCE_NAMES[@]}"; do NODE_NAME[share_i]="${SHARE_SOURCE_NAMES[share_i]}"; done
+    if [ -n "$SHARE_LABEL" ]; then
+      for share_i in 11 12 13 14 15 16 19 20 21 22 23; do
+        NODE_NAME[share_i]="${NODE_NAME[share_i]} ${SHARE_LABEL}"
+      done
+    fi
+    local SERVER_IP="$SHARE_ADDRESS" SERVER_IP_1 SERVER_IP_2
+    local SHARE_DETOUR_SUFFIX="${SHARE_LABEL:+-${SHARE_LABEL}}"
+    local PORT_VMESS_WS="$PORT_VMESS_WS" PORT_VLESS_WS="$PORT_VLESS_WS"
+    [ "$SHARE_SECOND" = 'true' ] && { PORT_VMESS_WS=''; PORT_VLESS_WS=''; }
+    if [[ "$SERVER_IP" == *:* ]]; then
+      SERVER_IP_1="[$SERVER_IP]"; SERVER_IP_2="[[$SERVER_IP]]"
+    else
+      SERVER_IP_1="$SERVER_IP"; SERVER_IP_2="$SERVER_IP"
+    fi
   # 生成各订阅文件
   # 生成 Clash proxy providers 订阅文件
   local CLASH_SUBSCRIBE='proxies:'
@@ -5517,27 +5667,6 @@ export_list() {
   $CLASH_SNELL
 "
 
-  echo -n "${CLASH_SUBSCRIBE}" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' > ${WORK_DIR}/subscribe/proxies
-
-  # 后台生成 clash 订阅配置文件
-  {
-    # 模板1: 使用 proxy providers
-    cat ${TEMP_DIR}/clash | sed "s#NODE_NAME#${NODE_NAME_CONFIRM}#g; s#PROXY_PROVIDERS_URL#$SUBSCRIBE_ADDRESS/${UUID_CONFIRM}/proxies#" > ${WORK_DIR}/subscribe/clash
-
-    # 模板2: 不使用 proxy providers
-    CLASH2_PORT=("$PORT_XTLS_REALITY" "$PORT_HYSTERIA2" "$PORT_TUIC" "$PORT_SHADOWTLS" "$PORT_SHADOWSOCKS" "$PORT_TROJAN" "$PORT_VMESS_WS" "$PORT_VLESS_WS" "$PORT_GRPC_REALITY" "$PORT_ANYTLS" "$PORT_SNELL")
-    CLASH2_PROXY_INSERT=("$CLASH_XTLS_REALITY" "$CLASH_HYSTERIA2" "$CLASH_TUIC" "$CLASH_SHADOWTLS" "$CLASH_SHADOWSOCKS" "$CLASH_TROJAN" "$CLASH_VMESS_WS" "$CLASH_VLESS_WS" "$CLASH_GRPC_REALITY" "$CLASH_ANYTLS" "$CLASH_SNELL")
-    CLASH2_PROXY_GROUPS_INSERT=("- ${NODE_NAME[11]} ${NODE_TAG[0]}" "- ${NODE_NAME[12]} ${NODE_TAG[1]}" "- ${NODE_NAME[13]} ${NODE_TAG[2]}" "- ${NODE_NAME[14]} ${NODE_TAG[3]}" "- ${NODE_NAME[15]} ${NODE_TAG[4]}" "- ${NODE_NAME[16]} ${NODE_TAG[5]}" "- ${NODE_NAME[17]} ${NODE_TAG[6]}" "- ${NODE_NAME[18]} ${NODE_TAG[7]}" "- ${NODE_NAME[20]} ${NODE_TAG[9]}" "- ${NODE_NAME[21]} ${NODE_TAG[10]}" "- ${NODE_NAME[23]} ${NODE_TAG[12]}")
-
-    CLASH2_YAML=$(cat ${TEMP_DIR}/clash2)
-    for x in ${!CLASH2_PORT[@]}; do
-      [[ ${CLASH2_PORT[x]} =~ [0-9]+ ]] && { CLASH2_YAML=$(sed "/proxy-groups:/i\  ${CLASH2_PROXY_INSERT[x]}" <<< "$CLASH2_YAML"); CLASH2_YAML=$(sed -E "/- name: (♻️ 自动选择|📲 电报消息|💬 OpenAi|📹 油管视频|🎥 奈飞视频|📺 巴哈姆特|📺 哔哩哔哩|🌍 国外媒体|🌏 国内媒体|📢 谷歌FCM|Ⓜ️ 微软Bing|Ⓜ️ 微软云盘|Ⓜ️ 微软服务|🍎 苹果服务|🎮 游戏平台|🎶 网易音乐|🎯 全球直连)|^rules:$/i\      ${CLASH2_PROXY_GROUPS_INSERT[x]}" <<< "$CLASH2_YAML"); }
-    done
-    echo "$CLASH2_YAML" > ${WORK_DIR}/subscribe/clash2
-
-    rm -f ${TEMP_DIR}/clash{,2}
-  } &>/dev/null
-
   # 生成 ShadowRocket 订阅配置文件
   [ -n "$PORT_XTLS_REALITY" ] && local SHADOWROCKET_SUBSCRIBE+="
 vless://$(echo -n "auto:${UUID[11]}@${SERVER_IP_2}:${PORT_XTLS_REALITY}" | base64 -w0)?remarks=${NODE_NAME[11]// /%20}%20${NODE_TAG[0]}&tls=1&peer=${TLS_SERVER}&${VISION_OR_MUX_SHADOWROCKET}&pbk=${REALITY_PUBLIC[11]}
@@ -5623,7 +5752,6 @@ http3://$(echo -n "${UUID[22]}:${UUID[22]}@${SERVER_IP_2}:${PORT_NAIVE}" | base6
   [ -n "$PORT_SNELL" ] && local SHADOWROCKET_SUBSCRIBE+="
 snell://$(echo -n "chacha20-ietf-poly1305:${UUID[23]}@${SERVER_IP_1}:${PORT_SNELL}" | base64 -w0)?version=6&mode=default&udp=1#${NODE_NAME[23]// /%20}%20${NODE_TAG[12]}
 "
-  echo -n "$SHADOWROCKET_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/shadowrocket
 
   # 生成 V2rayN 订阅文件
   [ -n "$PORT_XTLS_REALITY" ] && local V2RAYN_SUBSCRIBE+="
@@ -5662,7 +5790,7 @@ v2rayn://tuic/$(echo -n "{\"ConfigType\":8,\"CoreType\":24,\"ConfigVersion\":4,\
     ],
     \"outbounds\": [
         {
-            \"detour\": \"shadowtls-out\",
+            \"detour\": \"shadowtls-out${SHARE_DETOUR_SUFFIX}\",
             \"method\": \"$SHADOWTLS_METHOD\",
             \"password\": \"$SHADOWTLS_PASSWORD\",
             \"type\": \"shadowsocks\",
@@ -5679,7 +5807,7 @@ v2rayn://tuic/$(echo -n "{\"ConfigType\":8,\"CoreType\":24,\"ConfigVersion\":4,\
             \"password\": \"${UUID[14]}\",
             \"server\": \"${SERVER_IP}\",
             \"server_port\": ${PORT_SHADOWTLS},
-            \"tag\": \"shadowtls-out\",
+            \"tag\": \"shadowtls-out${SHARE_DETOUR_SUFFIX}\",
             \"tls\": {
                 \"enabled\": true,
                 \"server_name\": \"${TLS_SERVER}\",
@@ -5759,7 +5887,6 @@ v2rayn://naive/$(echo -n "{\"ConfigType\":12,\"CoreType\":24,\"ConfigVersion\":4
 ----------------------------
 v2rayn://naive/$(echo -n "{\"ConfigType\":12,\"CoreType\":24,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME[22]} ${NODE_TAG[11]} quic\",\"Address\":\"${SERVER_IP}\",\"Port\":${PORT_NAIVE},\"Password\":\"${UUID[22]}\",\"Username\":\"${UUID[22]}\",\"StreamSecurity\":\"tls\",\"AllowInsecure\":\"false\",\"Sni\":\"${TLS_SERVER}\",\"Cert\":\"${CERT_200_URL_2}\",\"ProtoExtraObj\":{\"CongestionControl\":\"bbr\",\"NaiveQuic\":true}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
 
-  echo -n "$V2RAYN_SUBSCRIBE" | sed '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/d' | sed -E '/^[ ]*#|^[ ]+|^\{|^\}/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/v2rayn
 
   # 生成 Throne 订阅文件
   [ -n "$PORT_XTLS_REALITY" ] && local THRONE_SUBSCRIBE+="
@@ -5857,7 +5984,6 @@ naive+quic://${UUID[22]}:${UUID[22]}@${SERVER_IP_1}:${PORT_NAIVE}?congestion_con
 ----------------------------
 snell://${UUID[23]}@${SERVER_IP_1}:${PORT_SNELL}?version=6&mode=default#${NODE_NAME[23]// /%20}%20${NODE_TAG[12]}"
 
-  echo -n "$THRONE_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${WORK_DIR}/subscribe/throne
 
   # 生成 Sing-box 订阅文件
   [ -n "$PORT_XTLS_REALITY" ] &&
@@ -5886,7 +6012,7 @@ snell://${UUID[23]}@${SERVER_IP_1}:${PORT_SNELL}?version=6&mode=default#${NODE_N
   local NODE_REPLACE+="\"${NODE_NAME[13]} ${NODE_TAG[2]}\","
 
   [ -n "$PORT_SHADOWTLS" ] &&
-  local SHADOWTLS_INBOUND=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[14]} ${NODE_TAG[3]}\", \"method\": \"$SHADOWTLS_METHOD\", \"password\": \"$SHADOWTLS_PASSWORD\", \"detour\": \"shadowtls-out\", \"udp_over_tcp\": false, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }, { \"type\": \"shadowtls\", \"tag\": \"shadowtls-out\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_SHADOWTLS}, \"version\": 3, \"password\": \"${UUID[14]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER}\", \"utls\": { \"enabled\": true, \"fingerprint\": \"${FINGER_PRINT}\" } } }," &&
+  local SHADOWTLS_INBOUND=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[14]} ${NODE_TAG[3]}\", \"method\": \"$SHADOWTLS_METHOD\", \"password\": \"$SHADOWTLS_PASSWORD\", \"detour\": \"shadowtls-out${SHARE_DETOUR_SUFFIX}\", \"udp_over_tcp\": false, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }, { \"type\": \"shadowtls\", \"tag\": \"shadowtls-out${SHARE_DETOUR_SUFFIX}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_SHADOWTLS}, \"version\": 3, \"password\": \"${UUID[14]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER}\", \"utls\": { \"enabled\": true, \"fingerprint\": \"${FINGER_PRINT}\" } } }," &&
   local OUTBOUND_REPLACE+="${SHADOWTLS_INBOUND}" &&
   local NODE_REPLACE+="\"${NODE_NAME[14]} ${NODE_TAG[3]}\","
 
@@ -5956,11 +6082,58 @@ snell://${UUID[23]}@${SERVER_IP_1}:${PORT_SNELL}?version=6&mode=default#${NODE_N
   local OUTBOUND_REPLACE+=" { \"type\": \"snell\", \"tag\": \"${NODE_NAME[23]} ${NODE_TAG[12]}\", \"server\":\"${SERVER_IP}\", \"server_port\": ${PORT_SNELL}, \"version\": 6, \"psk\": \"${UUID[23]}\", \"mode\": \"default\" }," &&
   local NODE_REPLACE+="\"${NODE_NAME[23]} ${NODE_TAG[12]}\","
 
+
+    SHARE_CLASH+="${CLASH_SUBSCRIBE#proxies:}"
+    SHARE_SHADOWROCKET+="$SHADOWROCKET_SUBSCRIBE"
+    SHARE_V2RAYN+="$V2RAYN_SUBSCRIBE"
+    SHARE_THRONE+="$THRONE_SUBSCRIBE"
+    SHARE_OUTBOUND+="$OUTBOUND_REPLACE"
+    SHARE_NODES+="$NODE_REPLACE"
+    [ "$SHARE_SECOND" = 'true' ] || SHARE_PROMPT="$PROMPT"
+    local -a pass_ports=("$PORT_XTLS_REALITY" "$PORT_HYSTERIA2" "$PORT_TUIC" "$PORT_SHADOWTLS" "$PORT_SHADOWSOCKS" "$PORT_TROJAN" "$PORT_VMESS_WS" "$PORT_VLESS_WS" "$PORT_H2_REALITY" "$PORT_GRPC_REALITY" "$PORT_ANYTLS" "$PORT_SNELL")
+    local -a pass_proxies=("$CLASH_XTLS_REALITY" "$CLASH_HYSTERIA2" "$CLASH_TUIC" "$CLASH_SHADOWTLS" "$CLASH_SHADOWSOCKS" "$CLASH_TROJAN" "$CLASH_VMESS_WS" "$CLASH_VLESS_WS" "$CLASH_H2_REALITY" "$CLASH_GRPC_REALITY" "$CLASH_ANYTLS" "$CLASH_SNELL")
+    local -a pass_groups=("- ${NODE_NAME[11]} ${NODE_TAG[0]}" "- ${NODE_NAME[12]} ${NODE_TAG[1]}" "- ${NODE_NAME[13]} ${NODE_TAG[2]}" "- ${NODE_NAME[14]} ${NODE_TAG[3]}" "- ${NODE_NAME[15]} ${NODE_TAG[4]}" "- ${NODE_NAME[16]} ${NODE_TAG[5]}" "- ${NODE_NAME[17]} ${NODE_TAG[6]}" "- ${NODE_NAME[18]} ${NODE_TAG[7]}" "- ${NODE_NAME[19]} ${NODE_TAG[8]}" "- ${NODE_NAME[20]} ${NODE_TAG[9]}" "- ${NODE_NAME[21]} ${NODE_TAG[10]}" "- ${NODE_NAME[23]} ${NODE_TAG[12]}")
+    SHARE_CLASH2_PORT+=("${pass_ports[@]}")
+    SHARE_CLASH2_PROXY+=("${pass_proxies[@]}")
+    SHARE_CLASH2_GROUP+=("${pass_groups[@]}")
+  }
+
+  if [ "$SHARE_MODE" = 'dual' ]; then
+    if [[ -z "$SHARE_IPV4" || -z "$SHARE_IPV6" ]]; then
+      error 'Dual-stack sharing requires both IPv4 and IPv6 addresses.'
+      return 1
+    fi
+    build_share_nodes "$SHARE_IPV4" IPv4 false
+    build_share_nodes "$SHARE_IPV6" IPv6 true
+  else
+    build_share_nodes "$SERVER_IP" '' false
+  fi
+  unset -f build_share_nodes
+  local CLASH_SUBSCRIBE="proxies:${SHARE_CLASH}"
+  local SHADOWROCKET_SUBSCRIBE="$SHARE_SHADOWROCKET" V2RAYN_SUBSCRIBE="$SHARE_V2RAYN" THRONE_SUBSCRIBE="$SHARE_THRONE"
+  local OUTBOUND_REPLACE="$SHARE_OUTBOUND" NODE_REPLACE="$SHARE_NODES"
+  local PROMPT="$SHARE_PROMPT"
+
+  echo -n "$CLASH_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' > "${WORK_DIR}/subscribe/proxies"
+  echo -n "$SHADOWROCKET_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > "${WORK_DIR}/subscribe/shadowrocket"
+  echo -n "$V2RAYN_SUBSCRIBE" | sed '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/d' | sed -E '/^[ ]*#|^[ ]+|^\{|^\}/d' | sed '/^$/d' | base64 -w0 > "${WORK_DIR}/subscribe/v2rayn"
+  echo -n "$THRONE_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > "${WORK_DIR}/subscribe/throne"
+
   {
-    # 生成 sing-box SFM SFA SFI 订阅文件
+    sed "s#NODE_NAME#${NODE_NAME_CONFIRM}#g; s#PROXY_PROVIDERS_URL#$SUBSCRIBE_ADDRESS/${UUID_CONFIRM}/proxies#" "${TEMP_DIR}/clash" > "${WORK_DIR}/subscribe/clash"
+    local CLASH2_YAML=$(cat "${TEMP_DIR}/clash2")
+    local x
+    for x in "${!SHARE_CLASH2_PORT[@]}"; do
+      if [[ ${SHARE_CLASH2_PORT[x]} =~ [0-9]+ ]]; then
+        CLASH2_YAML=$(sed "/proxy-groups:/i\  ${SHARE_CLASH2_PROXY[x]}" <<< "$CLASH2_YAML")
+        CLASH2_YAML=$(sed -E "/- name: (♻️ 自动选择|📲 电报消息|💬 OpenAi|📹 油管视频|🎥 奈飞视频|📺 巴哈姆特|📺 哔哩哔哩|🌍 国外媒体|🌏 国内媒体|📢 谷歌FCM|Ⓜ️ 微软Bing|Ⓜ️ 微软云盘|Ⓜ️ 微软服务|🍎 苹果服务|🎮 游戏平台|🎶 网易音乐|🎯 全球直连)|^rules:$/i\      ${SHARE_CLASH2_GROUP[x]}" <<< "$CLASH2_YAML")
+      fi
+    done
+    echo "$CLASH2_YAML" > "${WORK_DIR}/subscribe/clash2"
+    rm -f "${TEMP_DIR}/clash" "${TEMP_DIR}/clash2"
     [ ! -s "$TEMP_DIR/sing-box-template" ] && wget --no-check-certificate --continue --tries=2 --timeout=10 -qO "$TEMP_DIR/sing-box-template" "${GH_PROXY}${SUBSCRIBE_TEMPLATE}/sing-box" 2>/dev/null
-    cat $TEMP_DIR/sing-box-template | sed "s#\"<OUTBOUND_REPLACE>\",#$OUTBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" | ${WORK_DIR}/jq > ${WORK_DIR}/subscribe/sing-box
-    rm -f $TEMP_DIR/sing-box-template
+    sed "s#\"<OUTBOUND_REPLACE>\",#$OUTBOUND_REPLACE#; s#\"<NODE_REPLACE>\"#${NODE_REPLACE%,}#g" "$TEMP_DIR/sing-box-template" | "${WORK_DIR}/jq" > "${WORK_DIR}/subscribe/sing-box"
+    rm -f "$TEMP_DIR/sing-box-template"
   } &>/dev/null
 
   # 生成二维码 url 文件
@@ -6984,6 +7157,15 @@ for z in ${!ALL_PARAMETER[@]}; do
       ;;
     --SERVER_IP )
       ((z++)); SERVER_IP=${ALL_PARAMETER[z]}
+      ;;
+    --SHARE_STACK )
+      ((z++)); SHARE_MODE=${ALL_PARAMETER[z],,}
+      ;;
+    --SHARE_IPV4 )
+      ((z++)); SHARE_IPV4=${ALL_PARAMETER[z]}
+      ;;
+    --SHARE_IPV6 )
+      ((z++)); SHARE_IPV6=${ALL_PARAMETER[z]}
       ;;
     --VMESS_HOST_DOMAIN )
       ((z++)); VMESS_HOST_DOMAIN=${ALL_PARAMETER[z]}
