@@ -2,17 +2,22 @@ name: "Build and push images"
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - "docker_init.sh"
+    branches:
+      - main
 
 jobs:
   Build:
-      runs-on: ubuntu-latest
-      name: "Build Sing-box image"
-      env:
-        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-        DOCKERHUB_REPOSITORY: ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
+    runs-on: ubuntu-latest
+    name: "Build Sing-box image"
+    env:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      DOCKERHUB_REPOSITORY: ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
 
-      steps:
+    steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
@@ -34,5 +39,5 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           push: true
-          platforms: linux/amd64, linux/arm64, linux/arm/v7
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: ${{ env.DOCKERHUB_REPOSITORY }}
