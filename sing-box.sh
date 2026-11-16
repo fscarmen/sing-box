@@ -431,6 +431,8 @@ E[194]="Switch XTLS reality to Vision (current: multiplex)"
 C[194]="XTLS reality 切换为 vision（当前：多路复用）"
 E[195]="Downloading the latest version \${APP} failed, script exits. Feedback:[https://github.com/fscarmen/sing-box/issues]"
 C[195]="下载最新版本 \${APP} 失败，脚本退出，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
+E[196]="No interactive terminal detected; upgrade skipped. Re-run in a terminal, or pipe the answer: printf 'y\\n' | sb -v"
+C[196]="未检测到交互终端，已跳过升级；请在终端中重新运行，或使用：printf 'y\\n' | sb -v"
 
 # 自定义字体彩色，read 函数
 warning() { echo -e "\033[31m\033[01m$*\033[0m"; }  # 红色
@@ -442,13 +444,22 @@ INFO_PROMPT_HEAD=$'\001\033[32m\033[01m\002'
 INFO_PROMPT_TAIL=$'\001\033[0m\002'
 # 交互终端下启用 readline 行编辑：方向键移动光标、Home / End、Delete、Ctrl+A / Ctrl+E / Ctrl+W；
 reading() {
-  local prompt
+  local prompt reading_rc
+  printf -v prompt '%b' "$1"
   if [[ -t 0 ]]; then
-    printf -v prompt '%b' "$1"
     read -er -p "$INFO_PROMPT_HEAD$prompt$INFO_PROMPT_TAIL" "$2"
-  else
-    read -rp "$(info "$1")" "$2"
+    return
   fi
+  # 先按原方式从 stdin 读取（兼容 printf 'y\n' | sb -v 等管道输入）
+  read -rp "$(info "$1")" "$2" && return 0
+  reading_rc=$?
+  # stdin 已 EOF（ssh 远程命令、面板、cron 等非交互场景）时，尝试改用控制终端
+  if { exec 3</dev/tty; } 2>/dev/null; then
+    read -er -u 3 -p "$INFO_PROMPT_HEAD$prompt$INFO_PROMPT_TAIL" "$2"
+    reading_rc=$?
+    exec 3<&-
+  fi
+  return $reading_rc
 }
 
 # 预处理：扫描 E/C 数组，把含 $ 的条目下标记录到关联数组，避免 text() 每次调用都启动 grep 子进程
@@ -6533,7 +6544,11 @@ version() {
     ARGO_LOCAL=$(${WORK_DIR}/cloudflared -v | awk '{for (i=1; i<NF; i++) if ($i=="version") {print $(i+1); exit}}')
     local APP=Argo LOCAL="$ARGO_LOCAL" ONLINE="$ARGO_ONLINE"
     info "\n $(text 40) "
-    [[ -n "$ARGO_ONLINE" && "$ARGO_ONLINE" != "$ARGO_LOCAL" ]] && reading "\n $(text 9) " UPDATE[0] || info " $(text 41) "
+    if [[ -n "$ARGO_ONLINE" && "$ARGO_ONLINE" != "$ARGO_LOCAL" ]]; then
+      reading "\n $(text 9) " UPDATE[0] || warning "\n $(text 196) \n"
+    else
+      info " $(text 41) "
+    fi
   fi
 
   # Sing-box 版本检测
@@ -6541,7 +6556,11 @@ version() {
   grep -q '.' <<< "$ONLINE" || error " $(text 100) \n"
   local LOCAL=$(${WORK_DIR}/sing-box version | awk '/version/{print $NF}')
   local APP=Sing-box && info "\n $(text 40) "
-  [[ -n "$ONLINE" && "$ONLINE" != "$LOCAL" ]] && reading "\n $(text 9) " UPDATE[1] || info " $(text 41) "
+  if [[ -n "$ONLINE" && "$ONLINE" != "$LOCAL" ]]; then
+    reading "\n $(text 9) " UPDATE[1] || warning "\n $(text 196) \n"
+  else
+    info " $(text 41) "
+  fi
 
   [[ "${UPDATE[*],,}" =~ y ]] && check_system_info
 
