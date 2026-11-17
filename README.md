@@ -25,16 +25,18 @@
 
 * * *
 ## 1.更新信息
+2026.11.17 v1.3.31 Add dynamic subscription (render subscription by request Host): a post-install feature, available via `sb -d` only after a fresh install with subscription enabled. Direct node servers follow the access address (IPv4/IPv6/Domain/Tunnel), supporting multi-IP servers and IPv6 address pools; 新增动态订阅（按请求 Host 实时渲染）：安装后功能，需先完成新安装并开启订阅，再通过 `sb -d` 添加；直连节点 server 跟随访问地址（IPv4/IPv6/域名/固定隧道），适配多 IP 机器与 IPv6 地址池
+
 2026.11.07 v1.3.30 Add Snell v6 inbound with V2rayN, Throne, Clash Verge, Shadowrocket and sing-box client configuration output; 新增 Snell v6 入站，并输出 V2rayN、Throne、Clash Verge、Shadowrocket 和 sing-box 客户端配置
 
 2026.10.31 v1.3.29 Hysteria2 流量不再通过 WARP 出站，存量 Hysteria2 专属 WARP 路由自动清理；Hysteria2 Realm 功能保持不变
-
-2026.10.22 v1.3.28 sync cloudflared (Argo) in [sb -v], independent from sing-box https://github.com/fscarmen/sing-box/issues/364; [sb -v] 支持同步升级 cloudflared (Argo)，与 Sing-box 相互独立 https://github.com/fscarmen/sing-box/issues/364
 
 <details>
     <summary>历史更新 history（点击即可展开或收起）</summary>
 <br>
 
+>2026.10.22 v1.3.28 sync cloudflared (Argo) in [sb -v], independent from sing-box https://github.com/fscarmen/sing-box/issues/364; [sb -v] 支持同步升级 cloudflared (Argo)，与 Sing-box 相互独立 https://github.com/fscarmen/sing-box/issues/364
+>
 >2026.10.13 v1.3.27 [sb -d]: switch XTLS reality between xtls-rprx-vision and multiplex; [sb -d] 添加 XTLS reality 的 xtls-rprx-vision 与多路复用相互切换
 >
 >2026.10.13 v1.3.26 1. Fix the firewall allow rules being appended after an existing `REJECT`/`DROP` rule on the `INPUT` chain, which left node and `nginx` ports unreachable on images such as Oracle OCI and OpenVZ; the rules are now inserted before the first `REJECT`/`DROP` rule https://github.com/fscarmen/sing-box/issues/353; 2. Fix occasional empty version detection when checking for `sing-box` updates, which could abort installation or upgrade; the version is now read from the lightweight `releases.atom` feed first, with the GitHub API as fallback https://github.com/fscarmen/sing-box/issues/355; 3. Enable `readline` line editing on interactive inputs: arrow keys move the cursor, `Home` / `End` and `Ctrl+A` / `Ctrl+E` jump to line start / end, `Ctrl+W` deletes the previous word, `Ctrl+U` clears to line start, `Ctrl+K` deletes to line end, `Ctrl+Y` undoes the last deletion, `Ctrl+L` clears the screen; editing keys are no longer inserted into the value https://github.com/fscarmen/sing-box/pull/357#issuecomment-6137941771; 4. Make the uninstall path fully offline: `sb -u` no longer runs CDN detection and no longer pre-downloads subscription templates, binaries or `cloudflared`, so it completes immediately on hosts that cannot reach GitHub https://github.com/fscarmen/sing-box/issues/358; 5. update GitHub proxy CDN endpoints https://github.com/fscarmen/sing-box/issues/359; 1. 修复入站放行规则被追加到 `INPUT` 链已有的 `REJECT`/`DROP` 规则之后，导致甲骨文 OCI、OpenVZ 等镜像上节点端口与 `nginx` 端口无法访问的问题；放行规则现改为插入到第一条 `REJECT`/`DROP` 规则之前 https://github.com/fscarmen/sing-box/issues/353; 2. 修复检测 `sing-box` 更新时偶尔取不到最新版本号、导致安装或升级中断的问题；改为优先从体积很小的 `releases.atom` 获取，GitHub API 作为兜底 https://github.com/fscarmen/sing-box/issues/355; 3. 交互输入启用 `readline` 行编辑：方向键移动光标，`Home` / `End` 与 `Ctrl+A` / `Ctrl+E` 跳到行首 / 行尾，`Ctrl+W` 删除光标前一个词，`Ctrl+U` 清空到行首，`Ctrl+K` 删除到行尾，`Ctrl+Y` 撤销上一次删除，`Ctrl+L` 清屏；编辑键不再被当作内容插入输入值 https://github.com/fscarmen/sing-box/pull/357#issuecomment-6137941771; 4. 卸载流程完全离线化：`sb -u` 不再执行 CDN 探测，也不再预下载订阅模板、二进制与 `cloudflared`，GitHub 不可达时也能立即完成卸载 https://github.com/fscarmen/sing-box/issues/358; 5. 更换 GitHub 代理与 CDN 加速节点 https://github.com/fscarmen/sing-box/issues/359
@@ -182,7 +184,7 @@
 * 一键部署多协议，可以单选、多选或全选 ShadowTLS v3 / XTLS Reality / Hysteria2 / Tuic V5 / ShadowSocks / Trojan / Vmess + ws / Vless + ws + tls / H2 Reality / gRPC Reality / AnyTLS / NaiveProxy / Snell v6, 总有一款适合你
 * 所有协议均不需要域名，可选 Cloudflare Argo Tunnel 内网穿透以支持传统方式为 websocket 的协议
 * Hysteria2 支持 Realm 模式，适用于回国、没有公网入口、住宅 NAT、CGNAT 等无法开放入站端口的机器；有公网入口时不建议使用
-* 节点信息输出到 V2rayN / Clash Verge / 小火箭 / Throne / Sing-box (SFI, SFA, SFM)，订阅自动适配客户端，一个订阅 url 走天下
+* 节点信息输出到 V2rayN / Clash Verge / 小火箭 / Throne / Sing-box (SFI, SFA, SFM)，自动适配客户端，一个订阅 url 走天下；另有**动态订阅**——按请求 Host 实时渲染，直连节点 server 跟随访问地址（IPv4 / IPv6 / 域名 / 固定隧道），一份订阅适配多 IP 与 IPv6 地址池，WS / CDN / Argo 节点不变，独立开关、关闭后普通订阅照常可用
 * 自定义端口，适合有限开放端口的 nat 小鸡
 * 安装后通过 sb -d 可修改监听端口：修改开始端口（各协议按顺序占用）或为各协议设置独立（非连续）端口，端口变更自动同步 nginx 反代并热加载
 * 服务器地址支持填写 IP 或域名，NAT VPS 公网 IP 每日变化时可直接使用 DDNS 域名，新安装与 sb -d 修改均可
@@ -674,7 +676,22 @@ services:
 |   |-- sing-box-phone                       # SFI / SFA 订阅文件1
 |   |-- sing-box2                            # SFI / SFA / SFM 订阅文件2
 |   |-- v2rayn                               # V2rayN 订阅文件
-|   `-- throne                               # Throne 订阅文件
+|   |-- throne                               # Throne 订阅文件
+|   `-- dynamic                              # 动态订阅目录（sb -d 开启动态订阅后生成）
+|       |-- render.sh                        # CGI 渲染脚本，按请求 Host 实时生成订阅（主脚本现场生成）
+|       |-- fcgiwrap-start                   # fcgiwrap 幂等启动脚本
+|       |-- fcgiwrap.sock                    # FastCGI 通信 socket
+|       |-- fcgiwrap.pid                     # fcgiwrap 进程 PID 文件
+|       |-- meta.env                         # 渲染元数据：固定隧道域名 / 公网 WAN4 / WAN6
+|       `-- templates                        # 只读订阅模板目录（占位符版，动态请求不回写）
+|           |-- proxies                      # Clash proxy provider 节点模板
+|           |-- clash                        # Clash 完整配置模板
+|           |-- clash2                       # Clash 内联节点模板
+|           |-- shadowrocket                 # ShadowRocket 订阅模板
+|           |-- v2rayn                        # V2rayN 订阅模板
+|           |-- throne                       # Throne 订阅模板
+|           |-- sing-box                     # sing-box 客户端配置模板
+|           `-- src                          # clash / clash2 / sing-box 原始模板源文件
 |-- cache.db                                 # sing-box 缓存文件
 |-- nginx.conf                               # 用于订阅服务的 nginx 配置文件
 |-- language                                 # 存放脚本语言文件，E 为英文，C 为中文
