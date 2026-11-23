@@ -1,0 +1,7 @@
+Flask>=3.0,<4
+gunicorn>=23,<24
+grpcio>=1.75,<2
+protobuf>=5,<7
+maxminddb>=2.6,<4
+
+PyYAML>=6.0.3,<7

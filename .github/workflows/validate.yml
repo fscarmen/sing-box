@@ -1,0 +1,47 @@
+name: Validate installer and dashboard
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: dashboard/web/package-lock.json
+      - run: python -m pip install -r dashboard/requirements.lock
+      - run: python scripts/fetch-test-xray.py
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: python scripts/fetch-test-mihomo.py
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: python -B -m unittest discover -s dashboard/tests
+        env:
+          XRAY_TEST_BINARY: ${{ github.workspace }}/outputs/xray-v26.10.21
+          MIHOMO_TEST_BINARY: ${{ github.workspace }}/outputs/mihomo-v1.19.33
+      - run: bash -n bootstrap.sh sing-box.sh docker_init.sh dashboard/panel-firewall.sh dashboard/vendor/xray-install/install-release.sh
+      - run: npm ci && npm run build
+        working-directory: dashboard/web
+      - run: node --test tests/*.test.mjs && node scripts/check-build.mjs
+        working-directory: dashboard/web
+      - run: python scripts/check-release.py
+      - run: python scripts/package-installer.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sing-box-dashboard-installer
+          path: |
+            outputs/sing-box-dashboard-installer.sh
+            outputs/sing-box-dashboard-installer.sha256

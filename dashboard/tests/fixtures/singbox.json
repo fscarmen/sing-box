@@ -1,0 +1,23 @@
+{
+  "log": {"level": "warn"},
+  "inbounds": [
+    {"type": "vless", "tag": "vless-reality-in", "listen": "::", "listen_port": 443, "users": [{"name": "a", "uuid": "00000000-0000-4000-8000-000000000000"}], "tls": {"enabled": true, "reality": {"enabled": true}}},
+    {"type": "vless", "tag": "vless-esa-ws-in", "listen": "127.0.0.1", "listen_port": 10000, "users": [{"name": "b", "uuid": "00000000-0000-4000-8000-000000000001"}], "transport": {"type": "ws", "path": "/x"}},
+    {"type": "vless", "tag": "vless-esa-oxy-8001", "listen": "127.0.0.1", "listen_port": 10001, "users": [{"name": "c", "uuid": "00000000-0000-4000-8000-000000000002"}], "transport": {"type": "ws", "path": "/y"}}
+  ],
+  "outbounds": [
+    {"type": "direct", "tag": "direct"},
+    {"type": "http", "tag": "decodo-us-10003", "server": "upstream.example.test", "server_port": 10003, "username": "fixture-user", "password": "fixture-pass"},
+    {"type": "socks", "tag": "oxylabs-8001", "server": "upstream2.example.test", "server_port": 8001, "username": "fixture-user2", "password": "fixture-pass2"}
+  ],
+  "route": {
+    "rules": [
+      {"ip_is_private": true, "action": "reject"},
+      {"action": "sniff"},
+      {"domain_suffix": ["openai.com", "chatgpt.com"], "network": "tcp", "action": "route", "outbound": "oxylabs-8001", "inbound": ["vless-esa-oxy-8001"]},
+      {"domain_suffix": ["openai.com", "chatgpt.com"], "network": "tcp", "action": "route", "outbound": "decodo-us-10003"}
+    ],
+    "final": "direct"
+  },
+  "services": [{"type": "api", "tag": "joysol-monitor-api", "listen": "127.0.0.1", "listen_port": 8306}]
+}

@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+dashboard/web/node_modules/
+.env
+outputs/
+*.pem
+*.key
+private/
+*.sqlite3
+*.sqlite3-*
+*.log
+*.crt

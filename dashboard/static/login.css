@@ -1,0 +1,24 @@
+:root{--bg:#0b1016;--card:#121a23;--line:#223040;--text:#e6edf3;--muted:#8b9bab;--accent:#3dd6c4;--accent-ink:#04201c;--danger:#ff7b72;--field:#0d141b;color-scheme:dark}
+@media (prefers-color-scheme:light){:root{--bg:#eef2f5;--card:#fff;--line:#d9e1e8;--text:#14212b;--muted:#5f6f7c;--accent:#0f8f84;--accent-ink:#fff;--danger:#c4372d;--field:#f7f9fb;color-scheme:light}}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);display:grid;place-items:center;min-height:100vh;padding:24px 16px;overflow:hidden}
+.backdrop{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+.backdrop i{position:absolute;border-radius:50%;filter:blur(80px);opacity:.28}
+.backdrop i:nth-child(1){width:420px;height:420px;background:#1f8f86;top:-120px;left:-80px}
+.backdrop i:nth-child(2){width:360px;height:360px;background:#2c5cc5;bottom:-140px;right:-60px}
+.backdrop i:nth-child(3){width:240px;height:240px;background:#6d3fc4;top:40%;left:55%;opacity:.16}
+.card{position:relative;width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:34px 30px 26px;box-shadow:0 24px 60px rgba(0,0,0,.25)}
+.mark{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);margin-bottom:22px}
+.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--muted);font-weight:700}
+h1{font-size:24px;margin:6px 0 4px;letter-spacing:-.02em}
+.muted{color:var(--muted);margin:0 0 22px}
+form{display:grid;gap:8px}
+label{font-size:12px;color:var(--muted);margin-top:6px}
+input[type=text],input:not([type]),input[type=password]{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--line);background:var(--field);color:var(--text);font:inherit}
+input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.check{display:flex;gap:8px;align-items:center;color:var(--text);font-size:13px;margin:8px 0 4px}
+button{margin-top:6px;padding:12px;border:0;border-radius:9px;background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:650;cursor:pointer}
+button:hover{filter:brightness(1.08)}
+#error{color:var(--danger);min-height:20px;margin:6px 0 0;font-size:13px}
+.fine{color:var(--muted);font-size:12px;text-align:center;margin:14px 0 0}

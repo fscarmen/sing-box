@@ -1,0 +1,8 @@
+{
+  "stats": {},
+  "api": {"tag": "dashboard-stats", "listen": "127.0.0.1:8311", "services": ["StatsService"]},
+  "policy": {
+    "system": {"statsInboundUplink": true, "statsInboundDownlink": true, "statsOutboundUplink": true, "statsOutboundDownlink": true},
+    "levels": {"0": {"statsUserUplink": true, "statsUserDownlink": true, "statsUserOnline": true}}
+  }
+}

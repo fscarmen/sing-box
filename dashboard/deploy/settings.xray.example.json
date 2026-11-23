@@ -1,0 +1,28 @@
+{
+  "site": {
+    "public_url": "https://panel.example.com",
+    "base_path": "/monitor",
+    "title": "网络节点监控",
+    "timezone": "Asia/Shanghai"
+  },
+  "paths": {"data_dir": "/var/lib/vps-dashboard"},
+  "singbox": {"enabled": false},
+  "xray": {
+    "poll_seconds": 2,
+    "instances": [
+      {
+        "id": "main",
+        "label": "Xray 主入口",
+        "service": "xray.service",
+        "config_path": "/usr/local/etc/xray/config.json",
+        "api_address": "127.0.0.1:8311",
+        "external_tls": false,
+        "node_labels": {}
+      }
+    ]
+  },
+  "labels": {"xray": {}},
+  "alerts": {"services": ["xray.service", "nginx.service"], "probe_failures": 2},
+  "probes": {"enabled": true, "interval_seconds": 300},
+  "reachability": {"enabled": false, "interval_seconds": 600, "failures": 2, "targets": []}
+}

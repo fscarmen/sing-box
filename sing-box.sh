@@ -8,6 +8,7 @@ GITHUB_PROXY=('https://ghproxy.lvedong.eu.org/' 'https://accel.cloudflare.nyc.mn
 
 # 各变量默认值
 TEMP_DIR='/tmp/sing-box'
+[[ "$1" = '--dashboard-sync' ]] && TEMP_DIR=$(mktemp -d /tmp/sb-dashboard.XXXXXX)
 WORK_DIR='/etc/sing-box'
 FIREWALL_STATE_DIR="${WORK_DIR}/firewall"
 SERVICE_FIREWALL_STATE_FILE="${FIREWALL_STATE_DIR}/service_ports.list"
@@ -221,8 +222,8 @@ E[84]="Bound interface updated to: "
 C[84]="绑定接口已更新为: "
 E[85]="Please enter Argo Token, Argo Json or Cloudflare API\n\n [*] Token: Visit https://dash.cloudflare.com/ , Zero Trust > Networks > Connectors > Create a tunnel > Select Cloudflared\n\n [*] Json: Users can easily obtain it through the following website: https://fscarmen.cloudflare.now.cc\n\n [*] Cloudflare API: Visit https://dash.cloudflare.com/profile/api-tokens > Create Token > Create Custom Token > Add the following permissions:\n - Account > Cloudflare One Connectors: cloudflared > Edit\n - Zone > DNS > Edit\n\n - Account Resources: Include > Required Account\n - Zone Resources: Include > Specific zone > Argo Root Domain"
 C[85]="请输入 Argo Token, Argo Json 或者 Cloudflare API\n\n [*] Token: 访问 https://dash.cloudflare.com/ ，Zero Trust > 网络 > 连接器 > 创建隧道 > 选择 Cloudflared\n\n [*] Json: 用户通过以下网站轻松获取: https://fscarmen.cloudflare.now.cc\n\n [*] Cloudflare API: 访问 https://dash.cloudflare.com/profile/api-tokens > 创建令牌 > 创建自定义令牌 > 添加以下权限:\n - 帐户 > Cloudflare One连接器: Cloudflared > 编辑\n - 区域 > DNS > 编辑\n\n - 帐户资源: 包括 > 所需账户\n - 区域资源: 包括 > 特定区域 > 所需域名"
-E[86]="Argo authentication message does not match the rules, neither Token nor Json, script exits. Feedback:[https://github.com/fscarmen/sba/issues]"
-C[86]="Argo 认证信息不符合规则，既不是 Token，也是不是 Json，脚本退出，问题反馈:[https://github.com/fscarmen/sba/issues]"
+E[86]="Argo authentication message does not match the rules, neither Token nor Json, script exits. Feedback:[https://github.com/fscarmen/sing-box/issues]"
+C[86]="Argo 认证信息不符合规则，既不是 Token，也是不是 Json，脚本退出，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 E[87]="Please input the Argo domain (Default is temporary domain if left blank):"
 C[87]="请输入 Argo 域名 (如果没有，可以跳过以使用 Argo 临时域名):"
 E[88]="Please input the Argo domain (cannot be empty):"
@@ -2411,10 +2412,17 @@ check_install() {
       local ONLINE=$(get_sing_box_version)
       local SB_DIR="$TEMP_DIR/sing-box-$ONLINE-linux-$SING_BOX_ARCH"
       local SB_BIN="$SB_DIR/sing-box"
+      if [[ -n "${SB_DASHBOARD_CORE_BINARY-}" ]]; then
+        # The root manager downloaded and verified this exact release before invoking us.
+        [[ -x "$SB_DASHBOARD_CORE_BINARY" ]] || exit 1
+        cp -- "$SB_DASHBOARD_CORE_BINARY" "$TEMP_DIR/sing-box"
+        chmod +x "$TEMP_DIR/sing-box"
+      else
       wget --no-check-certificate --continue --tries=2 --timeout=10 \
         ${GH_PROXY}https://github.com/SagerNet/sing-box/releases/download/v$ONLINE/sing-box-$ONLINE-linux-$SING_BOX_ARCH.tar.gz \
         -qO- | tar xz -C $TEMP_DIR 2>/dev/null
       [ -s "$SB_BIN" ] && [ -x "$SB_BIN" ] && mv "$SB_BIN" "$TEMP_DIR/sing-box" && chmod +x "$TEMP_DIR/sing-box"
+      fi
     } &
 
     # 任务 2: 下载 jq
@@ -2663,6 +2671,11 @@ check_system_info() {
 # 获取 sing-box 最新版本
 get_sing_box_version() {
   local FORCE_VERSION RESULT_VERSION
+  # 面板引导固定经过验证的版本；命令行默认的版本选择行为保持不变。
+  if [[ "${SB_DASHBOARD_CORE_VERSION-}" =~ ^1\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$ ]]; then
+    echo "$SB_DASHBOARD_CORE_VERSION"
+    return
+  fi
   # FORCE_VERSION 用于在 sing-box 某个主程序出现 bug 时，强制为指定版本，以防止运行出错
   FORCE_VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- "${GH_PROXY}https://raw.githubusercontent.com/fscarmen/sing-box/refs/heads/main/force_version" 2>&1 | sed 's/^[vV]//g; s/\r//g')
   if grep -q '.' <<< "$FORCE_VERSION"; then
@@ -4395,18 +4408,18 @@ http {
 "
   [ "$IS_SUB" = 'is_sub' ] && NGINX_CONF+="
   map \$http_user_agent \$path1 {
-    default                    /;               # 默认路径
+    default                    /clash;          # 未知客户端默认返回 Clash 配置
     ~*v2rayN                   /v2rayn;         # 匹配 V2rayN 客户端
-    ~*clash                    /clash;          # 匹配 Clash 客户端
+    ~*clash|mihomo|stash        /clash;          # 匹配 Clash / Meta 客户端
     ~*Throne|Neko              /throne;         # 匹配 Throne / Neko 客户端
     ~*ShadowRocket             /shadowrocket;   # 匹配 ShadowRocket 客户端
     ~*SFM|SFI|SFA              /sing-box;       # 匹配 Sing-box 官方客户端
 #   ~*Chrome|Firefox|Mozilla   /;               # 添加更多的分流规则
   }
   map \$http_user_agent \$path2 {
-    default                    /;               # 默认路径
+    default                    /clash2;         # 未知客户端默认返回 Clash 配置
     ~*v2rayN                   /v2rayn;         # 匹配 V2rayN 客户端
-    ~*clash                    /clash2;         # 匹配 Clash 客户端
+    ~*clash|mihomo|stash        /clash2;         # 匹配 Clash / Meta 客户端
     ~*Throne|Neko              /throne;         # 匹配 Throne / Neko 客户端
     ~*ShadowRocket             /shadowrocket;   # 匹配 ShadowRocket 客户端
     ~*SFM|SFI|SFA              /sing-box;       # 匹配 Sing-box 官方客户端
@@ -5763,8 +5776,10 @@ install_sing-box() {
   fi
   [ ! -d ${WORK_DIR}/logs ] && mkdir -p ${WORK_DIR}/logs
   [ ! -d ${TEMP_DIR} ] && mkdir -p $TEMP_DIR
+  [[ "$SB_DASHBOARD_PROGRESS" = 1 ]] && echo 'SB_DASHBOARD_STAGE:certificates'
   ssl_certificate $TLS_SERVER_DEFAULT
   hint "\n $(text 2) " && wait
+  [[ "$SB_DASHBOARD_PROGRESS" = 1 ]] && echo 'SB_DASHBOARD_STAGE:configuration'
   sing-box_json
   echo "${L^^}" > ${WORK_DIR}/language
   cp $TEMP_DIR/sing-box $TEMP_DIR/jq ${WORK_DIR}
@@ -5781,6 +5796,7 @@ install_sing-box() {
   [ -n "$PORT_NGINX" ] && export_nginx_conf_file
 
   # 生成 sing-box systemd 配置文件
+  [[ "$SB_DASHBOARD_PROGRESS" = 1 ]] && echo 'SB_DASHBOARD_STAGE:services'
   sing-box_systemd
 
   # 系统启动 sing-box 服务
@@ -5790,6 +5806,7 @@ install_sing-box() {
   sleep 2
 
   # 处理防火墙相关端口
+  [[ "$SB_DASHBOARD_PROGRESS" = 1 ]] && echo 'SB_DASHBOARD_STAGE:firewall'
   sync_firewall_rules
 
   # 检查服务是否成功启动
@@ -7262,6 +7279,40 @@ menu() {
   fi
 }
 
+# 面板专用入口：复用现有订阅与防火墙逻辑，不进入交互菜单或升级兼容流程。
+if [[ "$1" = '--dashboard-sync' ]]; then
+  L=C
+  IS_UNINSTALL=is_uninstall  # 仅抑制 check_install 的预下载，不执行卸载
+  check_root
+  check_system_info
+  check_arch
+  check_brutal
+  DIR=$WORK_DIR
+  check_install
+  [ -x "$WORK_DIR/sing-box" ] || exit 1
+  "$WORK_DIR/sing-box" check -C "$WORK_DIR/conf" || exit 1
+  for TEMPLATE in clash clash2 sing-box; do
+    TARGET=$TEMPLATE
+    [ "$TEMPLATE" = sing-box ] && TARGET=sing-box-template
+    wget --tries=2 --timeout=15 -qO "$TEMP_DIR/$TARGET" "$SUBSCRIBE_TEMPLATE/$TEMPLATE" || exit 1
+    [ -s "$TEMP_DIR/$TARGET" ] || exit 1
+  done
+  export_list >/dev/null || exit 1
+  wait
+  if [ -s "$WORK_DIR/nginx.conf" ]; then
+    [ -z "$PORT_NGINX" ] && PORT_NGINX=$(awk '/listen/{print $2; exit}' "$WORK_DIR/nginx.conf" | tr -d ';')
+    DASHBOARD_ARGO_BAK="${IS_ARGO-}"
+    grep -q 'proxy_pass.*127.0.0.1' "$WORK_DIR/nginx.conf" && IS_ARGO=is_argo
+    export_nginx_conf_file
+    IS_ARGO="$DASHBOARD_ARGO_BAK"
+    nginx -t -c "$WORK_DIR/nginx.conf" || exit 1
+  fi
+  sync_firewall_rules
+  [ -s "$WORK_DIR/nginx.conf" ] && nginx_sync
+  [ -s "$WORK_DIR/subscribe/sing-box" ] && "$WORK_DIR/jq" -e . "$WORK_DIR/subscribe/sing-box" >/dev/null || exit 1
+  exit 0
+fi
+
 # 卸载是纯本地操作：-U / -u 时置位，作为下方所有网络动作的总开关
 # 首尾补空格并用 [[:space:]] 锚定，避免 -UUID 等含 -U 的长参数被误判
 [[ " ${*^^} " =~ [[:space:]]-U([[:space:]]|$) ]] && IS_UNINSTALL='is_uninstall'
@@ -7525,6 +7576,7 @@ for z in ${!ALL_PARAMETER[@]}; do
 done
 
 check_arch
+[[ "$SB_DASHBOARD_PROGRESS" = 1 ]] && echo 'SB_DASHBOARD_STAGE:dependencies'
 check_dependencies
 check_system_ip
 check_install
@@ -7538,6 +7590,7 @@ if [ "$NONINTERACTIVE_INSTALL" = 'noninteractive_install' ]; then
   IS_HOPPING=${IS_HOPPING:-'no_hopping'}
 
   install_sing-box
+  [[ "$SB_DASHBOARD_PROGRESS" = 1 ]] && echo 'SB_DASHBOARD_STAGE:subscriptions'
   export_list install
   create_shortcut
 elif [ "$IS_FAST_INSTALL" = 'is_fast_install' ]; then

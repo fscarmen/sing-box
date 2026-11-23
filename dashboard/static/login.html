@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>登录 · {{TITLE}}</title>
+<link rel="icon" href="{{BASE}}/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="{{BASE}}/static/login.css">
+</head>
+<body>
+<div class="backdrop" aria-hidden="true"><i></i><i></i><i></i></div>
+<main class="card">
+  <div class="mark" aria-hidden="true"><svg viewBox="0 0 32 32" width="22" height="22"><path d="M6 22 L13 10 L19 18 L26 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <div class="eyebrow">PRIVATE CONSOLE</div>
+  <h1>{{TITLE}}</h1>
+  <p class="muted">流量、链路与访问控制</p>
+  <form action="{{BASE}}/login" method="post" autocomplete="on">
+    <label for="username">用户名</label>
+    <input id="username" name="username" autocomplete="username" required autofocus>
+    <label for="password">密码</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <label class="check"><input type="checkbox" name="remember" checked> 保持登录 30 天</label>
+    <button type="submit">登录控制台</button>
+    <p id="error" role="alert">{{ERROR}}</p>
+  </form>
+  <p class="fine">HTTPS 加密连接 · 支持浏览器密码管理器</p>
+</main>
+</body>
+</html>

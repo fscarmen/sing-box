@@ -1,0 +1,26 @@
+[Unit]
+Description=Xray node monitoring dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/vps-dashboard/current
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=JOYSOL_CONFIG_DIR=/etc/vps-dashboard
+ExecStart=/opt/vps-dashboard/venv/bin/python -m gunicorn --bind 127.0.0.1:8307 --workers 1 --worker-class gthread --threads 16 --timeout 60 --graceful-timeout 10 --access-logfile /dev/null --error-logfile - app:app
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/vps-dashboard
+# Read the existing protected core config for topology/probes. No firewall privileges.
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+{
+  "name": "joysol-panel-web",
+  "private": true,
+  "version": "2.5.3",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/compress.mjs"
+  },
+  "dependencies": {
+    "echarts": "6.1.0",
+    "topojson-client": "3.1.0",
+    "vue": "3.5.43",
+    "world-atlas": "2.0.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.9",
+    "vite": "8.3.4"
+  }
+}
