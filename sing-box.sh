@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.31 (2026.11.23)'
+VERSION='v1.3.31 (2026.11.27)'
 
 # Github 反代加速代理
 GITHUB_PROXY=('https://ghproxy.lvedong.eu.org/' 'https://accel.cloudflare.nyc.mn/')
@@ -20,9 +20,9 @@ TLS_SERVER_DEFAULT=addons.mozilla.org
 PROTOCOL_LIST=("XTLS + reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess + ws" "vless + ws + tls" "H2 + reality" "gRPC + reality" "AnyTLS" "naive" "Snell v6")
 NODE_TAG=("xtls-reality" "hysteria2" "tuic" "ShadowTLS" "shadowsocks" "trojan" "vmess-ws" "vless-ws-tls" "h2-reality" "grpc-reality" "anytls" "naive" "snell-v6")
 CONSECUTIVE_PORTS=${#PROTOCOL_LIST[@]}
-CDN_DOMAIN=("skk.moe" "ip.sb" "time.is" "cfip.xxxxxxxx.tk" "bestcf.top" "cdn.2020111.xyz" "xn--b6gac.eu.org" "cf.090227.xyz")
+CDN_DOMAIN=("openai.com" "staticdelivery.nexusmods.com" "www.shopify.com" "cdn.204910.best" "xin.usfox.qzz.io" "saas.sin.fan" "nrt.xxxxxxxx.nyc.mn" "cf.877771.xyz" "nrtcfdns.zone.id" "cloudflare-ip.mofashi.ltd")
 SUBSCRIBE_TEMPLATE="https://raw.githubusercontent.com/fscarmen/client_template/main"
-DEFAULT_NEWEST_VERSION='1.15.0-alpha.13'
+DEFAULT_NEWEST_VERSION='1.15.0-alpha.14'
 IP_API_NODES=('https://ip.cloudflare.now.cc' 'https://ip.cloudflare.nyc.mn')
 FINGER_PRINT='chrome'
 STEP_NUM=0      # 当前步骤编号（安装流程中动态递增）
@@ -60,8 +60,8 @@ mkdir -p "$TEMP_DIR"
 
 E[0]="Language:\n 1. English (default) \n 2. 简体中文"
 C[0]="${E[0]}"
-E[1]="1. [sb -d] supports setting an independent (non-consecutive) port for each protocol, only available after installation via [sb -d] so the install flow stays unchanged; 2. Dynamic Subscription: nginx renders the subscription in real time by request Host, so direct node servers follow the access address (IPv4/IPv6/Domain/Tunnel); WS/CDN/Argo nodes stay unchanged. Enable it after install with sb -d, or set SUBSCRIBE=dynamic / --SUBSCRIBE dynamic during installation; 3. Add TLS and SNI to VMess client configurations for Clash, V2rayN, Throne, ShadowRocket and sing-box clients."
-C[1]="1. [sb -d] 支持为各协议设置独立（非连续）端口，仅在安装后通过 [sb -d] 修改，不影响常规安装流程; 2. 动态订阅：nginx 按请求 Host 实时渲染，直连节点 server 跟随访问地址（IPv4/IPv6/域名/固定隧道），WS/CDN/Argo 节点保持原地址不变。可在安装后通过 sb -d 开启，也可在安装时设置 SUBSCRIBE=dynamic 或 --SUBSCRIBE dynamic; 3. VMess 客户端配置增加 TLS 和 SNI，覆盖 Clash、V2rayN、Throne、ShadowRocket 与 sing-box 客户端。"
+E[1]="1. [sb -d] supports setting an independent (non-consecutive) port for each protocol, only available after installation via [sb -d] so the install flow stays unchanged; 2. Dynamic Subscription: nginx renders the subscription in real time by request Host, so direct node servers follow the access address (IPv4/IPv6/Domain/Tunnel); WS/CDN/Argo nodes stay unchanged. Enable it after install with sb -d, or set SUBSCRIBE=dynamic / --SUBSCRIBE dynamic during installation; 3. Add TLS and SNI to VMess client configurations for Clash, V2rayN, Throne, ShadowRocket and sing-box clients; 4. Subscription nodes are sorted by each protocol's real listening port in ascending order, and ports are assigned in the order protocols are selected."
+C[1]="1. [sb -d] 支持为各协议设置独立（非连续）端口，仅在安装后通过 [sb -d] 修改，不影响常规安装流程; 2. 动态订阅：nginx 按请求 Host 实时渲染，直连节点 server 跟随访问地址（IPv4/IPv6/域名/固定隧道），WS/CDN/Argo 节点保持原地址不变。可在安装后通过 sb -d 开启，也可在安装时设置 SUBSCRIBE=dynamic 或 --SUBSCRIBE dynamic; 3. VMess 客户端配置增加 TLS 和 SNI，覆盖 Clash、V2rayN、Throne、ShadowRocket 与 sing-box 客户端; 4. 订阅节点按各协议真实监听端口升序排列，端口按选择协议的顺序分配。"
 E[2]="Downloading Sing-box. Please wait a seconds ..."
 C[2]="下载 Sing-box 中，请稍等 ..."
 E[3]="Input errors up to 5 times.The script is aborted."
@@ -156,8 +156,8 @@ E[47]="No server ip, script exits. Feedback:[https://github.com/fscarmen/sing-bo
 C[47]="没有 server ip，脚本退出，问题反馈:[https://github.com/fscarmen/sing-box/issues]"
 E[48]="Client Fingerprint  (current: \${VAL_ITEM})"
 C[48]="客户端指纹  (当前: \${VAL_ITEM})"
-E[49]="Select more protocols to install (e.g. hgbd). The order of the port numbers of the protocols is related to the ordering of the multiple choices:\n a. all (default)"
-C[49]="多选需要安装协议(比如 hgbd)，协议的端口号次序与多选的排序有关:\n a. all (默认)"
+E[49]="Select protocols to install (e.g. hgbd). The input order determines port assignment, and nodes are listed in ascending port order:\n a. all (default)"
+C[49]="多选需要安装的协议(比如 hgbd)，输入顺序决定端口分配，订阅节点按端口升序排列:\n a. all (默认)"
 E[50]="Please enter the \$TYPE domain name:"
 C[50]="请输入 \$TYPE 域名:"
 E[51]="Please select or input client fingerprint:\n 1. chrome (default)\n 2. firefox\n Or input custom value:"
@@ -687,6 +687,12 @@ parse_host_port() {
   if [[ "$INPUT_VALUE" =~ ^\[([^][]+)\]:([0-9]{1,5})$ ]]; then
     HOST_VALUE="${BASH_REMATCH[1]}"
     PORT_VALUE="${BASH_REMATCH[2]}"
+  elif [[ "$INPUT_VALUE" =~ ^\[([^][]+)\]$ ]]; then
+    # [IPv6] 无端口：剥方括号取纯地址，端口用默认值。
+    # mihomo 的 server 字段不允许 []（YAML 会把 [x] 解析成数组，且 Go JoinHostPort 会对含 : 的 host 再包一层），
+    # 方括号仅在 URI host（vless://...@[IPv6]:port）中由 format_uri_host 补回。
+    HOST_VALUE="${BASH_REMATCH[1]}"
+    PORT_VALUE="$DEFAULT_PORT"
   elif [[ "$INPUT_VALUE" =~ ^([^:]+):([0-9]{1,5})$ ]] && [[ "${BASH_REMATCH[1]}" != *:* ]]; then
     HOST_VALUE="${BASH_REMATCH[1]}"
     PORT_VALUE="${BASH_REMATCH[2]}"
@@ -5956,12 +5962,12 @@ fetch_nodes_value() {
   [ -s ${WORK_DIR}/conf/*_${NODE_TAG[5]}_inbounds.json ] && local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[5]}_inbounds.json) && NODE_NAME[16]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[5]}.*/\1/p" <<< "$JSON") && PORT_TROJAN=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && TROJAN_PASSWORD=$(awk -F '"' '/"password"/{print $4}' <<< "$JSON")
 
   # 获取 vmess + ws key-value
-  [ -s ${WORK_DIR}/conf/*_${NODE_TAG[6]}_inbounds.json ] && local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[6]}_inbounds.json) && NODE_NAME[17]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[6]}.*/\1/p" <<< "$JSON") && PORT_VMESS_WS=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[17]=$(awk -F '"' '/"uuid"/{print $4}' <<< "$JSON") && VMESS_WS_PATH=$(sed -n 's#.*"path":"/\(.*\)",#\1#p' <<< "$JSON") && WS_SERVER_IP[17]=$(awk  -F '"' '/"WS_SERVER_IP_SHOW"/{print $4}' <<< "$JSON") && CDN[17]=$(awk  -F '"' '/"CDN"/{print $4}' <<< "$JSON") && CDN_PORT[17]=$(awk  -F '"' '/"CDN_PORT"/{print $4}' <<< "$JSON") && [ "$IS_ARGO" = 'is_argo' ] && ARGO_DOMAIN=$(awk  -F '"' '/"VMESS_HOST_DOMAIN"/{print $4}' <<< "$JSON") || VMESS_HOST_DOMAIN=$(awk  -F '"' '/"VMESS_HOST_DOMAIN"/{print $4}' <<< "$JSON")
+  [ -s ${WORK_DIR}/conf/*_${NODE_TAG[6]}_inbounds.json ] && local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[6]}_inbounds.json) && NODE_NAME[17]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[6]}.*/\1/p" <<< "$JSON") && PORT_VMESS_WS=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[17]=$(awk -F '"' '/"uuid"/{print $4}' <<< "$JSON") && VMESS_WS_PATH=$(sed -n 's#.*"path":"/\(.*\)",#\1#p' <<< "$JSON") && WS_SERVER_IP[17]=$(awk -F '"' '/"WS_SERVER_IP_SHOW"/{print $4}' <<< "$JSON") && CDN[17]=$(awk -F '"' '/"CDN"/{print $4}' <<< "$JSON") && CDN_PORT[17]=$(awk -F '"' '/"CDN_PORT"/{print $4}' <<< "$JSON") && [ "$IS_ARGO" = 'is_argo' ] && ARGO_DOMAIN=$(awk -F '"' '/"VMESS_HOST_DOMAIN"/{print $4}' <<< "$JSON") || VMESS_HOST_DOMAIN=$(awk -F '"' '/"VMESS_HOST_DOMAIN"/{print $4}' <<< "$JSON")
 #### vmess 从原来的 notls 改为 tls 才能通，这个判断保留至 2027年2月28日
   [ -n "$PORT_VMESS_WS" ] && [ "$CDN_PORT[17]" = '80' ] && CDN_PORT[17]='443'
 
   # 获取 vless + ws + tls key-value
-  [ -s ${WORK_DIR}/conf/*_${NODE_TAG[7]}_inbounds.json ] && local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[7]}_inbounds.json) && NODE_NAME[18]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[7]}.*/\1/p" <<< "$JSON") && PORT_VLESS_WS=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[18]=$(awk -F '"' '/"uuid"/{print $4}' <<< "$JSON") && VLESS_WS_PATH=$(sed -n 's#.*"path":"/\(.*\)",#\1#p' <<< "$JSON") && WS_SERVER_IP[18]=$(awk  -F '"' '/"WS_SERVER_IP_SHOW"/{print $4}' <<< "$JSON") && CDN[18]=$(awk  -F '"' '/"CDN"/{print $4}' <<< "$JSON") && [ "$IS_ARGO" = 'is_argo' ] && CDN_PORT[18]=$(awk  -F '"' '/"CDN_PORT"/{print $4}' <<< "$JSON") && ARGO_DOMAIN=$(awk -F '"' '/"server_name"/{print $4}' <<< "$JSON") || VLESS_HOST_DOMAIN=$(awk -F '"' '/"server_name"/{print $4}' <<< "$JSON")
+  [ -s ${WORK_DIR}/conf/*_${NODE_TAG[7]}_inbounds.json ] && local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[7]}_inbounds.json) && NODE_NAME[18]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[7]}.*/\1/p" <<< "$JSON") && PORT_VLESS_WS=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[18]=$(awk -F '"' '/"uuid"/{print $4}' <<< "$JSON") && VLESS_WS_PATH=$(sed -n 's#.*"path":"/\(.*\)",#\1#p' <<< "$JSON") && WS_SERVER_IP[18]=$(awk -F '"' '/"WS_SERVER_IP_SHOW"/{print $4}' <<< "$JSON") && CDN[18]=$(awk -F '"' '/"CDN"/{print $4}' <<< "$JSON") && [ "$IS_ARGO" = 'is_argo' ] && CDN_PORT[18]=$(awk -F '"' '/"CDN_PORT"/{print $4}' <<< "$JSON") && ARGO_DOMAIN=$(awk -F '"' '/"server_name"/{print $4}' <<< "$JSON") || VLESS_HOST_DOMAIN=$(awk -F '"' '/"server_name"/{print $4}' <<< "$JSON")
 
   # 获取 H2 + Reality key-value
   [ -s ${WORK_DIR}/conf/*_${NODE_TAG[8]}_inbounds.json ] && local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[8]}_inbounds.json) && NODE_NAME[19]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[8]}.*/\1/p" <<< "$JSON") && PORT_H2_REALITY=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[19]=$(awk -F '"' '/"uuid"/{print $4}' <<< "$JSON") && REALITY_PRIVATE[19]=$(awk -F '"' '/"private_key"/{print $4}' <<< "$JSON") && REALITY_PUBLIC[19]=$(awk -F '"' '/"public_key"/{print $4}' <<< "$JSON")
@@ -6212,6 +6218,94 @@ export_list() {
 
   [ "$IS_INSTALL" != 'install' ] && fetch_nodes_value
 
+  # 节点排序：按协议真实监听端口数值升序，端口并列时保留 NODE_TAG 原次序。
+  # 非数值端口保持原样输出，排序键兜底放到末尾，避免比较报错。
+  local -a SB_PORT=("$PORT_XTLS_REALITY" "$PORT_HYSTERIA2" "$PORT_TUIC" "$PORT_SHADOWTLS" "$PORT_SHADOWSOCKS" "$PORT_TROJAN" "$PORT_VMESS_WS" "$PORT_VLESS_WS" "$PORT_H2_REALITY" "$PORT_GRPC_REALITY" "$PORT_ANYTLS" "$PORT_NAIVE" "$PORT_SNELL")
+  local -a SB_SORT_KEY=() SB_ENABLED_NODES=() SB_NODE_ORDER=()
+  local sb_i sb_j sb_key_port sb_key_idx sb_prev_idx
+  for sb_i in "${!SB_PORT[@]}"; do
+    [ -n "${SB_PORT[sb_i]}" ] || continue
+    SB_ENABLED_NODES+=("$sb_i")
+    [[ "${SB_PORT[sb_i]}" =~ ^[0-9]+$ ]] && SB_SORT_KEY[sb_i]=${SB_PORT[sb_i]} || SB_SORT_KEY[sb_i]=65536
+  done
+  SB_NODE_ORDER=("${SB_ENABLED_NODES[@]}")
+  for ((sb_i=1; sb_i<${#SB_NODE_ORDER[@]}; sb_i++)); do
+    sb_key_idx=${SB_NODE_ORDER[sb_i]} && sb_key_port=${SB_SORT_KEY[sb_key_idx]}
+    for ((sb_j=sb_i-1; sb_j>=0; sb_j--)); do
+      sb_prev_idx=${SB_NODE_ORDER[sb_j]}
+      [ "${SB_SORT_KEY[sb_prev_idx]}" -le "$sb_key_port" ] && break
+      SB_NODE_ORDER[sb_j+1]=$sb_prev_idx
+    done
+    SB_NODE_ORDER[sb_j+1]=$sb_key_idx
+  done
+
+  # 把已按固定次序拼好的订阅字符串切成节点块，再按 SB_NODE_ORDER 重排。
+  # 各格式的注释/分隔线最终都会被 sed 过滤，这里只保证节点块同步移动。
+  # node_ids：该格式实际输出的节点下标（对应 SB_PORT）；clash/proxies 不输出 naive(11)。
+  local SB_ALL_NODE_IDS='0 1 2 3 4 5 6 7 8 9 10 11 12'
+  local SB_CLASH_NODE_IDS='0 1 2 3 4 5 6 7 8 9 10 12'
+  _sb_reorder_chunks() {
+    local input="$1" mode="$2" node_ids="$3" chunk='' line
+    local -a chunks=() format_nodes=() format_order=()
+    local sb_node_idx sb_pos
+    for sb_node_idx in "${SB_ENABLED_NODES[@]}"; do
+      [[ " $node_ids " == *" $sb_node_idx "* ]] && format_nodes+=("$sb_node_idx")
+    done
+    for sb_node_idx in "${SB_NODE_ORDER[@]}"; do
+      [[ " $node_ids " == *" $sb_node_idx "* ]] && format_order+=("$sb_node_idx")
+    done
+    case "$mode" in
+      clash)
+        while IFS= read -r line; do
+          [[ "$line" =~ ^[[:space:]]*-[[:space:]]+\{name: ]] && chunks+=("$line"$'\n')
+        done <<< "$input"
+        ;;
+      v2rayn|throne)
+        while IFS= read -r line; do
+          if [ "$line" = '----------------------------' ]; then
+            [ -n "$chunk" ] && chunks+=("$chunk")
+            chunk="$line"$'\n'
+          else
+            [ -n "$chunk" ] && chunk+="$line"$'\n'
+          fi
+        done <<< "$input"
+        [ -n "$chunk" ] && chunks+=("$chunk")
+        # naive 的 http2 / quic 两段之间多一个分隔线，合并回同一个节点块
+        if [ "${#chunks[@]}" -eq $(( ${#format_nodes[@]} + 1 )) ]; then
+          local -a sb_merged=()
+          local sb_merge_i
+          for ((sb_merge_i=0; sb_merge_i<${#chunks[@]}; sb_merge_i++)); do
+            if [[ "${chunks[sb_merge_i]}" == *naive* ]] && [[ "${chunks[sb_merge_i+1]:-}" == *naive* ]]; then
+              sb_merged+=("${chunks[sb_merge_i]}${chunks[sb_merge_i+1]}")
+              sb_merge_i=$((sb_merge_i+1))
+            else
+              sb_merged+=("${chunks[sb_merge_i]}")
+            fi
+          done
+          chunks=("${sb_merged[@]}")
+        fi
+        ;;
+      shadowrocket)
+        while IFS= read -r line; do
+          if [[ "$line" =~ ^[A-Za-z0-9+.-]+:// ]] && [[ "$line" != http3://* ]]; then
+            [ -n "$chunk" ] && chunks+=("$chunk")
+            chunk="$line"$'\n'
+          else
+            [ -n "$chunk" ] && chunk+="$line"$'\n'
+          fi
+        done <<< "$input"
+        [ -n "$chunk" ] && chunks+=("$chunk")
+        ;;
+    esac
+    [ "${#chunks[@]}" -eq "${#format_nodes[@]}" ] || { printf '%s' "$input"; return; }
+    for sb_node_idx in "${format_order[@]}"; do
+      for sb_pos in "${!format_nodes[@]}"; do
+        [ "${format_nodes[sb_pos]}" -eq "$sb_node_idx" ] && break
+      done
+      printf '%s' "${chunks[sb_pos]}"
+    done
+  }
+
   # 动态模板模式（IS_INSTALL=dynamic_template）：复用整套渲染逻辑，但把三件套
   # 替换成占位符、输出目录指向只读模板目录，绝不触碰 ${WORK_DIR}/subscribe/* 与 list。
   # 直连节点统一引用 SERVER_IP 系列；WS/CDN/Argo 用独立变量，天然不受影响。
@@ -6334,7 +6428,9 @@ export_list() {
 "
   if [ -n "$PORT_VMESS_WS" ]; then
     local VMESS_CDN_PORT=${CDN_PORT[17]:-443}
-    local VMESS_CDN_SERVER=$(format_uri_host "${CDN[17]}")
+    # Clash 的 server 字段必须是纯地址（不带 []）：YAML 会把 [x] 解析成数组，mihomo 的
+    # net.JoinHostPort 也会对含 : 的 host 再包一层 [] 导致拨号失败；[] 仅用于 URI host。
+    local VMESS_CDN_SERVER="${CDN[17]}"
     if [ "$IS_ARGO" = 'is_argo' ]; then
       local CLASH_VMESS_WS="- {name: \"${NODE_NAME[17]} ${NODE_TAG[6]}\", type: vmess, server: ${VMESS_CDN_SERVER}, port: ${VMESS_CDN_PORT}, uuid: ${UUID[17]}, udp: true, tls: true, servername: $ARGO_DOMAIN, alterId: 0, cipher: aes-128-gcm, network: ws, ws-opts: { path: \"/$VMESS_WS_PATH\", headers: {Host: $ARGO_DOMAIN} }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
       local CLASH_SUBSCRIBE+="
@@ -6356,7 +6452,8 @@ export_list() {
 
   if [ -n "$PORT_VLESS_WS" ]; then
     local VLESS_CDN_PORT=${CDN_PORT[18]:-443}
-    local VLESS_CDN_SERVER=$(format_uri_host "${CDN[18]}")
+    # 同上：Clash server 纯地址，不带 []
+    local VLESS_CDN_SERVER="${CDN[18]}"
      if [ "$IS_ARGO" = 'is_argo' ]; then
       local CLASH_VLESS_WS="- {name: \"${NODE_NAME[18]} ${NODE_TAG[7]}\", type: vless, server: ${VLESS_CDN_SERVER}, port: ${VLESS_CDN_PORT}, uuid: ${UUID[18]}, udp: true, tls: true, servername: $ARGO_DOMAIN, network: ws, skip-cert-verify: false, ws-opts: { path: \"/$VLESS_WS_PATH\", headers: {Host: $ARGO_DOMAIN}, max-early-data: 2560, early-data-header-name: Sec-WebSocket-Protocol }, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
       local CLASH_SUBSCRIBE+="
@@ -6396,7 +6493,9 @@ export_list() {
   $CLASH_SNELL
 "
 
-  echo -n "${CLASH_SUBSCRIBE}" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' > ${SUB_OUT_DIR}/proxies
+  # 排序结果同时供订阅文件与 list 展示复用，避免同一格式重复切块排序
+  local SB_CLASH_SORTED=$(_sb_reorder_chunks "${CLASH_SUBSCRIBE#proxies:}" clash "$SB_CLASH_NODE_IDS")
+  echo -n $'proxies:\n'"$SB_CLASH_SORTED" | sed -E '/^[ ]*#|^--/d; /^$/d' > ${SUB_OUT_DIR}/proxies
 
   # 后台生成 clash 订阅配置文件
   {
@@ -6407,6 +6506,25 @@ export_list() {
     CLASH2_PORT=("$PORT_XTLS_REALITY" "$PORT_HYSTERIA2" "$PORT_TUIC" "$PORT_SHADOWTLS" "$PORT_SHADOWSOCKS" "$PORT_TROJAN" "$PORT_VMESS_WS" "$PORT_VLESS_WS" "$PORT_GRPC_REALITY" "$PORT_ANYTLS" "$PORT_SNELL")
     CLASH2_PROXY_INSERT=("$CLASH_XTLS_REALITY" "$CLASH_HYSTERIA2" "$CLASH_TUIC" "$CLASH_SHADOWTLS" "$CLASH_SHADOWSOCKS" "$CLASH_TROJAN" "$CLASH_VMESS_WS" "$CLASH_VLESS_WS" "$CLASH_GRPC_REALITY" "$CLASH_ANYTLS" "$CLASH_SNELL")
     CLASH2_PROXY_GROUPS_INSERT=("- ${NODE_NAME[11]} ${NODE_TAG[0]}" "- ${NODE_NAME[12]} ${NODE_TAG[1]}" "- ${NODE_NAME[13]} ${NODE_TAG[2]}" "- ${NODE_NAME[14]} ${NODE_TAG[3]}" "- ${NODE_NAME[15]} ${NODE_TAG[4]}" "- ${NODE_NAME[16]} ${NODE_TAG[5]}" "- ${NODE_NAME[17]} ${NODE_TAG[6]}" "- ${NODE_NAME[18]} ${NODE_TAG[7]}" "- ${NODE_NAME[20]} ${NODE_TAG[9]}" "- ${NODE_NAME[21]} ${NODE_TAG[10]}" "- ${NODE_NAME[23]} ${NODE_TAG[12]}")
+
+    # 按真实监听端口同步重排 Clash2 三数组；h2-reality / naive 本就不在 Clash2 中
+    local -a CLASH2_NODE_INDEX=(0 1 2 3 4 5 6 7 9 10 12) CLASH2_ORDER=() CLASH2_PORT_SORTED=() CLASH2_PROXY_SORTED=() CLASH2_GROUP_SORTED=()
+    local clash2_idx clash2_pos
+    for clash2_idx in "${SB_NODE_ORDER[@]}"; do
+      case "$clash2_idx" in 8|11) continue ;; esac
+      CLASH2_ORDER+=("$clash2_idx")
+    done
+    for clash2_idx in "${CLASH2_ORDER[@]}"; do
+      for clash2_pos in "${!CLASH2_NODE_INDEX[@]}"; do
+        [ "${CLASH2_NODE_INDEX[clash2_pos]}" -eq "$clash2_idx" ] && break
+      done
+      CLASH2_PORT_SORTED+=("${CLASH2_PORT[clash2_pos]}")
+      CLASH2_PROXY_SORTED+=("${CLASH2_PROXY_INSERT[clash2_pos]}")
+      CLASH2_GROUP_SORTED+=("${CLASH2_PROXY_GROUPS_INSERT[clash2_pos]}")
+    done
+    CLASH2_PORT=("${CLASH2_PORT_SORTED[@]}")
+    CLASH2_PROXY_INSERT=("${CLASH2_PROXY_SORTED[@]}")
+    CLASH2_PROXY_GROUPS_INSERT=("${CLASH2_GROUP_SORTED[@]}")
 
     # clash2 模板较大，旧实现按节点反复执行 sed，会对整文件扫描二十多次。
     # 先收集插入项，再用 awk 单次扫描完成所有插入。
@@ -6526,7 +6644,8 @@ http3://$(echo -n "${UUID[22]}:${UUID[22]}@${SERVER_IP_2}:${PORT_NAIVE}" | base6
   [ -n "$PORT_SNELL" ] && local SHADOWROCKET_SUBSCRIBE+="
 snell://$(echo -n "chacha20-ietf-poly1305:${UUID[23]}@${SERVER_IP_1}:${PORT_SNELL}" | base64 -w0)?version=6&mode=default&reuse=1&udp=1#${NODE_NAME[23]// /%20}%20${NODE_TAG[12]}
 "
-  echo -n "$SHADOWROCKET_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${SUB_OUT_DIR}/shadowrocket
+  local SB_SHADOWROCKET_SORTED=$(_sb_reorder_chunks "$SHADOWROCKET_SUBSCRIBE" shadowrocket "$SB_ALL_NODE_IDS")
+  echo -n "$SB_SHADOWROCKET_SORTED" | sed -E '/^[ ]*#|^--/d; /^$/d' | base64 -w0 > ${SUB_OUT_DIR}/shadowrocket
 
   # 生成 V2rayN 订阅文件
   [ -n "$PORT_XTLS_REALITY" ] && local V2RAYN_SUBSCRIBE+="
@@ -6624,7 +6743,8 @@ v2rayn://naive/$(echo -n "{\"ConfigType\":12,\"CoreType\":24,\"ConfigVersion\":4
 ----------------------------
 v2rayn://snell/$(echo -n "{\"ConfigType\":13,\"CoreType\":24,\"ConfigVersion\":4,\"Remarks\":\"${NODE_NAME[23]} ${NODE_TAG[12]}\",\"CustomOutboundObj\":{\"type\":\"snell\",\"tag\":\"${NODE_NAME[23]} ${NODE_TAG[12]}\",\"server\":\"${SERVER_IP}\",\"server_port\":${PORT_SNELL},\"version\":6,\"psk\":\"${UUID[23]}\",\"mode\":\"default\",\"reuse\":true}}" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
 
-  echo -n "$V2RAYN_SUBSCRIBE" | sed '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/d' | sed -E '/^[ ]*#|^[ ]+|^\{|^\}/d' | sed '/^$/d' | base64 -w0 > ${SUB_OUT_DIR}/v2rayn
+  local SB_V2RAYN_SORTED=$(_sb_reorder_chunks "$V2RAYN_SUBSCRIBE" v2rayn "$SB_ALL_NODE_IDS")
+  echo -n "$SB_V2RAYN_SORTED" | sed -E '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/d; /^[ ]*#|^[ ]+|^\{|^\}/d; /^$/d' | base64 -w0 > ${SUB_OUT_DIR}/v2rayn
 
   # 生成 Throne 订阅文件
   [ -n "$PORT_XTLS_REALITY" ] && local THRONE_SUBSCRIBE+="
@@ -6723,12 +6843,14 @@ naive+quic://${UUID[22]}:${UUID[22]}@${SERVER_IP_1}:${PORT_NAIVE}?congestion_con
 ----------------------------
 snell://${UUID[23]}@${SERVER_IP_1}:${PORT_SNELL}?version=6&mode=default&reuse=1#${NODE_NAME[23]// /%20}%20${NODE_TAG[12]}"
 
-  echo -n "$THRONE_SUBSCRIBE" | sed -E '/^[ ]*#|^--/d' | sed '/^$/d' | base64 -w0 > ${SUB_OUT_DIR}/throne
+  local SB_THRONE_SORTED=$(_sb_reorder_chunks "$THRONE_SUBSCRIBE" throne "$SB_ALL_NODE_IDS")
+  echo -n "$SB_THRONE_SORTED" | sed -E '/^[ ]*#|^--/d; /^$/d' | base64 -w0 > ${SUB_OUT_DIR}/throne
 
   # 生成 Sing-box 订阅文件
+  local -a SB_OUTBOUND_CHUNK=() SB_NODE_CHUNK=()
   [ -n "$PORT_XTLS_REALITY" ] &&
-  local OUTBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[11]} ${NODE_TAG[0]}\", \"server\":\"${SERVER_IP}\", \"server_port\":${PORT_XTLS_REALITY}, \"uuid\":\"${UUID[11]}\", \"flow\":\"${FLOW}\", \"tls\":{ \"enabled\":true, \"server_name\":\"${TLS_SERVER}\", \"utls\":{ \"enabled\":true, \"fingerprint\":\"${FINGER_PRINT}\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[11]}\", \"short_id\":\"\" } }, \"multiplex\": { \"enabled\": ${MULTIPLEX_PADDING_ENABLED}, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": ${MULTIPLEX_PADDING_ENABLED}, \"brutal\":{ \"enabled\":${VISION_BRUTAL_ENABLED}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
-  local NODE_REPLACE+="\"${NODE_NAME[11]} ${NODE_TAG[0]}\","
+  SB_OUTBOUND_CHUNK[0]=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[11]} ${NODE_TAG[0]}\", \"server\":\"${SERVER_IP}\", \"server_port\":${PORT_XTLS_REALITY}, \"uuid\":\"${UUID[11]}\", \"flow\":\"${FLOW}\", \"tls\":{ \"enabled\":true, \"server_name\":\"${TLS_SERVER}\", \"utls\":{ \"enabled\":true, \"fingerprint\":\"${FINGER_PRINT}\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[11]}\", \"short_id\":\"\" } }, \"multiplex\": { \"enabled\": ${MULTIPLEX_PADDING_ENABLED}, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": ${MULTIPLEX_PADDING_ENABLED}, \"brutal\":{ \"enabled\":${VISION_BRUTAL_ENABLED}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
+  SB_NODE_CHUNK[0]="\"${NODE_NAME[11]} ${NODE_TAG[0]}\","
 
   if [ -n "$PORT_HYSTERIA2" ]; then
     local HYSTERIA2_CONFIG=" { \"type\": \"hysteria2\", \"tag\": \"${NODE_NAME[12]} ${NODE_TAG[1]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_HYSTERIA2},"
@@ -6742,33 +6864,34 @@ snell://${UUID[23]}@${SERVER_IP_1}:${PORT_SNELL}?version=6&mode=default&reuse=1#
     if [[ -n "${PORT_HOPPING_START}" && -n "${PORT_HOPPING_END}" ]]; then
       HYSTERIA2_CONFIG="${HYSTERIA2_CONFIG/\"server_port\": ${PORT_HYSTERIA2},/\"server_port\": ${PORT_HYSTERIA2}, \"server_ports\": [ \"${PORT_HOPPING_START}:${PORT_HOPPING_END}\" ], \"hop_interval\": \"30s\", \"hop_interval_max\": \"60s\",}"
     fi
-    local OUTBOUND_REPLACE+="${HYSTERIA2_CONFIG}"
-    local NODE_REPLACE+="\"${NODE_NAME[12]} ${NODE_TAG[1]}\","
+    SB_OUTBOUND_CHUNK[1]="${HYSTERIA2_CONFIG}"
+    SB_NODE_CHUNK[1]="\"${NODE_NAME[12]} ${NODE_TAG[1]}\","
   fi
 
   [ -n "$PORT_TUIC" ] &&
   local TUIC_INBOUND=" { \"type\": \"tuic\", \"tag\": \"${NODE_NAME[13]} ${NODE_TAG[2]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_TUIC}, \"uuid\": \"${UUID[13]}\", \"password\": \"${TUIC_PASSWORD}\", \"congestion_control\": \"$TUIC_CONGESTION_CONTROL\", \"udp_relay_mode\": \"native\", \"zero_rtt_handshake\": false, \"heartbeat\": \"10s\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER}\", \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"alpn\": [ \"h3\" ] } }," &&
-  local OUTBOUND_REPLACE+="${TUIC_INBOUND}" &&
-  local NODE_REPLACE+="\"${NODE_NAME[13]} ${NODE_TAG[2]}\","
+  SB_OUTBOUND_CHUNK[2]="${TUIC_INBOUND}" &&
+  SB_NODE_CHUNK[2]="\"${NODE_NAME[13]} ${NODE_TAG[2]}\","
 
   [ -n "$PORT_SHADOWTLS" ] &&
   local SHADOWTLS_INBOUND=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[14]} ${NODE_TAG[3]}\", \"method\": \"$SHADOWTLS_METHOD\", \"password\": \"$SHADOWTLS_PASSWORD\", \"detour\": \"shadowtls-out\", \"udp_over_tcp\": false, \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }, { \"type\": \"shadowtls\", \"tag\": \"shadowtls-out\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_SHADOWTLS}, \"version\": 3, \"password\": \"${UUID[14]}\", \"tls\": { \"enabled\": true, \"server_name\": \"${TLS_SERVER}\", \"utls\": { \"enabled\": true, \"fingerprint\": \"${FINGER_PRINT}\" } } }," &&
-  local OUTBOUND_REPLACE+="${SHADOWTLS_INBOUND}" &&
-  local NODE_REPLACE+="\"${NODE_NAME[14]} ${NODE_TAG[3]}\","
+  SB_OUTBOUND_CHUNK[3]="${SHADOWTLS_INBOUND}" &&
+  SB_NODE_CHUNK[3]="\"${NODE_NAME[14]} ${NODE_TAG[3]}\","
 
   [ -n "$PORT_SHADOWSOCKS" ] &&
-  local OUTBOUND_REPLACE+=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[15]} ${NODE_TAG[4]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_SHADOWSOCKS, \"method\": \"${SHADOWSOCKS_METHOD}\", \"password\": \"${SHADOWSOCKS_PASSWORD}\", \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
-  local NODE_REPLACE+="\"${NODE_NAME[15]} ${NODE_TAG[4]}\","
+  SB_OUTBOUND_CHUNK[4]=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[15]} ${NODE_TAG[4]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_SHADOWSOCKS, \"method\": \"${SHADOWSOCKS_METHOD}\", \"password\": \"${SHADOWSOCKS_PASSWORD}\", \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
+  SB_NODE_CHUNK[4]="\"${NODE_NAME[15]} ${NODE_TAG[4]}\","
 
   [ -n "$PORT_TROJAN" ] &&
-  local OUTBOUND_REPLACE+=" { \"type\": \"trojan\", \"tag\": \"${NODE_NAME[16]} ${NODE_TAG[5]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_TROJAN, \"password\": \"$TROJAN_PASSWORD\", \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\":\"${TLS_SERVER}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"${FINGER_PRINT}\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
-  local NODE_REPLACE+="\"${NODE_NAME[16]} ${NODE_TAG[5]}\","
+  SB_OUTBOUND_CHUNK[5]=" { \"type\": \"trojan\", \"tag\": \"${NODE_NAME[16]} ${NODE_TAG[5]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_TROJAN, \"password\": \"$TROJAN_PASSWORD\", \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\":\"${TLS_SERVER}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"${FINGER_PRINT}\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
+  SB_NODE_CHUNK[5]="\"${NODE_NAME[16]} ${NODE_TAG[5]}\","
 
   if [ -n "$PORT_VMESS_WS" ]; then
     local VMESS_CDN_PORT=${CDN_PORT[17]:-443}
-    local VMESS_CDN_HOST=$(format_uri_host "${CDN[17]}")
+    # sing-box JSON 的 server 字段同样是纯地址（Go 拨号对含 [] 的 host 会双重方括号），不带 []
+    local VMESS_CDN_HOST="${CDN[17]}"
      if [ "$IS_ARGO" = 'is_argo' ]; then
-      local OUTBOUND_REPLACE+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${VMESS_CDN_HOST}\", \"server_port\":${VMESS_CDN_PORT}, \"uuid\": \"${UUID[17]}\", \"security\": \"aes-128-gcm\", \"tls\": { \"enabled\": true, \"server_name\": \"$ARGO_DOMAIN\", \"insecure\": false, \"utls\": { \"enabled\": true, \"fingerprint\": \"${FINGER_PRINT}\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$ARGO_DOMAIN\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
+      SB_OUTBOUND_CHUNK[6]+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${VMESS_CDN_HOST}\", \"server_port\":${VMESS_CDN_PORT}, \"uuid\": \"${UUID[17]}\", \"security\": \"aes-128-gcm\", \"tls\": { \"enabled\": true, \"server_name\": \"$ARGO_DOMAIN\", \"insecure\": false, \"utls\": { \"enabled\": true, \"fingerprint\": \"${FINGER_PRINT}\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$ARGO_DOMAIN\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
       [ "$ARGO_TYPE" = 'is_token_argo' ] && [ -z "$PROMPT" ] && local PROMPT="
   # $(text 94)"
     else
@@ -6777,16 +6900,17 @@ snell://${UUID[23]}@${SERVER_IP_1}:${PORT_SNELL}?version=6&mode=default&reuse=1#
       local TYPE_PORT_WS=$PORT_VMESS_WS &&
       local PROMPT+="
       # $(text 52)" &&
-      local OUTBOUND_REPLACE+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${VMESS_CDN_HOST}\", \"server_port\":${VMESS_CDN_PORT}, \"uuid\":\"${UUID[17]}\", \"security\": \"aes-128-gcm\", \"tls\": { \"enabled\": true, \"server_name\": \"$VMESS_HOST_DOMAIN\", \"insecure\": false, \"utls\": { \"enabled\": true, \"fingerprint\": \"${FINGER_PRINT}\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$VMESS_HOST_DOMAIN\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
+      SB_OUTBOUND_CHUNK[6]+=" { \"type\": \"vmess\", \"tag\": \"${NODE_NAME[17]} ${NODE_TAG[6]}\", \"server\":\"${VMESS_CDN_HOST}\", \"server_port\":${VMESS_CDN_PORT}, \"uuid\":\"${UUID[17]}\", \"security\": \"aes-128-gcm\", \"tls\": { \"enabled\": true, \"server_name\": \"$VMESS_HOST_DOMAIN\", \"insecure\": false, \"utls\": { \"enabled\": true, \"fingerprint\": \"${FINGER_PRINT}\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VMESS_WS_PATH\", \"headers\": { \"Host\": \"$VMESS_HOST_DOMAIN\" } }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
     fi
-    local NODE_REPLACE+="\"${NODE_NAME[17]} ${NODE_TAG[6]}\","
+    SB_NODE_CHUNK[6]="\"${NODE_NAME[17]} ${NODE_TAG[6]}\","
   fi
 
   if [ -n "$PORT_VLESS_WS" ]; then
     local VLESS_CDN_PORT=${CDN_PORT[18]:-443}
-    local VLESS_CDN_HOST=$(format_uri_host "${CDN[18]}")
-    if [ "$IS_ARGO" = 'is_argo' ]; then
-      local OUTBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[18]} ${NODE_TAG[7]}\", \"server\":\"${VLESS_CDN_HOST}\", \"server_port\":${VLESS_CDN_PORT}, \"uuid\": \"${UUID[18]}\", \"tls\": { \"enabled\":true, \"server_name\":\"$ARGO_DOMAIN\", \"insecure\": false, \"utls\": { \"enabled\":true, \"fingerprint\":\"${FINGER_PRINT}\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VLESS_WS_PATH\", \"headers\": { \"Host\": \"$ARGO_DOMAIN\" }, \"max_early_data\":2560, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
+    # 同上：sing-box JSON server 纯地址
+    local VLESS_CDN_HOST="${CDN[18]}"
+     if [ "$IS_ARGO" = 'is_argo' ]; then
+      SB_OUTBOUND_CHUNK[7]+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[18]} ${NODE_TAG[7]}\", \"server\":\"${VLESS_CDN_HOST}\", \"server_port\":${VLESS_CDN_PORT}, \"uuid\": \"${UUID[18]}\", \"tls\": { \"enabled\":true, \"server_name\":\"$ARGO_DOMAIN\", \"insecure\": false, \"utls\": { \"enabled\":true, \"fingerprint\":\"${FINGER_PRINT}\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VLESS_WS_PATH\", \"headers\": { \"Host\": \"$ARGO_DOMAIN\" }, \"max_early_data\":2560, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
       [ "$ARGO_TYPE" = 'is_token_argo' ] && [ -z "$PROMPT" ] && local PROMPT="
   # $(text 94)"
     else
@@ -6795,32 +6919,39 @@ snell://${UUID[23]}@${SERVER_IP_1}:${PORT_SNELL}?version=6&mode=default&reuse=1#
       local TYPE_PORT_WS=$PORT_VLESS_WS &&
       local PROMPT+="
       # $(text 52)" &&
-      local OUTBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[18]} ${NODE_TAG[7]}\", \"server\":\"${VLESS_CDN_HOST}\", \"server_port\":${VLESS_CDN_PORT}, \"uuid\": \"${UUID[18]}\",\"tls\": { \"enabled\":true, \"server_name\":\"$VLESS_HOST_DOMAIN\", \"insecure\": false, \"utls\": { \"enabled\":true, \"fingerprint\":\"${FINGER_PRINT}\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VLESS_WS_PATH\", \"headers\": { \"Host\": \"$VLESS_HOST_DOMAIN\" }, \"max_early_data\":2560, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
+      SB_OUTBOUND_CHUNK[7]+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[18]} ${NODE_TAG[7]}\", \"server\":\"${VLESS_CDN_HOST}\", \"server_port\":${VLESS_CDN_PORT}, \"uuid\": \"${UUID[18]}\",\"tls\": { \"enabled\":true, \"server_name\":\"$VLESS_HOST_DOMAIN\", \"insecure\": false, \"utls\": { \"enabled\":true, \"fingerprint\":\"${FINGER_PRINT}\" } }, \"transport\": { \"type\":\"ws\", \"path\":\"/$VLESS_WS_PATH\", \"headers\": { \"Host\": \"$VLESS_HOST_DOMAIN\" }, \"max_early_data\":2560, \"early_data_header_name\":\"Sec-WebSocket-Protocol\" }, \"multiplex\": { \"enabled\":true, \"protocol\":\"h2mux\", \"max_streams\":16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } },"
     fi
-    local NODE_REPLACE+="\"${NODE_NAME[18]} ${NODE_TAG[7]}\","
+    SB_NODE_CHUNK[7]="\"${NODE_NAME[18]} ${NODE_TAG[7]}\","
   fi
 
   [ -n "$PORT_H2_REALITY" ] &&
   local REALITY_H2_INBOUND=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[19]} ${NODE_TAG[8]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_H2_REALITY}, \"uuid\":\"${UUID[19]}\", \"tls\": { \"enabled\":true, \"server_name\":\"${TLS_SERVER}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"${FINGER_PRINT}\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[19]}\", \"short_id\":\"\" } }, \"transport\": { \"type\": \"http\" } }," &&
   local REALITY_H2_NODE="\"${NODE_NAME[19]} ${NODE_TAG[8]}\"" &&
-  local NODE_REPLACE+="${REALITY_H2_NODE}," &&
-  local OUTBOUND_REPLACE+=" ${REALITY_H2_INBOUND}"
+  SB_NODE_CHUNK[8]="${REALITY_H2_NODE}," &&
+  SB_OUTBOUND_CHUNK[8]="${REALITY_H2_INBOUND}"
 
   [ -n "$PORT_GRPC_REALITY" ] &&
-  local OUTBOUND_REPLACE+=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[20]} ${NODE_TAG[9]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_GRPC_REALITY}, \"uuid\":\"${UUID[20]}\", \"tls\": { \"enabled\":true, \"server_name\":\"${TLS_SERVER}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"${FINGER_PRINT}\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[20]}\", \"short_id\":\"\" } }, \"transport\": { \"type\": \"grpc\", \"service_name\": \"grpc\" } }," &&
-  local NODE_REPLACE+="\"${NODE_NAME[20]} ${NODE_TAG[9]}\","
+  SB_OUTBOUND_CHUNK[9]=" { \"type\": \"vless\", \"tag\": \"${NODE_NAME[20]} ${NODE_TAG[9]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_GRPC_REALITY}, \"uuid\":\"${UUID[20]}\", \"tls\": { \"enabled\":true, \"server_name\":\"${TLS_SERVER}\", \"utls\": { \"enabled\":true, \"fingerprint\":\"${FINGER_PRINT}\" }, \"reality\":{ \"enabled\":true, \"public_key\":\"${REALITY_PUBLIC[20]}\", \"short_id\":\"\" } }, \"transport\": { \"type\": \"grpc\", \"service_name\": \"grpc\" } }," &&
+  SB_NODE_CHUNK[9]="\"${NODE_NAME[20]} ${NODE_TAG[9]}\","
 
   [ -n "$PORT_ANYTLS" ] &&
-  local OUTBOUND_REPLACE+=" { \"type\": \"anytls\", \"tag\": \"${NODE_NAME[21]} ${NODE_TAG[10]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_ANYTLS}, \"password\": \"${UUID[21]}\", \"idle_session_check_interval\": \"30s\", \"idle_session_timeout\": \"30s\", \"min_idle_session\": 5, \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\": \"${TLS_SERVER}\", \"utls\": { \"enabled\": true, \"fingerprint\": \"${FINGER_PRINT}\" } } }," &&
-  local NODE_REPLACE+="\"${NODE_NAME[21]} ${NODE_TAG[10]}\","
+  SB_OUTBOUND_CHUNK[10]=" { \"type\": \"anytls\", \"tag\": \"${NODE_NAME[21]} ${NODE_TAG[10]}\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_ANYTLS}, \"password\": \"${UUID[21]}\", \"idle_session_check_interval\": \"30s\", \"idle_session_timeout\": \"30s\", \"min_idle_session\": 5, \"tls\": { \"enabled\": true, \"certificate_public_key_sha256\": [\"$SELF_SIGNED_FINGERPRINT_BASE64\"], \"server_name\": \"${TLS_SERVER}\", \"utls\": { \"enabled\": true, \"fingerprint\": \"${FINGER_PRINT}\" } } }," &&
+  SB_NODE_CHUNK[10]="\"${NODE_NAME[21]} ${NODE_TAG[10]}\","
 
   [ -n "$PORT_NAIVE" ] &&
-  local OUTBOUND_REPLACE+=" { \"type\": \"naive\", \"tag\": \"${NODE_NAME[22]} ${NODE_TAG[11]} http2\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_NAIVE}, \"username\": \"${UUID[22]}\", \"password\": \"${UUID[22]}\", \"udp_over_tcp\": true, \"quic\": false, \"tls\": { \"enabled\": true, \"certificate\": [$(tr -d '\n' <<< "$CERT200_JSON")], \"server_name\": \"${TLS_SERVER}\" } }, { \"type\": \"naive\", \"tag\": \"${NODE_NAME[22]} ${NODE_TAG[11]} quic\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_NAIVE}, \"username\": \"${UUID[22]}\", \"password\": \"${UUID[22]}\", \"udp_over_tcp\": false, \"quic\": true, \"quic_congestion_control\": \"bbr\", \"tls\": { \"enabled\": true, \"certificate\": [$(tr -d '\n' <<< "$CERT200_JSON")], \"server_name\": \"${TLS_SERVER}\" } }," &&
-  local NODE_REPLACE+="\"${NODE_NAME[22]} ${NODE_TAG[11]} http2\",\"${NODE_NAME[22]} ${NODE_TAG[11]} quic\","
+  SB_OUTBOUND_CHUNK[11]=" { \"type\": \"naive\", \"tag\": \"${NODE_NAME[22]} ${NODE_TAG[11]} http2\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_NAIVE}, \"username\": \"${UUID[22]}\", \"password\": \"${UUID[22]}\", \"udp_over_tcp\": true, \"quic\": false, \"tls\": { \"enabled\": true, \"certificate\": [$(tr -d '\n' <<< "$CERT200_JSON")], \"server_name\": \"${TLS_SERVER}\" } }, { \"type\": \"naive\", \"tag\": \"${NODE_NAME[22]} ${NODE_TAG[11]} quic\", \"server\": \"${SERVER_IP}\", \"server_port\": ${PORT_NAIVE}, \"username\": \"${UUID[22]}\", \"password\": \"${UUID[22]}\", \"udp_over_tcp\": false, \"quic\": true, \"quic_congestion_control\": \"bbr\", \"tls\": { \"enabled\": true, \"certificate\": [$(tr -d '\n' <<< "$CERT200_JSON")], \"server_name\": \"${TLS_SERVER}\" } }," &&
+  SB_NODE_CHUNK[11]="\"${NODE_NAME[22]} ${NODE_TAG[11]} http2\",\"${NODE_NAME[22]} ${NODE_TAG[11]} quic\","
 
   [ -n "$PORT_SNELL" ] &&
-  local OUTBOUND_REPLACE+=" { \"type\": \"snell\", \"tag\": \"${NODE_NAME[23]} ${NODE_TAG[12]}\", \"server\":\"${SERVER_IP}\", \"server_port\": ${PORT_SNELL}, \"version\": 6, \"psk\": \"${UUID[23]}\", \"mode\": \"default\", \"reuse\": true }," &&
-  local NODE_REPLACE+="\"${NODE_NAME[23]} ${NODE_TAG[12]}\","
+  SB_OUTBOUND_CHUNK[12]=" { \"type\": \"snell\", \"tag\": \"${NODE_NAME[23]} ${NODE_TAG[12]}\", \"server\":\"${SERVER_IP}\", \"server_port\": ${PORT_SNELL}, \"version\": 6, \"psk\": \"${UUID[23]}\", \"mode\": \"default\", \"reuse\": true }," &&
+  SB_NODE_CHUNK[12]="\"${NODE_NAME[23]} ${NODE_TAG[12]}\","
+
+  # 按真实监听端口顺序拼装 sing-box outbound 与节点列表，保持三格式同步移动
+  local OUTBOUND_REPLACE='' NODE_REPLACE='' sb_node_i
+  for sb_node_i in "${SB_NODE_ORDER[@]}"; do
+    OUTBOUND_REPLACE+="${SB_OUTBOUND_CHUNK[sb_node_i]}"
+    NODE_REPLACE+="${SB_NODE_CHUNK[sb_node_i]}"
+  done
 
   {
     # 生成 sing-box SFM SFA SFI 订阅文件
@@ -6877,6 +7008,10 @@ $(text 82) 2:
 $(${WORK_DIR}/qrencode "$QR_SUBSCRIBE_2")
 EOF
 
+  # list 展示与订阅文件共用同一份排序结果，避免二次切块排序
+  local LIST_V2RAYN="$SB_V2RAYN_SORTED" LIST_SHADOWROCKET="$SB_SHADOWROCKET_SORTED"
+  local LIST_CLASH="$SB_CLASH_SORTED" LIST_THRONE="$SB_THRONE_SORTED"
+
   # 生成配置文件
   EXPORT_LIST_FILE="*******************************************
 ┌────────────────┐
@@ -6884,7 +7019,7 @@ EOF
 │     $(warning "V2rayN")     │
 │                │
 └────────────────┘
-$(info "${V2RAYN_SUBSCRIBE}")
+$(info "${LIST_V2RAYN}")
 
 *******************************************
 ┌────────────────┐
@@ -6893,7 +7028,7 @@ $(info "${V2RAYN_SUBSCRIBE}")
 │                │
 └────────────────┘
 ----------------------------
-$(hint "${SHADOWROCKET_SUBSCRIBE}")
+$(hint "${LIST_SHADOWROCKET}")
 
 *******************************************
 ┌────────────────┐
@@ -6903,7 +7038,7 @@ $(hint "${SHADOWROCKET_SUBSCRIBE}")
 └────────────────┘
 ----------------------------
 
-$(info "$(sed '1d' <<< "${CLASH_SUBSCRIBE}")")
+$(info "${LIST_CLASH}")
 
 *******************************************
 ┌────────────────┐
@@ -6911,7 +7046,7 @@ $(info "$(sed '1d' <<< "${CLASH_SUBSCRIBE}")")
 │     $(warning "Throne")     │
 │                │
 └────────────────┘
-$(hint "${THRONE_SUBSCRIBE}")
+$(hint "${LIST_THRONE}")
 
 *******************************************
 ┌────────────────┐

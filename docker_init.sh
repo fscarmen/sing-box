@@ -139,7 +139,7 @@ install() {
   local SIP022_METHOD="2022-blake3-aes-128-gcm"
   local UUID=${UUID:-"$(${WORK_DIR}/sing-box generate uuid)"}
   local NODE_NAME=${NODE_NAME:-"sing-box"}
-  local CDN=${CDN:-"skk.moe"}
+  local CDN=${CDN:-"openai.com"}
 
   # 检测是否解锁 chatGPT，首先检查API访问
   local CHECK_RESULT1=$(wget --timeout=2 --tries=2 --retry-connrefused --waitretry=5 -qO- --content-on-error --header='authority: api.openai.com' --header='accept: */*' --header='accept-language: en-US,en;q=0.9' --header='authorization: Bearer null' --header='content-type: application/json' --header='origin: https://platform.openai.com' --header='referer: https://platform.openai.com/' --header='sec-ch-ua: "Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"' --header='sec-ch-ua-mobile: ?0' --header='sec-ch-ua-platform: "Windows"' --header='sec-fetch-dest: empty' --header='sec-fetch-mode: cors' --header='sec-fetch-site: same-site' --user-agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' 'https://api.openai.com/compliance/cookie_requirements')
